@@ -205,6 +205,7 @@ h3 { font-size: clamp(22px, 2vw, 30px); line-height: 1.2; }
 .foot-brand { display: flex; align-items: center; gap: 18px; }
 .foot-brand img { width: 56px; }
 .foot-name { font-family: var(--font-head); font-weight: 700; font-size: 15px; color: var(--mist); margin: 0 0 6px; }
+.foot-tag { font-family: var(--font-body); font-style: italic; font-size: 15px; color: var(--sage); margin: 0 0 6px; }
 .foot-meta { font-family: var(--font-head); font-size: 14px; margin: 0; }
 .foot-links { display: flex; flex-wrap: wrap; gap: 28px; font-family: var(--font-head); font-size: 15px; }
 .foot-links a { text-decoration: none; }
