@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title} | Sutura Works</title>
+  <meta name="description" content="${meta_description}">
+  <meta name="keywords" content="${keywords}">
+  <link rel="canonical" href="${canonical}">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${meta_description}">
+  <meta property="og:url" content="${canonical}">
+  <meta property="article:modified_time" content="${iso_date}">
+  <link rel="icon" href="${root}assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="${root}assets/favicon.png">
+  <link rel="stylesheet" href="${root}styles.css">
+</head>
+<body>
+${header}
+<main>
+  <section class="guide-hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow crumb"><a href="${root}guides/index.html">Guides</a> / How to</p>
+        <h1 class="guide-title">${title}</h1>
+        <p class="lead">${description}</p>
+      </div>
+      <aside class="control-box" aria-label="Guide details">
+        <div class="cb-head"><span>Guide control</span><span class="stamp">Current</span></div>
+        <dl>${control}</dl>
+      </aside>
+    </div>
+  </section>
+
+  <div class="wrap guide-layout">
+    <nav class="guide-toc" aria-label="Contents">
+      <p class="label">Contents</p>
+      <ol>${toc}</ol>
+    </nav>
+    <article class="guide-body">
+${body}
+      ${cta}
+      <p class="guide-disclaimer"><span class="label">Please note</span> ${disclaimer}</p>
+    </article>
+  </div>
+</main>
+${footer}
+</body>
+</html>
