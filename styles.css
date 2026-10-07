@@ -101,7 +101,19 @@ h3 { font-size: clamp(22px, 2vw, 30px); line-height: 1.2; }
 .diamond { position: absolute; width: 65%; aspect-ratio: 1; border: 2px solid var(--line-strong); transform: translate(-50%, -50%) rotate(45deg); }
 .d1 { left: 44%; top: 44%; }
 .d2 { left: 58%; top: 56%; }
-.panel-mark { position: absolute; left: 50%; top: 50%; width: 33%; transform: translate(-50%, -50%); }
+.panel-mark { position: absolute; left: 50%; top: 50%; width: 33%; aspect-ratio: 572 / 720; transform: translate(-50%, -50%); }
+.panel-mark .part { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* Hero mark: the diamonds settle, then the W, the S and the chevron rise into place */
+@keyframes rise { from { opacity: 0; transform: translateY(60%); } to { opacity: 1; transform: none; } }
+@keyframes settle { from { opacity: 0; } to { opacity: 1; } }
+.diamond { animation: settle .9s ease-out both; }
+.d2 { animation-delay: .15s; }
+.part { animation: rise .9s cubic-bezier(.2, .7, .2, 1) both; }
+.part-w { animation-delay: .35s; }
+.part-s { animation-delay: .65s; }
+.part-chevron { animation-delay: 1.05s; animation-duration: .8s; }
+@media (prefers-reduced-motion: reduce) { .diamond, .part { animation: none; } }
 .panel-caption { position: absolute; left: 28px; bottom: 16px; margin: 0; }
 
 /* Sections */
