@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title} | Sutura Works</title>
+  <meta name="description" content="${meta_description}">
+  <meta name="keywords" content="${keywords}">
+  <link rel="canonical" href="${canonical}">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${meta_description}">
+  <meta property="og:url" content="${canonical}">
+  <meta property="article:modified_time" content="${iso_date}">
+  <link rel="icon" href="${root}assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="${root}styles.css">
+</head>
+<body>
+${header}
+<main>
+  <section class="guide-hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="kicker"><a href="${root}guides/index.html">Guides</a> / How to</p>
+        <h1 class="guide-title">${title}</h1>
+        <p class="lede">${description}</p>
+      </div>
+      <aside class="control-box" aria-label="Guide details">
+        <div class="cb-head"><span>Guide control</span><span class="stamp">Current</span></div>
+        <dl>${control}</dl>
+      </aside>
+    </div>
+  </section>
+
+  <div class="wrap guide-layout">
+    <nav class="guide-toc" aria-label="Contents">
+      <p class="mono">Contents</p>
+      <ol>${toc}</ol>
+    </nav>
+    <article class="guide-body">
+${body}
+      ${cta}
+      <p class="guide-disclaimer"><span class="mono">Please note</span> ${disclaimer}</p>
+    </article>
+  </div>
+</main>
+${footer}
+</body>
+</html>
