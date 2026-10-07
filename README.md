@@ -7,7 +7,8 @@ Website for Sutura Works Limited.
 - `index.html`: the homepage
 - `styles.css`: all styling and brand colours (tokens at the top)
 - `thanks.html`: shown after someone sends the enquiry form
-- `assets/`: logo mark, full logo and favicon (SVG)
+- `assets/`: logo files and favicons (PNG)
+- `reference/`: the Canva design the site follows (not published)
 - `guides/`: one Markdown file per how-to guide
 - `templates/`: page layouts used for the guides
 - `build.py`: turns everything into the finished site in `_site/`
@@ -41,21 +42,24 @@ Something that will cause real problems if ignored.
 :::
 ```
 
-A line on its own like `[Button: Book a consultation]` becomes a button to the enquiry form.
-Guides without one get a standard "Talk to Sutura Works" box at the end.
+A line on its own like `[Button: Book a consultation]` becomes a button to the free 20 minute call booking page.
+Guides without one get a standard booking box at the end.
 
 To preview locally: `pip install -r requirements.txt`, then `python build.py`, then open `_site/index.html`.
 
 ## Brand
 
-| Token | Hex | Use |
-| --- | --- | --- |
-| Ink | `#0D2620` | Text and dark sections |
-| Paper | `#EDF0EA` | Page background |
-| Lime | `#C8F03C` | Accent fills only, never as text on paper |
-| Moss | `#1F4D3F` | Secondary green |
+The design follows `reference/website-page5.png` (page 5 of the Canva file "Geometric Logo for SUTURA WORKS").
+Colour tokens sit at the top of `styles.css`. Headings use Verdana and body text uses Georgia, both system fonts.
 
-Fonts (Google Fonts): Familjen Grotesk for headings, Newsreader for body text, IBM Plex Mono for labels.
+Logo files in `assets/`:
+
+- `mark-white.png`: the white SW mark, for dark backgrounds
+- `mark-dark.png`: the dark SW mark, for light backgrounds
+- `logo-full-dark.png` and `logo-full-light.png`: the full logo with wordmark, as supplied
+- `favicon.png` and `favicon-32.png`: made from the dark mark
+
+The marks are taller than they are wide (about 0.8 to 1). Never stretch them to square.
 
 ## Enquiry form
 

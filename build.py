@@ -23,6 +23,7 @@ OUT = ROOT / "_site"
 GUIDES_DIR = ROOT / "guides"
 TEMPLATES = ROOT / "templates"
 SITE_URL = "https://suturaworks.com"
+CALENDLY = "https://calendly.com/hadeezahmusa/free-20-minute-consultation"
 STATIC = ["index.html", "thanks.html", "styles.css", "assets", "CNAME"]
 HOME_GUIDE_COUNT = 3
 REQUIRED = ["title", "description", "slug", "last_updated"]
@@ -84,7 +85,7 @@ def render_body(body, root):
     )
     has_button = bool(BUTTON_RE.search(body))
     body = BUTTON_RE.sub(
-        lambda m: f'<p class="guide-btn"><a class="btn" href="{root}index.html#enquiry">{esc(m.group(1))}</a></p>',
+        lambda m: f'<p class="guide-btn"><a class="btn btn-primary" href="{CALENDLY}" target="_blank" rel="noopener">{esc(m.group(1))}</a></p>',
         body,
     )
 
@@ -111,10 +112,10 @@ def guide_card(g, href):
     meta = " &middot; ".join(m for m in meta if m)
     return (
         f'<li class="guide-card"><a href="{href}">'
-        f'<span class="mono">{meta}</span>'
+        f'<p class="label">{meta}</p>'
         f'<h3>{esc(g["title"])}</h3>'
         f'<p>{esc(g["description"])}</p>'
-        f'<span class="card-foot mono">Updated {nice_date(g["last_updated"])}</span>'
+        f'<p class="card-foot">Updated {nice_date(g["last_updated"])}</p>'
         f"</a></li>"
     )
 

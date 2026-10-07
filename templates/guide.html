@@ -12,10 +12,8 @@
   <meta property="og:description" content="${meta_description}">
   <meta property="og:url" content="${canonical}">
   <meta property="article:modified_time" content="${iso_date}">
-  <link rel="icon" href="${root}assets/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="icon" href="${root}assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="${root}assets/favicon.png">
   <link rel="stylesheet" href="${root}styles.css">
 </head>
 <body>
@@ -24,9 +22,9 @@ ${header}
   <section class="guide-hero">
     <div class="wrap hero-grid">
       <div>
-        <p class="kicker"><a href="${root}guides/index.html">Guides</a> / How to</p>
+        <p class="eyebrow crumb"><a href="${root}guides/index.html">Guides</a> / How to</p>
         <h1 class="guide-title">${title}</h1>
-        <p class="lede">${description}</p>
+        <p class="lead">${description}</p>
       </div>
       <aside class="control-box" aria-label="Guide details">
         <div class="cb-head"><span>Guide control</span><span class="stamp">Current</span></div>
@@ -37,13 +35,13 @@ ${header}
 
   <div class="wrap guide-layout">
     <nav class="guide-toc" aria-label="Contents">
-      <p class="mono">Contents</p>
+      <p class="label">Contents</p>
       <ol>${toc}</ol>
     </nav>
     <article class="guide-body">
 ${body}
       ${cta}
-      <p class="guide-disclaimer"><span class="mono">Please note</span> ${disclaimer}</p>
+      <p class="guide-disclaimer"><span class="label">Please note</span> ${disclaimer}</p>
     </article>
   </div>
 </main>
