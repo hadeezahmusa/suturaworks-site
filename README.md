@@ -12,6 +12,8 @@ Website for Sutura Works Limited.
 - `guides/`: one Markdown file per how-to guide
 - `templates/`: page layouts used for the guides
 - `build.py`: turns everything into the finished site in `_site/`
+- `research/`: the unlisted research survey page (see `docs/research-setup.md`)
+- `worker/`: the Cloudflare Worker and database schema that store survey responses
 
 ## Posting a new guide
 
