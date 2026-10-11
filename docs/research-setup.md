@@ -30,6 +30,10 @@ details, the 18 or older condition and the "15 to 25 minutes" time estimate.
 
 ## Deploying the Worker (needs Cloudflare access)
 
+Cloudflare account: a dedicated **Sutura Works** account (login info@suturaworks.com), separate from
+Hadeezah's other projects. Its workers.dev subdomain is `suturaworks`, so the Worker lives at
+`https://sutura-research.suturaworks.workers.dev`, which is already set in `research/config.js`.
+
 The session needs these in its environment:
 
 - `CLOUDFLARE_API_TOKEN` (secret): custom token with **Account / Workers Scripts / Edit**,
@@ -47,17 +51,17 @@ npx wrangler whoami                                   # confirms the token works
 npx wrangler d1 create sutura-research --location=weur   # Western Europe is the closest location to Nigeria
 # copy the database_id it prints into wrangler.toml
 npx wrangler d1 execute sutura-research --remote --file=schema.sql
-npx wrangler deploy                                   # prints https://sutura-research.<subdomain>.workers.dev
+npx wrangler deploy                                   # prints https://sutura-research.suturaworks.workers.dev
 ```
 
 After deploying:
 
-1. Put `https://sutura-research.<subdomain>.workers.dev/api/submit` into `research/config.js`.
+1. Confirm the deploy printed `https://sutura-research.suturaworks.workers.dev`, the address already in `research/config.js`.
 2. **Export key.** Hadeezah adds a secret named `EXPORT_KEY` herself in the Cloudflare dashboard
    (Workers & Pages > sutura-research > Settings > Variables and Secrets > Add, type Secret),
    using a long random value she keeps private. Her download links are then:
-   - `https://sutura-research.<subdomain>.workers.dev/api/export/responses.csv?key=<EXPORT_KEY>`
-   - `https://sutura-research.<subdomain>.workers.dev/api/export/contacts.csv?key=<EXPORT_KEY>`
+   - `https://sutura-research.suturaworks.workers.dev/api/export/responses.csv?key=<EXPORT_KEY>`
+   - `https://sutura-research.suturaworks.workers.dev/api/export/contacts.csv?key=<EXPORT_KEY>`
    Do not generate or display the key in chat.
 3. Test from the live page: submit one response, download both CSVs, then delete the test rows:
    `npx wrangler d1 execute sutura-research --remote --command "DELETE FROM contacts WHERE ref='SW-...'; DELETE FROM responses WHERE ref='SW-...'"`.

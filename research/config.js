@@ -1,3 +1,3 @@
 // Address of the Cloudflare Worker that stores responses.
-// Filled in after the Worker is deployed (see docs/research-setup.md).
-export const ENDPOINT = "https://REPLACE-AFTER-DEPLOY.workers.dev/api/submit";
+// Worker "sutura-research" on the Sutura Works Cloudflare account (subdomain: suturaworks).
+export const ENDPOINT = "https://sutura-research.suturaworks.workers.dev/api/submit";
