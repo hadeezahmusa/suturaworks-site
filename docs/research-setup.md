@@ -34,12 +34,29 @@ Cloudflare account: a dedicated **Sutura Works** account (login info@suturaworks
 Hadeezah's other projects. Its workers.dev subdomain is `suturaworks`, so the Worker lives at
 `https://sutura-research.suturaworks.workers.dev`, which is already set in `research/config.js`.
 
-The session needs these in its environment:
+How the token reaches the session (two possible setups):
 
-- `CLOUDFLARE_API_TOKEN` (secret): custom token with **Account / Workers Scripts / Edit**,
-  **Account / D1 / Edit** and **Account / Account Settings / Read**, limited to her account.
-- `CLOUDFLARE_ACCOUNT_ID`
-- Network access to `api.cloudflare.com`.
+- **Network secret (Pro and Max plans).** The token is stored as a network secret on the
+  environment with allowed website `api.cloudflare.com`. The agent proxy adds
+  `Authorization: Bearer <token>` to requests for that host, so the token is never visible in
+  the session and `api.cloudflare.com` is reachable without an allowed-domains entry.
+  `CLOUDFLARE_ACCOUNT_ID` is a plain environment variable. First check the proxy works:
+  `curl -sS https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database`
+  should return `"success": true`. Wrangler insists on a token variable, so try
+  `CLOUDFLARE_API_TOKEN=placeholder npx wrangler whoami`. If the proxy does not override the
+  placeholder header, skip wrangler for remote calls and use the REST API with curl instead:
+  create the database with `POST /accounts/{id}/d1/database`, run `schema.sql` with
+  `POST /accounts/{id}/d1/database/{db}/query`, bundle with
+  `npx wrangler deploy --dry-run --outdir dist`, then upload `dist/index.js` with
+  `PUT /accounts/{id}/workers/scripts/sutura-research` (multipart, `main_module` metadata with
+  the D1 binding and the vars from wrangler.toml), and enable workers.dev with
+  `POST /accounts/{id}/workers/scripts/sutura-research/subdomain` `{"enabled":true}`.
+- **Environment variables (no Network secrets section).** `CLOUDFLARE_API_TOKEN` and
+  `CLOUDFLARE_ACCOUNT_ID` are environment variables and `api.cloudflare.com` is listed under
+  Custom network access, allowed domains. Wrangler then works as below.
+
+The token is a custom token with **Account / Workers Scripts / Edit**, **Account / D1 / Edit**
+and **Account / Account Settings / Read**, limited to the Sutura Works account.
 
 Then:
 
