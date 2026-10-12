@@ -84,6 +84,19 @@ After deploying:
    `npx wrangler d1 execute sutura-research --remote --command "DELETE FROM contacts WHERE ref='SW-...'; DELETE FROM responses WHERE ref='SW-...'"`.
 4. Build, commit, open a pull request and merge to publish.
 
+## Private dashboard
+
+`suturaworks.com/research/dashboard/` shows live counts: responses per day, who responded,
+how many left contact details, the 10 latest references and a breakdown of every
+multiple-choice question. It also has buttons to download both CSVs.
+
+- It asks for the `EXPORT_KEY`. The key is sent to the Worker in a header, so it never appears
+  in a link or in browser history. "Remember on this device" keeps it in that browser only;
+  "Lock" forgets it.
+- The page itself holds no data. The Worker's `/api/stats` route returns counts only: no
+  written answers, names or emails.
+- Like the survey it is `noindex`, not in the sitemap and not linked from anywhere.
+
 ## Email notifications to socials@suturaworks.com (optional, later)
 
 The Worker emails `NOTIFY_TO` through Resend when a `RESEND_API_KEY` secret exists. The email

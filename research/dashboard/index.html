@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Research Responses | Sutura Works</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" href="../../assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="stylesheet" href="../../styles.css">
+  <link rel="stylesheet" href="../research.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+<header class="site-head">
+  <div class="wrap head-row">
+    <a class="brand" href="../../index.html">
+      <img class="brand-mark" src="../../assets/mark-white-sm.png" alt="Sutura Works" width="42" height="53">
+      <span>SUTURA WORKS LIMITED</span>
+    </a>
+    <div class="dash-actions" id="actions" hidden>
+      <button class="btn btn-secondary" id="refresh" type="button">Refresh</button>
+      <button class="text-btn dash-signout" id="signout" type="button">Lock</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="dash-hero">
+    <div class="wrap">
+      <p class="eyebrow">Research / Private</p>
+      <h1 class="dash-title">Survey responses</h1>
+      <p class="dash-updated" id="updated" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="dash-body">
+    <div class="wrap" id="app">
+      <form class="survey-card dash-lock" id="lock">
+        <h2>Enter your export key</h2>
+        <p>This is the same key you saved for the CSV downloads. It is checked by the server and never stored on the website.</p>
+        <div class="question">
+          <label class="q-label" for="key">Export key</label>
+          <input class="q-input" id="key" type="password" autocomplete="current-password" spellcheck="false" required>
+        </div>
+        <label class="check dash-remember"><input type="checkbox" id="remember"> <span>Remember on this device</span></label>
+        <p class="field-error" id="lock-error" hidden></p>
+        <div class="nav-row">
+          <button class="btn btn-primary" type="submit">Open dashboard</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<div class="dash-tip" id="tip" role="tooltip" hidden></div>
+
+<script type="module" src="dashboard.js"></script>
+</body>
+</html>

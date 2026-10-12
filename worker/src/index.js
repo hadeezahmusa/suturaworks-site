@@ -4,8 +4,12 @@
 //   POST /api/submit                     store one response (called by the survey page)
 //   GET  /api/export/responses.csv?key=  download answers (no contact details)
 //   GET  /api/export/contacts.csv?key=   download contact details (no answers)
+//   GET  /api/stats                      counts for the private dashboard
+//
+// The export and stats routes need EXPORT_KEY, either as ?key= or as an
+// "Authorization: Bearer <key>" header (the dashboard uses the header).
 
-import { ROLE, allQuestions, CONTACT_FIELDS } from "../../research/questions.js";
+import { ROLE, allQuestions, CONTACT_FIELDS, ROLE_SECTION, BRANCHES, CLOSING_SECTION } from "../../research/questions.js";
 
 const QUESTIONS = allQuestions();
 const KNOWN = new Map(QUESTIONS.map((q) => [q.id, q]));
@@ -23,8 +27,13 @@ export default {
         if (request.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
         return cors(request, env, await submit(request, env, ctx));
       }
-      if (request.method === "GET" && url.pathname === "/api/export/responses.csv") return exportResponses(url, env);
-      if (request.method === "GET" && url.pathname === "/api/export/contacts.csv") return exportContacts(url, env);
+      const route = PRIVATE_ROUTES[url.pathname];
+      if (route) {
+        if (request.method === "OPTIONS") return cors(request, env, new Response(null, { status: 204 }));
+        if (request.method !== "GET") return json({ ok: false, error: "Method not allowed" }, 405);
+        if (!authorised(request, url, env)) return cors(request, env, new Response("Not found", { status: 404 }));
+        return cors(request, env, await route(env));
+      }
       return new Response("Not found", { status: 404 });
     } catch (err) {
       console.error(err);
@@ -122,8 +131,15 @@ async function notify(env, ref, role, hasContact) {
 
 // ---------- export ----------
 
-function authorised(url, env) {
-  const key = url.searchParams.get("key") || "";
+const PRIVATE_ROUTES = {
+  "/api/export/responses.csv": exportResponses,
+  "/api/export/contacts.csv": exportContacts,
+  "/api/stats": stats,
+};
+
+function authorised(request, url, env) {
+  const bearer = (request.headers.get("Authorization") || "").match(/^Bearer\s+(.+)$/);
+  const key = bearer ? bearer[1].trim() : url.searchParams.get("key") || "";
   const expected = env.EXPORT_KEY || "";
   if (!expected || key.length !== expected.length) return false;
   let diff = 0;
@@ -131,8 +147,7 @@ function authorised(url, env) {
   return diff === 0;
 }
 
-async function exportResponses(url, env) {
-  if (!authorised(url, env)) return new Response("Not found", { status: 404 });
+async function exportResponses(env) {
   const { results } = await env.DB.prepare("SELECT ref, created_at, answers FROM responses ORDER BY created_at").all();
   const columns = [];
   for (const q of QUESTIONS) {
@@ -147,8 +162,7 @@ async function exportResponses(url, env) {
   return csv(rows, "research-responses.csv");
 }
 
-async function exportContacts(url, env) {
-  if (!authorised(url, env)) return new Response("Not found", { status: 404 });
+async function exportContacts(env) {
   const { results } = await env.DB.prepare(
     "SELECT ref, created_at, name, email, location, wants_results, wants_interview FROM contacts ORDER BY created_at",
   ).all();
@@ -157,6 +171,58 @@ async function exportContacts(url, env) {
     rows.push([r.ref, r.created_at, r.name, r.email, r.location || "", r.wants_results ? "Yes" : "No", r.wants_interview ? "Yes" : "No"]);
   }
   return csv(rows, "research-contacts.csv");
+}
+
+// ---------- dashboard stats ----------
+
+const SECTIONS = [ROLE_SECTION, ...Object.values(BRANCHES), CLOSING_SECTION];
+const ROLE_SHORT = { owner: "Business owners", lawyer: "Lawyers", agent: "CAC agents", consultant: "Consultants", otherPro: "Other professionals", other: "Other" };
+const lagosDay = (iso) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" }); // YYYY-MM-DD
+
+// Counts only: no free-text answers and no contact details leave the database here.
+async function stats(env) {
+  const [{ results: rows }, contactRow] = await Promise.all([
+    env.DB.prepare("SELECT ref, created_at, role, answers FROM responses ORDER BY created_at").all(),
+    env.DB.prepare("SELECT count(*) AS total, coalesce(sum(wants_results), 0) AS results, coalesce(sum(wants_interview), 0) AS interview FROM contacts").first(),
+  ]);
+  const answers = rows.map((r) => JSON.parse(r.answers));
+
+  const roles = Object.entries(ROLE).map(([k, label]) => ({ label: ROLE_SHORT[k], count: rows.filter((r) => r.role === label).length }));
+
+  const perDay = new Map();
+  for (const r of rows) { const d = lagosDay(r.created_at); perDay.set(d, (perDay.get(d) || 0) + 1); }
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = lagosDay(new Date(Date.now() - i * 86400000).toISOString());
+    days.push({ date: d, count: perDay.get(d) || 0 });
+  }
+
+  const sections = SECTIONS.map((s) => ({
+    title: s.title,
+    questions: s.questions.map((q) => {
+      const given = answers.filter((a) => (Array.isArray(a[q.id]) ? a[q.id].length : a[q.id]));
+      const out = { id: q.id, label: q.label, type: q.type, answered: given.length };
+      if (q.options) {
+        out.max = q.max || null;
+        out.options = q.options.map((o) => ({ label: o, count: given.filter((a) => (Array.isArray(a[q.id]) ? a[q.id].includes(o) : a[q.id] === o)).length }));
+      }
+      return out;
+    }),
+  }));
+
+  const today = lagosDay(new Date().toISOString());
+  return new Response(JSON.stringify({
+    ok: true,
+    total: rows.length,
+    today: perDay.get(today) || 0,
+    last7: days.slice(-7).reduce((n, d) => n + d.count, 0),
+    lastAt: rows.length ? rows[rows.length - 1].created_at : null,
+    roles,
+    days,
+    contacts: contactRow,
+    recent: rows.slice(-10).reverse().map((r) => ({ ref: r.ref, at: r.created_at, role: ROLE_SHORT[Object.keys(ROLE).find((k) => ROLE[k] === r.role)] || r.role })),
+    sections,
+  }), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
 }
 
 // Quote every cell, and stop spreadsheet apps treating text as a formula.
@@ -190,8 +256,9 @@ function cors(request, env, response) {
   const origin = request.headers.get("Origin");
   if (origin && allowedOrigins(env).includes(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin);
-    response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+    response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    response.headers.set("Access-Control-Expose-Headers", "Content-Disposition");
     response.headers.set("Access-Control-Max-Age", "86400");
     response.headers.set("Vary", "Origin");
   }
