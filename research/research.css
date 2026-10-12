@@ -50,6 +50,8 @@ textarea.q-input { border: 2px solid var(--ink); min-height: 140px; resize: vert
 .choice input { margin: 4px 0 0; width: 18px; height: 18px; flex: none; accent-color: var(--ink); }
 .choice:has(input:checked) { border-color: var(--ink); background: rgba(255, 255, 255, .5); }
 .choice:has(input:focus-visible) { outline: 2px solid var(--sage-deep); outline-offset: 2px; }
+.choice:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+.choice:has(input:disabled):hover { border-color: rgba(18, 36, 31, .25); }
 
 .has-error .q-label { color: #8A1F11; }
 .field-error { color: #8A1F11; font-family: var(--font-head); font-size: 14px; margin: 10px 0 0; }
