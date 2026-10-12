@@ -28,6 +28,27 @@ Changes agreed with Hadeezah to the original questionnaire:
 Points Hadeezah should confirm before launch: the 12 month retention period for contact
 details, the 18 or older condition and the "15 to 25 minutes" time estimate.
 
+## Status on 12 October 2026
+
+- Survey page, questions, Worker code and database schema are built and tested locally
+  (all four role paths, validation, separate contact table, spam and formula guards).
+  Everything is on the branch `claude/github-integration-overview-9al5ao`, not yet on `main`.
+- Cloudflare: the Sutura Works account exists (login info@suturaworks.com), workers.dev
+  subdomain `suturaworks` is set, and a custom API token "Sutura research" exists with the
+  three permissions below, limited to that account. Nothing is deployed yet: no database,
+  no Worker.
+- The environment is named **Sutura** and has `CLOUDFLARE_ACCOUNT_ID` set.
+- **The network secret route did not work.** With the token stored as a network secret for
+  `api.cloudflare.com`, every request (with or without our own Authorization header) got
+  `6111 Invalid format for Authorization header`, including after the session reloaded.
+  Recommended next step: delete the network secret, roll the token in Cloudflare, put it in
+  the environment variables as `CLOUDFLARE_API_TOKEN`, set network access to Custom with
+  `api.cloudflare.com` allowed, start a new session and follow the wrangler steps below.
+  After the survey is live, roll the token again.
+- A **Cloudflare Developer Platform connector** has since appeared in Claude. It can create
+  and query D1 databases but has no tool to deploy a Worker, so wrangler (or the REST API)
+  is still needed for `wrangler deploy`.
+
 ## Deploying the Worker (needs Cloudflare access)
 
 Cloudflare account: a dedicated **Sutura Works** account (login info@suturaworks.com), separate from
