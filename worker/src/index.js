@@ -78,9 +78,9 @@ function cleanAnswers(input) {
     if (!q) continue;
     if (Array.isArray(value)) {
       const list = value.filter((v) => typeof v === "string").map((v) => v.slice(0, 300));
-      if (q.options) out[key] = list.filter((v) => q.options.includes(v));
+      if (q.options) out[key] = list.filter((v) => q.options.includes(v)).slice(0, q.max || undefined);
     } else if (typeof value === "string" && value.trim()) {
-      if (q.type === "single" && key === q.id && !q.options.includes(value)) continue;
+      if (key === q.id && (q.type === "multi" || (q.type === "single" && !q.options.includes(value)))) continue;
       out[key] = value.trim().slice(0, MAX_TEXT);
     }
   }
@@ -94,7 +94,8 @@ function cleanContact(c) {
   if (!wants_results && !wants_interview) return null;
   const name = String(c.name || "").trim().slice(0, 120);
   const email = String(c.email || "").trim().slice(0, 200);
-  if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  // email is needed for either option; a name only for an interview
+  if ((wants_interview && !name) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
   return { name, email, location: String(c.location || "").trim().slice(0, 120), wants_results, wants_interview };
 }
 

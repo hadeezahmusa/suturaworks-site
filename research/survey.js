@@ -93,7 +93,8 @@ function questionHTML(q) {
     const kind = q.type === "single" ? "radio" : "checkbox";
     field = `<div class="choices">${q.options.map((o) => {
       const on = q.type === "single" ? v === o : Array.isArray(v) && v.includes(o);
-      return `<label class="choice"><input type="${kind}" name="${q.id}" value="${esc(o)}" ${on ? "checked" : ""}> <span>${esc(o)}</span></label>`;
+      const full = q.max && Array.isArray(v) && v.length >= q.max && !on;
+      return `<label class="choice"><input type="${kind}" name="${q.id}" value="${esc(o)}" ${on ? "checked" : ""} ${full ? "disabled" : ""}> <span>${esc(o)}</span></label>`;
     }).join("")}</div>`;
     if (q.other) {
       const picked = q.type === "single" ? v === "Other." : Array.isArray(v) && v.includes("Other.");
@@ -118,6 +119,9 @@ function sectionHTML(section) {
     </div>`;
 }
 
+// Email is needed for either option; a name only for an interview
+const nameTag = (c) => (c.wants_interview ? '<span class="req">Required</span>' : '<span class="opt">Optional</span>');
+
 function contactHTML() {
   const c = state.contact;
   const any = c.wants_results || c.wants_interview;
@@ -132,7 +136,7 @@ function contactHTML() {
       </div>
     </fieldset>
     <div class="contact-fields" ${any ? "" : "hidden"}>
-      <div class="question"><label class="q-label" for="c-name">Your name <span class="req">Required</span></label><input class="q-input" id="c-name" name="name" type="text" autocomplete="name" maxlength="120" value="${esc(c.name || "")}"><p class="field-error" hidden>Please enter your name.</p></div>
+      <div class="question"><label class="q-label" for="c-name">Your name ${nameTag(c)}</label><input class="q-input" id="c-name" name="name" type="text" autocomplete="name" maxlength="120" value="${esc(c.name || "")}"><p class="field-error" hidden>Please enter your name.</p></div>
       <div class="question"><label class="q-label" for="c-email">Email address <span class="req">Required</span></label><input class="q-input" id="c-email" name="email" type="email" autocomplete="email" maxlength="200" value="${esc(c.email || "")}"><p class="field-error" hidden>Please enter a valid email address.</p></div>
       <div class="question"><label class="q-label" for="c-location">Location <span class="opt">Optional</span></label><p class="q-help">City and state.</p><input class="q-input" id="c-location" name="location" type="text" maxlength="120" value="${esc(c.location || "")}"></div>
     </div>
@@ -157,6 +161,10 @@ function bind(current) {
       if (el.type === "checkbox") state.contact[el.name] = el.checked;
       else if (el.name !== "website") state.contact[el.name] = el.value;
       app.querySelector(".contact-fields").hidden = !(state.contact.wants_results || state.contact.wants_interview);
+      if (el.type === "checkbox") {
+        app.querySelector('label[for="c-name"]').innerHTML = `Your name ${nameTag(state.contact)}`;
+        if (!state.contact.wants_interview) app.querySelector("#c-name").parentElement.querySelector(".field-error").hidden = true;
+      }
       save();
     }));
     return;
@@ -166,6 +174,12 @@ function bind(current) {
     if (el.type === "radio") state.answers[name] = el.value;
     else if (el.type === "checkbox") {
       state.answers[name] = [...app.querySelectorAll(`input[name="${name}"]:checked`)].map((x) => x.value);
+      // once the maximum is picked, the rest are disabled until one is unticked
+      const q = current.questions.find((x) => x.id === name);
+      if (q && q.max) {
+        const full = state.answers[name].length >= q.max;
+        app.querySelectorAll(`input[name="${name}"]`).forEach((x) => { x.disabled = full && !x.checked; });
+      }
     } else state.answers[name] = el.value;
     save();
     if (el.type !== "radio" && el.type !== "checkbox") return;
@@ -193,7 +207,7 @@ function validateSection(section) {
     const box = app.querySelector(`[data-q="${q.id}"]`);
     const v = state.answers[q.id];
     let ok = true;
-    if (q.required) ok = Array.isArray(v) ? v.length > 0 : Boolean(v && String(v).trim());
+    if (q.required) ok = q.type === "multi" ? Array.isArray(v) && v.length > 0 : Boolean(v && String(v).trim());
     box.querySelector(".field-error").hidden = ok;
     box.classList.toggle("has-error", !ok);
     if (!ok && !firstBad) firstBad = box;
@@ -208,7 +222,7 @@ function validateContact() {
   let ok = true;
   const nameBox = app.querySelector("#c-name").parentElement;
   const emailBox = app.querySelector("#c-email").parentElement;
-  const nameOk = Boolean(c.name && c.name.trim());
+  const nameOk = !c.wants_interview || Boolean(c.name && c.name.trim());
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email || "");
   nameBox.querySelector(".field-error").hidden = nameOk;
   emailBox.querySelector(".field-error").hidden = emailOk;
@@ -260,7 +274,7 @@ async function submit() {
   const payload = {
     consent: state.consent,
     answers: visibleAnswers(),
-    contact: wantsContact ? { name: c.name.trim(), email: c.email.trim(), location: (c.location || "").trim(), wants_results: Boolean(c.wants_results), wants_interview: Boolean(c.wants_interview) } : null,
+    contact: wantsContact ? { name: (c.name || "").trim(), email: c.email.trim(), location: (c.location || "").trim(), wants_results: Boolean(c.wants_results), wants_interview: Boolean(c.wants_interview) } : null,
     website: app.querySelector('input[name="website"]').value,
     seconds: Math.round((Date.now() - state.startedAt) / 1000),
   };
