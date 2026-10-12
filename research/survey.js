@@ -55,6 +55,13 @@ function render() {
   if (h && state.step > 0) { h.setAttribute("tabindex", "-1"); h.focus({ preventScroll: true }); }
 }
 
+// Bring the top of the form into view, just below the sticky site header
+function toForm() {
+  const head = document.querySelector(".site-head");
+  const top = app.getBoundingClientRect().top + window.scrollY - (head ? head.offsetHeight : 0) - 16;
+  window.scrollTo(0, Math.max(0, top));
+}
+
 function introHTML() {
   const resume = Object.keys(state.answers).length > 0;
   return `
@@ -214,12 +221,12 @@ function act(what, current) {
     state = { step: 0, answers: {}, contact: {}, consent: false, startedAt: Date.now() };
     save(); render(); return;
   }
-  if (what === "back") { state.step = Math.max(0, state.step - 1); save(); render(); window.scrollTo(0, 0); return; }
+  if (what === "back") { state.step = Math.max(0, state.step - 1); save(); render(); toForm(); return; }
   if (what === "next") {
     if (current === "intro") {
       if (!state.consent) { app.querySelector("#consent-error").hidden = false; return; }
     } else if (!validateSection(current)) return;
-    state.step += 1; save(); render(); window.scrollTo(0, 0); return;
+    state.step += 1; save(); render(); toForm(); return;
   }
   if (what === "submit") submit();
 }
@@ -269,7 +276,7 @@ async function submit() {
       <p class="lead narrow">Your experience will help us understand how to make the Nigerian business journey easier to navigate.</p>
       <p>Your reference number is <strong class="ref">${esc(data.ref)}</strong>. Quote it if you ever want us to correct or delete your response.</p>
       <p><a class="text-link" href="../index.html">Visit Sutura Works</a></p>`;
-    window.scrollTo(0, 0);
+    toForm();
   } catch (e) {
     btn.disabled = false;
     btn.textContent = "Submit my response";
