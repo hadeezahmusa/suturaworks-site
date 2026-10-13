@@ -25,6 +25,16 @@ Changes agreed with Hadeezah to the original questionnaire:
 5. One contact step at the end: "send me the findings" and "open to an interview", then name,
    email and location.
 
+Changes made after launch (October 2026, with 14 responses already in):
+
+- The lawyer and "another professional role" options on the first question were reworded on
+  screen only, through the `labels` map in `questions.js`. Stored values and the CSV still use
+  the original wording, so old and new responses match.
+- "How did you hear about this survey?" (optional) opens the closing section. It is stored with
+  the answers and appears as the last two columns of `responses.csv` (`csvLast`).
+- The thank you screen has a WhatsApp share button and a copy link button. Nothing is stored.
+- Answers are JSON, so none of this needed a database migration.
+
 Points Hadeezah should confirm before launch: the 12 month retention period for contact
 details, the 18 or older condition and the "15 to 25 minutes" time estimate.
 

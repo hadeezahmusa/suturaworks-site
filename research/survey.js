@@ -94,7 +94,7 @@ function questionHTML(q) {
     field = `<div class="choices">${q.options.map((o) => {
       const on = q.type === "single" ? v === o : Array.isArray(v) && v.includes(o);
       const full = q.max && Array.isArray(v) && v.length >= q.max && !on;
-      return `<label class="choice"><input type="${kind}" name="${q.id}" value="${esc(o)}" ${on ? "checked" : ""} ${full ? "disabled" : ""}> <span>${esc(o)}</span></label>`;
+      return `<label class="choice"><input type="${kind}" name="${q.id}" value="${esc(o)}" ${on ? "checked" : ""} ${full ? "disabled" : ""}> <span>${esc((q.labels && q.labels[o]) || o)}</span></label>`;
     }).join("")}</div>`;
     if (q.other) {
       const picked = q.type === "single" ? v === "Other." : Array.isArray(v) && v.includes("Other.");
@@ -289,7 +289,16 @@ async function submit() {
       <h2>Thank you.</h2>
       <p class="lead narrow">Your experience will help us understand how to make the Nigerian business journey easier to navigate.</p>
       <p>Your reference number is <strong class="ref">${esc(data.ref)}</strong>. Quote it if you ever want us to correct or delete your response.</p>
+      <div class="share-box">
+        <p class="share-title">Know a founder who has been through this? Send them the survey.</p>
+        <div class="share-row">
+          <a class="btn btn-primary" href="https://wa.me/?text=${encodeURIComponent(SHARE_TEXT)}" target="_blank" rel="noopener">Share on WhatsApp</a>
+          <button class="btn btn-secondary" type="button" id="copy-link">Copy link</button>
+        </div>
+        <p class="share-status" id="copy-status" aria-live="polite"></p>
+      </div>
       <p><a class="text-link" href="../index.html">Visit Sutura Works</a></p>`;
+    app.querySelector("#copy-link").addEventListener("click", copyLink);
     toForm();
   } catch (e) {
     btn.disabled = false;
@@ -297,6 +306,28 @@ async function submit() {
     err.textContent = "Something went wrong and your response was not sent. Your answers are still saved on this device, so please try again in a moment. If it keeps happening, email socials@suturaworks.com.";
     err.hidden = false;
   }
+}
+
+// ---------- share prompt on the thank you screen (nothing is stored) ----------
+const SHARE_LINK = "https://suturaworks.com/research/";
+const SHARE_TEXT = `I just filled this survey on what founders find out after registering a business in Nigeria. You might want to add your experience: ${SHARE_LINK}`;
+
+async function copyLink() {
+  const status = app.querySelector("#copy-status");
+  try {
+    await navigator.clipboard.writeText(SHARE_LINK);
+  } catch {
+    const t = Object.assign(document.createElement("textarea"), { value: SHARE_LINK });
+    t.setAttribute("readonly", "");
+    t.style.position = "fixed";
+    t.style.opacity = "0";
+    document.body.append(t);
+    t.select();
+    const ok = document.execCommand("copy");
+    t.remove();
+    if (!ok) { status.textContent = `Copy this link: ${SHARE_LINK}`; return; }
+  }
+  status.textContent = "Link copied.";
 }
 
 render();
