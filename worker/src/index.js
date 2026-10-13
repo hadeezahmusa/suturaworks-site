@@ -150,7 +150,8 @@ function authorised(request, url, env) {
 async function exportResponses(env) {
   const { results } = await env.DB.prepare("SELECT ref, created_at, answers FROM responses ORDER BY created_at").all();
   const columns = [];
-  for (const q of QUESTIONS) {
+  // questions added after launch (csvLast) go at the end so the original columns keep their positions
+  for (const q of [...QUESTIONS.filter((x) => !x.csvLast), ...QUESTIONS.filter((x) => x.csvLast)]) {
     columns.push({ key: q.id, title: q.label });
     if (q.other) columns.push({ key: `${q.id}_other`, title: `${q.label} (Other, please specify)` });
   }
@@ -204,7 +205,7 @@ async function stats(env) {
       const out = { id: q.id, label: q.label, type: q.type, answered: given.length };
       if (q.options) {
         out.max = q.max || null;
-        out.options = q.options.map((o) => ({ label: o, count: given.filter((a) => (Array.isArray(a[q.id]) ? a[q.id].includes(o) : a[q.id] === o)).length }));
+        out.options = q.options.map((o) => ({ label: (q.labels && q.labels[o]) || o, count: given.filter((a) => (Array.isArray(a[q.id]) ? a[q.id].includes(o) : a[q.id] === o)).length }));
       }
       return out;
     }),

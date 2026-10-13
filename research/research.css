@@ -67,4 +67,9 @@ textarea.q-input { border: 2px solid var(--ink); min-height: 140px; resize: vert
 .survey-card .btn-primary:hover { background: var(--logo-ink); }
 .survey-card .btn-secondary { background: transparent; color: var(--ink); border-color: var(--ink); }
 .survey-card .btn[disabled] { opacity: .6; cursor: wait; }
+.share-box { border: 2px solid var(--ink); padding: 22px 24px; margin: 32px 0; }
+.share-title { font-family: var(--font-head); font-size: 17px; font-weight: 700; margin: 0 0 16px; }
+.share-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.survey-card .share-row .btn { text-decoration: none; }
+.share-status { font-family: var(--font-head); font-size: 14px; margin: 12px 0 0; min-height: 1.4em; }
 .text-btn { background: none; border: 0; padding: 0; font-family: var(--font-head); font-size: 15px; color: var(--ink); text-decoration: underline; cursor: pointer; }

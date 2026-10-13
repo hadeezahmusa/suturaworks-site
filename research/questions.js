@@ -7,7 +7,9 @@
 //   type      single | multi | short | long
 //   label     the question
 //   help      optional hint under the question
-//   options   for single and multi
+//   options   for single and multi; this text is what gets stored, so never edit it once responses exist
+//   labels    optional { option: display text } to reword an option on screen without changing what is stored
+//   csvLast   true puts the question's columns at the end of responses.csv, after the original ones
 //   other     true adds a text box when "Other" is chosen
 //   required  true if an answer is needed when the question is shown
 //   showIf    { q: <id>, in: [values] } shows the question only for those answers
@@ -46,6 +48,11 @@ export const ROLE_SECTION = {
       type: "single",
       label: "Which of the following best describes you?",
       options: Object.values(ROLE),
+      // reworded after launch to route lawyers correctly; stored values stay as in ROLE
+      labels: {
+        [ROLE.lawyer]: "I am a lawyer or legal practitioner who assists businesses with registration or business-related matters.",
+        [ROLE.otherPro]: "I perform another professional role related to business formation or operations (not a lawyer, CAC-accredited agent or consultant).",
+      },
       required: true,
     },
     {
@@ -174,6 +181,8 @@ export const CLOSING_SECTION = {
   id: "closing",
   title: "Closing questions",
   questions: [
+    // added after launch; csvLast keeps the original export columns in place
+    { id: "x_heard", type: "single", required: false, other: true, csvLast: true, label: "How did you hear about this survey?", options: ["A personal message from someone I know", "A WhatsApp or Telegram group", "Instagram", "LinkedIn", "Email", "From Sutura Works directly", "Other."], labels: { "Other.": "Other (please specify)" } },
     { id: "x_guidance", type: "multi", max: 3, required: true, other: true, label: "In your experience, which parts of the Nigerian business journey most need clearer guidance?", help: "Choose up to three.", options: ["Choosing the right business model or legal structure.", "Registration or incorporation.", "Understanding obligations after registration.", "Identifying permits, licences or approvals.", "Understanding fees and required documents.", "Knowing which agency or authority to approach.", "Resolving contradictory instructions.", "Handling delays, rejections or unexpected requirements.", "Knowing when to seek professional help.", "Other."] },
     { id: "x_benefit", type: "single", required: true, other: true, label: "Suppose a service could help people understand their options, identify the requirements that apply to them and navigate problems. Which potential benefit, if any, would matter most?", options: ["Making better decisions before starting.", "Avoiding preventable mistakes.", "Saving time.", "Reducing unnecessary expenses.", "Knowing what to do after registration.", "Knowing how to respond when a process goes wrong.", "Knowing when professional assistance is necessary.", "None of these, or I am not sure such a service would help.", "Other."] },
     { id: "x_must", type: "long", required: true, label: "If such a service existed, what is the one thing it would have to get right to be genuinely useful?", help: "If you think it would not be useful, please tell us why." },
