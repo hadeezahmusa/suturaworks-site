@@ -9,7 +9,7 @@ enabled = true
 [vars]
 ALLOWED_ORIGINS = "https://suturaworks.com,https://www.suturaworks.com"
 NOTIFY_TO = "socials@suturaworks.com"
-NOTIFY_FROM = "Sutura Works Research <research@suturaworks.com>"
+NOTIFY_FROM = "Sutura Works Limited Research <research@suturaworks.com>"
 
 [[d1_databases]]
 binding = "DB"

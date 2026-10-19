@@ -2,20 +2,20 @@
 //
 // Sign in: enter an address on ADMIN_EMAILS, get a one-time link by email,
 // press Continue on the page it opens. That sets a signed, HttpOnly cookie
-// for 12 hours. Every admin call checks the cookie, and every change needs
+// for 7 days. Every admin call checks the cookie, and every change needs
 // the x-admin header, which another site cannot send.
 //
 // Verifying is two steps on purpose: "Payment verified" makes the tickets
 // (or the sponsor's claim link) without sending anything, the admin previews
 // each email, then "Send" sends them.
 
-import { RELEASE_AFTER_DAYS, TIER_NAME, ngn } from "../../qlv2026/event.js";
+import { RELEASE_AFTER_DAYS, TIER_NAME, ngn, closeLabel, closeAtFor } from "../../qlv2026/event.js";
 import { QBANK } from "../../qlv2026/questions.js";
 import * as mail from "./emails.js";
-import { HttpError, now, token, links, ticketLinks, sendMail } from "./index.js";
+import { HttpError, now, token, links, ticketLinks, sendMail, closesAt } from "./index.js";
 
 const COOKIE = "qlv_admin";
-const SESSION_HOURS = 12;
+const SESSION_HOURS = 24 * 7;
 const enc = new TextEncoder();
 
 // ---------- session ----------
@@ -99,7 +99,8 @@ async function list(env, filter) {
   const pick = rows.filter((r) =>
     filter === "adviser" ? r.tier === "adviser"
       : r.tier !== "adviser" && (filter === "all" || !filter || (filter === "flagged" ? r.flagged : r.status === filter)));
-  return { rows: pick, counts, releaseAfterDays: RELEASE_AFTER_DAYS };
+  const close = await closesAt(env);
+  return { rows: pick, counts, releaseAfterDays: RELEASE_AFTER_DAYS, closesAt: close, closed: Date.now() >= Date.parse(close) };
 }
 
 async function detail(env, ref) {
@@ -150,7 +151,7 @@ async function outgoing(env, r) {
   const out = [];
   if (r.tier === "sponsored") {
     const l = links(env, r);
-    out.push({ kind: "sponsor_link", to: r.email, ...mail.sponsorLink(r, l.claim, l.manage) });
+    out.push({ kind: "sponsor_link", to: r.email, ...mail.sponsorLink(r, l.claim, l.manage, closeLabel(await closesAt(env))) });
     return out;
   }
   const t = await tickets(env, r.ref);
@@ -232,6 +233,19 @@ async function resendTicket(env, b) {
   if (!ok) throw new HttpError(502, "The email did not send. Try again in a minute.");
   await env.DB.prepare("UPDATE tickets SET email = ?, sent_at = ? WHERE id = ?").bind(email, now(), t.id).run();
   return detail(env, r.ref);
+}
+
+// Moves the closing date. Registration, sponsored claims and new answers all
+// close at the end of this day, Abuja time. A date in the past closes now; a
+// later date reopens.
+async function setClosing(env, b) {
+  const date = String(b.date || "");
+  if (!/^2026-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(date) || Number.isNaN(Date.parse(date))) {
+    throw new HttpError(400, "Pick a date in 2026.");
+  }
+  if (date > "2026-11-06") throw new HttpError(400, "Registration cannot stay open past day one, 6 November.");
+  await env.KV.put("setting:closes_at", closeAtFor(date));
+  return list(env, b.status || "awaiting");
 }
 
 async function answerList(env) {
@@ -354,6 +368,10 @@ async function loadList() {
   const d = await call("list?status=" + filter);
   const labels = { awaiting: "Awaiting", flagged: "Flagged for release", verified: "Verified, not sent", queried: "Queried", confirmed: "Confirmed", released: "Released", all: "All", adviser: "Advisers" };
   $("#chips").innerHTML = Object.keys(labels).map((k) => '<button data-f="' + k + '" class="' + (k === filter ? "on" : "") + '">' + labels[k] + " (" + d.counts[k] + ")</button>").join("");
+  const day = new Date(Date.parse(d.closesAt) + 3600000 - 60000).toISOString().slice(0, 10);
+  if (document.activeElement !== $("#closeDate")) $("#closeDate").value = day;
+  $("#closeState").textContent = d.closed ? "Registration is closed." : "Registration is open.";
+  $("#closeState").style.color = d.closed ? "#8A2A20" : "#19646D";
   $("#flagNote").textContent = "Flagged means still awaiting " + d.releaseAfterDays + " days after registering. Nothing is released until you press Release.";
   $("#rows").innerHTML = d.rows.map((r) => '<tr data-ref="' + esc(r.ref) + '" class="' + (current && current.reg.ref === r.ref ? "sel" : "") + '">' +
     '<td class="mono">' + esc(r.ref) + "</td><td>" + esc(r.contact_person ? r.name + " (" + r.contact_person + ")" : r.name) + '<div class="small">' + esc(r.email) + "</div></td>" +
@@ -489,6 +507,17 @@ document.addEventListener("click", (e) => {
     if (tab === "answers") loadAnswers();
   }
 });
+async function saveClosing(btn) {
+  const date = $("#closeDate").value;
+  if (!date) return;
+  const human = new Date(date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+  if (!confirm("Registration, sponsored claims and new answers will close at the end of " + human + ", Abuja time. Save?")) return;
+  btn.disabled = true;
+  try { await call("closing", { date, status: filter }); msg("Closing date saved. The page picks it up within a minute.", true); loadList(); }
+  catch (err) { msg(err.message); }
+  btn.disabled = false;
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("#saveClose"); if (b) saveClosing(b); });
 loadList().catch((err) => msg(err.message));
 `;
 
@@ -499,6 +528,13 @@ function appPage(email) {
   <div class="wrap">
     <div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="answers">Answers</button></div>
     <div id="msg" class="msg" hidden role="status"></div>
+    <div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+      <label for="closeDate" style="font-weight:600">Registration closes at the end of</label>
+      <input type="date" id="closeDate" min="2026-10-01" max="2026-11-06" style="width:auto;min-height:40px;padding:6px 10px">
+      <button class="btn ghost" id="saveClose">Save date</button>
+      <span id="closeState" class="small" style="font-weight:600"></span>
+      <span class="small">Abuja time. Moves registration, sponsored claims and new answers together. A past date closes it now; a later date reopens it.</span>
+    </div>
     <div id="regsView"><div id="chips" class="chips"></div><p class="small" id="flagNote" style="margin:-4px 0 12px"></p>
       <div class="grid"><div class="list card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Ref</th><th>Who</th><th>Ticket</th><th>Amount</th><th class="hide-s">Proof</th><th class="hide-s">Registered</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
       <div class="side" id="detail"><div class="card small">Pick a registration to see its details and proof.</div></div></div></div>
@@ -567,6 +603,7 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST release": () => release(env, body.ref),
       "POST reopen": () => reopen(env, body.ref),
       "POST resend-ticket": () => resendTicket(env, body),
+      "POST closing": () => setClosing(env, body),
     }[`${req.method} ${path.slice("/admin/api/".length)}`];
     if (!path.startsWith("/admin/api/") || !api) return json({ error: "Not found." }, 404);
     return json(await api());

@@ -5,7 +5,7 @@
 
 import { API, CONTACT, PRIVACY } from "./config.js";
 import { QBANK, SITUATIONS, MAX_ANSWER } from "./questions.js";
-import { PRICES, SPONSORED_MIN, SPONSORED_MAX, TIER_NAME, BANK, CLOSES_AT, amountFor, ngn, word } from "./event.js";
+import { PRICES, SPONSORED_MIN, SPONSORED_MAX, TIER_NAME, BANK, CLOSES_AT, amountFor, ngn, word, closeLabel } from "./event.js";
 
 const STORE = "qlv26";
 const MAX_FILE = 5 * 1024 * 1024;
@@ -34,8 +34,15 @@ function reset() {
 let Q = { key: null, branch: "emp", needsSit: false, back: "pending" };
 let proofFile = null;
 
-const closed = params.get("closed") === "1" ||
-  (params.get("closed") !== "0" && Date.now() >= Date.parse(CLOSES_AT));
+// The closing date comes from the Worker, so it can be moved from the admin
+// page without a code change. The date in event.js is the fallback.
+let closeAt = CLOSES_AT;
+let closed = false;
+function setClosing(at) {
+  closeAt = at;
+  closed = params.get("closed") === "1" || (params.get("closed") !== "0" && Date.now() >= Date.parse(at));
+  bind("closeDate", closeLabel(at));
+}
 
 // ---------- helpers ----------
 
@@ -198,6 +205,7 @@ const RENDER = {
       el.classList.toggle("sel", on);
       el.setAttribute("aria-checked", on);
     });
+    $('[data-action="fromTickets"]').textContent = S.tier === "adviser" ? "Confirm your place" : "Continue to your details";
   },
   details() {
     $("#memberBox").hidden = S.tier !== "member";
@@ -281,6 +289,7 @@ const ACTIONS = {
   // Changing ticket type after a reference exists keeps the same reference;
   // the server updates the tier and amount until proof is uploaded.
   fromTickets() {
+    if (S.tier === "adviser") return go("adviser");
     go(S.tier === "corporate" ? "corporate" : S.tier === "sponsored" ? "sponsored" : "details");
   },
   backFromTransfer() {
@@ -304,7 +313,7 @@ const ACTIONS = {
   },
   questionsBack() {
     if (Q.back === "claimed") {
-      message("Your seat is claimed", `Ticket ${Q.claimRef} is on its way to ${Q.claimEmail}. You can answer the three questions any time before 30 October from the link in that email.`, false);
+      message("Your seat is claimed", `Ticket ${Q.claimRef} is on its way to ${Q.claimEmail}. If it is not in your inbox in a few minutes, check your junk or spam folder. You can answer the three questions any time before ${closeLabel(closeAt)} from the link in that email.`, false);
     } else go(Q.back || "tickets");
   },
   questionsAgain() { go("questions"); },
@@ -623,7 +632,7 @@ async function openClaim(token) {
   try {
     const r = await api("/api/claim?t=" + encodeURIComponent(token));
     if (r.state === "full") return message("All the seats on this link have been claimed", "Every seat your sponsor paid for now has a name on it. If you were expecting one, ask the person who sent you the link.", false);
-    if (r.state === "closed") return message("This claim link has closed", "Seats that were not claimed by 30 October have been released. If you were expecting one, ask the person who sent you the link.", false);
+    if (r.state === "closed") return message("This claim link has closed", `Seats that were not claimed by ${closeLabel(closeAt)} have been released. If you were expecting one, ask the person who sent you the link.`, false);
     if (r.state !== "open") return message("This link is not ready yet", "Your sponsor's transfer is still being checked. Try the link again later today.", false);
     go("claim", false);
   } catch (err) {
@@ -668,7 +677,7 @@ async function openSponsor(manage, refresh) {
     $("#claimUrl").value = r.claimUrl;
     $("#spPips").innerHTML = Array.from({ length: total }, (_, i) => `<i class="${i < taken ? "on" : ""}"></i>`).join("");
     let rows = r.claims.map((c) => `<div class="claimrow"><div><b style="font-size:13px">Claimed</b><div class="fine">Ticket ${esc(c.ref)} issued</div></div><span class="chip" style="background:#E2F2F2;color:#19646D">Claimed</span></div>`).join("");
-    const open = r.closed ? "Released on 30 October" : "Nobody has used the link for this one yet";
+    const open = r.closed ? `Released on ${closeLabel(closeAt)}` : "Nobody has used the link for this one yet";
     for (let i = taken; i < total; i++) rows += `<div class="claimrow"><div><b style="font-size:13px;color:var(--mute)">Open seat</b><div class="fine">${open}</div></div><span class="chip pill">${r.closed ? "Released" : "Open"}</span></div>`;
     $("#claimRows").innerHTML = rows;
     go("sponsorlink", false);
@@ -769,7 +778,19 @@ async function resume(ref, key) {
 
 // ---------- start ----------
 
-function init() {
+async function loadClosing() {
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 4000);
+    const r = await fetch(API + "/api/config", { signal: ctl.signal }).then((x) => x.json());
+    clearTimeout(timer);
+    if (r.closesAt) return setClosing(r.closesAt);
+  } catch { /* fall back to the date in event.js */ }
+  setClosing(CLOSES_AT);
+}
+
+async function init() {
+  await loadClosing();
   $$(".js-sit").forEach((sel) => sitOptions(sel, sel.dataset.long === "1"));
   $$(".js-privacy").forEach((p) => { p.textContent = PRIVACY; });
   $$(".js-contact").forEach((a) => { a.href = "mailto:" + CONTACT; if (a.textContent.includes("@")) a.textContent = CONTACT; });

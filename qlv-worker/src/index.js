@@ -5,7 +5,7 @@
 // records, KV for proof files, sign-in links and the dev outbox.
 
 import { QBANK, SITUATIONS, MAX_ANSWER } from "../../qlv2026/questions.js";
-import { CLOSES_AT, ADVISERS_CLOSE_AT, SPONSORED_MIN, SPONSORED_MAX, amountFor } from "../../qlv2026/event.js";
+import { CLOSES_AT, ADVISERS_CLOSE_AT, SPONSORED_MIN, SPONSORED_MAX, amountFor, closeLabel } from "../../qlv2026/event.js";
 import { sniff, stripMetadata } from "./strip.js";
 import * as mail from "./emails.js";
 import { handleAdmin } from "./admin.js";
@@ -28,7 +28,13 @@ export class HttpError extends Error {
 // ---------- small helpers, shared with admin.js ----------
 
 export const now = () => new Date().toISOString();
-export const isClosed = (at = CLOSES_AT) => Date.now() >= Date.parse(at);
+export const isClosed = (at) => Date.now() >= Date.parse(at);
+
+// When registration closes. Set from the admin page; the date in event.js
+// is used until someone changes it.
+export async function closesAt(env) {
+  return (await env.KV.get("setting:closes_at")) || CLOSES_AT;
+}
 
 const ALPHABET = "abcdefghijkmnpqrstuvwxyzACDEFGHJKLMNPQRSTUVWXYZ23456789";
 export function token(len = 24) {
@@ -184,7 +190,7 @@ const REG_FIELDS = ["tier", "size", "amount", "name", "email", "phone", "organis
 async function register(req, env) {
   const b = await readJson(req);
   if (b.website) throw new HttpError(400, "We could not accept that registration.");
-  if (isClosed()) throw new HttpError(403, "Registration for QLV 2026 has closed.", "closed");
+  if (isClosed(await closesAt(env))) throw new HttpError(403, "Registration for QLV 2026 has closed.", "closed");
   const r = buildRegistration(b);
   const values = REG_FIELDS.map((f) => (r[f] === undefined ? null : r[f]));
   const stamp = now();
@@ -251,7 +257,8 @@ async function status(url, env) {
 async function adviser(req, env, ctx) {
   const b = await readJson(req);
   if (b.website) throw new HttpError(400, "We could not accept that.");
-  if (isClosed(ADVISERS_CLOSE_AT)) throw new HttpError(403, "Confirmations have closed. Please contact the person who invited you.", "closed");
+  const close = await closesAt(env);
+  if (isClosed(Date.parse(close) > Date.parse(ADVISERS_CLOSE_AT) ? close : ADVISERS_CLOSE_AT)) throw new HttpError(403, "Confirmations have closed. Please contact the person who invited you.", "closed");
   const a = {
     name: need(clean(b.name, 120), "your full name"),
     email: need(clean(b.email).toLowerCase(), "your email", "email"),
@@ -287,7 +294,7 @@ async function adviser(req, env, ctx) {
 async function claimState(env, reg) {
   const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE reg_ref = ? AND kind = 'sponsored'").bind(reg.ref).first();
   if (reg.status !== "confirmed") return { state: "pending", taken: n };
-  if (isClosed()) return { state: "closed", taken: n };
+  if (isClosed(await closesAt(env))) return { state: "closed", taken: n };
   if (n >= reg.size) return { state: "full", taken: n };
   return { state: "open", taken: n };
 }
@@ -314,7 +321,7 @@ async function claim(req, env, ctx) {
     situation: SITS.has(b.situation) ? b.situation : "emp",
   };
   const s = await claimState(env, reg);
-  if (s.state === "closed") throw new HttpError(403, "This claim link closed on 30 October.", "closed");
+  if (s.state === "closed") throw new HttpError(403, `This claim link closed on ${closeLabel(await closesAt(env))}.`, "closed");
   if (s.state === "pending") throw new HttpError(409, "Your sponsor's transfer is still being checked. Try again later today.", "pending");
 
   // The same person pressing the button twice gets their existing seat back.
@@ -339,7 +346,7 @@ async function claim(req, env, ctx) {
   // so a claimed seat's ticket goes straight to the claimant.
   ctx.waitUntil((async () => {
     await sendMail(env, { to: c.email, ...mail.ticketIssued(t, reg, ticketLinks(env, t)) }, t.ticket_ref, "ticket_issued");
-    await sendMail(env, { to: reg.email, ...mail.seatClaimed(reg, t, n, links(env, reg).manage) }, reg.ref, "seat_claimed");
+    await sendMail(env, { to: reg.email, ...mail.seatClaimed(reg, t, n, links(env, reg).manage, closeLabel(await closesAt(env))) }, reg.ref, "seat_claimed");
   })());
   return { ref: t.ticket_ref, key: t.token, email: c.email };
 }
@@ -350,7 +357,7 @@ async function sponsorView(url, env) {
   if (!reg) throw new HttpError(404, "This link is not valid.");
   const { results } = await env.DB.prepare("SELECT ticket_ref FROM tickets WHERE reg_ref = ? AND kind = 'sponsored' AND ticket_ref != 'pending' ORDER BY id").bind(reg.ref).all();
   return {
-    ref: reg.ref, seats: reg.size, closed: isClosed(),
+    ref: reg.ref, seats: reg.size, closed: isClosed(await closesAt(env)),
     claimUrl: reg.status === "confirmed" ? links(env, reg).claim : null,
     claims: results.map((r) => ({ ref: r.ticket_ref })),
   };
@@ -384,12 +391,13 @@ async function answerHolder(env, key) {
 
 async function answerContext(url, env) {
   const h = await answerHolder(env, url.searchParams.get("k"));
-  return { branch: h.branch || null, closed: isClosed() };
+  return { branch: h.branch || null, closed: isClosed(await closesAt(env)) };
 }
 
 async function answers(req, env) {
   const b = await readJson(req);
-  if (isClosed()) throw new HttpError(403, "Answers closed on 30 October. Thank you for thinking of it.", "closed");
+  const close = await closesAt(env);
+  if (isClosed(close)) throw new HttpError(403, `Answers closed on ${closeLabel(close)}. Thank you for thinking of it.`, "closed");
   const h = await answerHolder(env, b.key);
   const set = QBANK[b.branch];
   if (!set) throw new HttpError(400, "Please choose the situation closest to yours.");
@@ -406,6 +414,7 @@ async function answers(req, env) {
 // ---------- router ----------
 
 const ROUTES = {
+  "GET /api/config": async (req, env) => ({ closesAt: await closesAt(env) }),
   "POST /api/register": (req, env) => register(req, env),
   "POST /api/proof": (req, env, ctx) => uploadProof(req, env, ctx),
   "GET /api/status": (req, env, ctx, url) => status(url, env),

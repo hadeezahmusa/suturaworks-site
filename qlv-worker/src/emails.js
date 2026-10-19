@@ -36,7 +36,7 @@ function shell({ preheader, body, foot }) {
   </tr></table>
 </td></tr>
 </table>
-<p style="font-family:${FONT};font-size:10px;color:#5A6B85;margin:14px 0 0;">Registration for QLV 2026 is hosted by Sutura Works for JCI Aso.</p>
+<p style="font-family:${FONT};font-size:10px;color:#5A6B85;margin:14px 0 0;">Registration for QLV 2026 is hosted by Sutura Works Limited for JCI Aso.</p>
 </td></tr></table></body></html>`;
 }
 
@@ -197,7 +197,7 @@ export function couldNotMatch(reg, note, retryUrl) {
   };
 }
 
-export function sponsorLink(reg, claimUrl, manageUrl) {
+export function sponsorLink(reg, claimUrl, manageUrl, closeDate = "30 October") {
   const n = word(reg.size).toLowerCase();
   const body = h1(`Transfer verified, ${n} seats held`) +
     p(`Hello ${esc(first(reg.contact_person))}, thank you. Your transfer has been checked against the JCI Aso account and this email is your receipt. Now send the link below to the people you are sponsoring. Each one fills their own details and their ticket comes straight to them.`) +
@@ -209,21 +209,21 @@ export function sponsorLink(reg, claimUrl, manageUrl) {
     rows([["Reference", `<span style="font-family:${MONO};">${esc(reg.ref)}</span>`], ["Seats", `${reg.size} at ${ngn(9500)}`], ["Paid", ngn(reg.amount)], ["Named as sponsor", reg.named_publicly ? "Yes" : "No, anonymous"]]) +
     p("We email you whenever somebody claims a seat. You can also see how many are claimed here:") +
     button(manageUrl, "See your seats", true) +
-    p("Unclaimed seats are released on 30 October and refunded. Keep this email, because the link above to see your seats is private to you.", "font-size:12px;margin:0;");
+    p(`Unclaimed seats are released on ${closeDate} and refunded. Keep this email, because the link above to see your seats is private to you.`, "font-size:12px;margin:0;");
   return {
     subject: `Your QLV 2026 claim link, ${n} seats (${reg.ref})`,
     html: shell({ preheader: "Send this link to the people you are sponsoring.", body, foot: `Paid ${ngn(reg.amount)} by transfer &middot; <span style="font-family:${MONO};">${esc(reg.ref)}</span>` }),
-    text: `Transfer verified, ${n} seats held\n\nYour transfer has been checked and this email is your receipt. Send the link below to the people you are sponsoring.\n\nYour claim link: ${claimUrl}\nAnyone with this link can take one of your seats, so send it to named people rather than posting it in a group.\n\nSee your seats: ${manageUrl}\nReference: ${reg.ref}\nPaid: ${ngn(reg.amount)}\n\nUnclaimed seats are released on 30 October and refunded.\n`,
+    text: `Transfer verified, ${n} seats held\n\nYour transfer has been checked and this email is your receipt. Send the link below to the people you are sponsoring.\n\nYour claim link: ${claimUrl}\nAnyone with this link can take one of your seats, so send it to named people rather than posting it in a group.\n\nSee your seats: ${manageUrl}\nReference: ${reg.ref}\nPaid: ${ngn(reg.amount)}\n\nUnclaimed seats are released on ${closeDate} and refunded.\n`,
   };
 }
 
-export function seatClaimed(reg, t, taken, manageUrl) {
+export function seatClaimed(reg, t, taken, manageUrl, closeDate = "30 October") {
   const left = reg.size - taken;
   const status = left ? `${word(taken)} of ${reg.size} seats are now claimed, so ${word(left).toLowerCase()} ${left === 1 ? "is" : "are"} still open.` : `All ${reg.size} seats are now claimed. Thank you for sponsoring them.`;
   const body = h1("A seat has been claimed") +
     p(`Hello ${esc(first(reg.contact_person))}, ${esc(t.name)} has just claimed one of your seats and their ticket, ${esc(t.ticket_ref)}, has gone to them.`) +
     p(status) + button(manageUrl, "See your seats", true) +
-    (left ? p("Unclaimed seats are released on 30 October.", "font-size:12px;margin:0;") : "");
+    (left ? p(`Unclaimed seats are released on ${closeDate}.`, "font-size:12px;margin:0;") : "");
   return {
     subject: `${t.name} claimed a seat (${taken} of ${reg.size})`,
     html: shell({ preheader: status, body, foot: `<span style="font-family:${MONO};">${esc(reg.ref)}</span>` }),

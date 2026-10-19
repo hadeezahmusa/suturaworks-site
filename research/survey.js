@@ -297,7 +297,7 @@ async function submit() {
         </div>
         <p class="share-status" id="copy-status" aria-live="polite"></p>
       </div>
-      <p><a class="text-link" href="../index.html">Visit Sutura Works</a></p>`;
+      <p><a class="text-link" href="../index.html">Visit Sutura Works Limited</a></p>`;
     app.querySelector("#copy-link").addEventListener("click", copyLink);
     toForm();
   } catch (e) {
