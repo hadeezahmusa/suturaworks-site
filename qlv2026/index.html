@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>QLV 2026 Registration</title>
+<link rel="icon" href="assets/jci-aso-qlv-lockup.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="qlv.css">
+</head>
+<body>
+
+<div class="bar" id="bar"><div class="brand"><img src="assets/jci-aso-qlv-lockup.png" alt="JCI Aso, Quality Leadership Value" width="135" height="32"><em>6 and 7 November 2026</em></div><span class="host">Registration hosted by Sutura Works</span></div>
+
+<noscript><div class="wrap"><div class="inner narrow"><div class="card"><p>This registration page needs JavaScript switched on. If you cannot switch it on, email <a href="mailto:info@suturaworks.com">info@suturaworks.com</a> and the registration team will help.</p></div></div></div></noscript>
+
+<section class="screen on" id="loading"><div class="loading">Loading&hellip;</div></section>
+
+<!-- MESSAGE: bad links, released registrations and similar -->
+<section class="screen" id="message">
+  <div class="wrap"><div class="inner narrow">
+    <div class="card closed-panel">
+      <h1 data-bind="msgTitle">This link has not worked</h1>
+      <p style="margin-top:8px" data-bind="msgBody">Check that you copied the whole link from your email.</p>
+      <p class="fine" style="margin-top:14px">Need a hand? Email <a class="js-contact" href="mailto:info@suturaworks.com">info@suturaworks.com</a> with your reference.</p>
+    </div>
+    <div class="row" data-show="msgRestart"><span></span><button class="btn ghost" data-action="restart">Back to registration</button></div>
+  </div></div>
+</section>
+
+<!-- CLOSED -->
+<section class="screen" id="closed">
+  <div class="wrap"><div class="inner narrow">
+    <div class="card closed-panel">
+      <span class="chip gold" style="display:inline-block">Registration closed</span>
+      <h1 style="margin-top:12px">Registration for QLV 2026 has closed</h1>
+      <p style="margin-top:8px">Registration closed on 30 October. Thank you to everyone who signed up. Teams are announced on day one.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
+        <div class="tl"><b>Fri 6 Nov</b><span>Day one, virtual, 4:00pm.</span></div>
+        <div class="tl"><b>Sat 7 Nov</b><span>Day two at the Transcorp Hilton, Abuja, 8:30am to 4:00pm.</span></div>
+      </div>
+    </div>
+    <div class="card" style="padding:18px 24px">
+      <p style="font-size:12.5px">Already registered and waiting on your ticket? Your place is safe. Look for an email from the registration team, or send your reference to <a class="js-contact" href="mailto:info@suturaworks.com">info@suturaworks.com</a>.</p>
+      <p style="font-size:12.5px;margin-top:8px">Invited to serve as an adviser or judge on day two? You can still confirm your place.</p>
+      <div style="margin-top:12px"><button class="btn ghost" style="padding:12px 20px;min-height:44px;font-size:13px" data-go="adviser">Confirm your place &rarr;</button></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- 1. TICKETS -->
+<section class="screen" id="tickets">
+  <div class="wrap"><div class="inner">
+    <div class="steps">
+      <div class="st now"><b>1</b><span>Ticket</span><i></i></div>
+      <div class="st"><b>2</b><span>Details</span><i></i></div>
+      <div class="st"><b>3</b><span>Transfer and proof</span><i></i></div>
+      <div class="st"><b>4</b><span>Ticket issued</span></div>
+    </div>
+    <div>
+      <h1>Choose your ticket</h1>
+      <p style="margin-top:6px">One fee covers both days. You meet your team on day one and work with them on day two, so you need both. Nobody sees the task before the sprint opens, so there is nothing to prepare.</p>
+      <div class="row" style="justify-content:flex-start;gap:26px;margin-top:13px">
+        <div style="display:flex;gap:9px;align-items:baseline"><b style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--blue)">D1</b><span style="font-size:12.5px;font-weight:500">Friday 6 November, 4:00pm, virtual</span></div>
+        <div style="display:flex;gap:9px;align-items:baseline"><b style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--blue)">D2</b><span style="font-size:12.5px;font-weight:500">Saturday 7 November, 8:30am, Transcorp Hilton, Abuja</span></div>
+      </div>
+    </div>
+    <div class="grid4" role="radiogroup" aria-label="Ticket type">
+      <div class="tier sel" id="t-standard" data-tier="standard" role="radio" tabindex="0" aria-checked="true">
+        <div class="top"><div class="nm">Standard</div></div>
+        <div class="pr">&#8358;10,000</div>
+        <p style="font-size:12px">One seat, both days. Lunch and materials on day two. Open to anyone.</p>
+      </div>
+      <div class="tier" id="t-member" data-tier="member" role="radio" tabindex="0" aria-checked="false">
+        <div class="top"><div class="nm">JCI Aso member</div><span class="chip teal">Members</span></div>
+        <div class="pr">&#8358;8,000</div>
+        <p style="font-size:12px">The same seat at the member rate. We check your name against the register before issuing.</p>
+      </div>
+      <div class="tier" id="t-corporate" data-tier="corporate" role="radio" tabindex="0" aria-checked="false">
+        <div class="top"><div class="nm">Corporate team</div></div>
+        <div class="pr">from &#8358;40,000</div>
+        <p style="font-size:12px">Three or five seats, a free judge or mentor seat, and your organisation named on both days.</p>
+      </div>
+      <div class="tier" id="t-sponsored" data-tier="sponsored" role="radio" tabindex="0" aria-checked="false">
+        <div class="top"><div class="nm">Sponsored seats</div><span class="chip gold">Min 6</span></div>
+        <div class="pr">&#8358;9,500 <span style="font-size:13px;font-weight:500;color:var(--body)">each</span></div>
+        <p style="font-size:12px">Pay for six or more people. You get a link to share. They fill their own details and get their tickets.</p>
+      </div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+      <div class="row">
+        <p style="font-size:12px">Invited to serve as an adviser or judge on day two? You do not pay and you do not need a ticket.</p>
+        <button class="btn ghost" style="padding:12px 20px;min-height:44px;font-size:13px" data-go="adviser">Confirm your place &rarr;</button>
+      </div>
+    </div>
+    <div class="row">
+      <span class="fine">Registration closes 30 October. Teams are built as seats fill, so the earlier you register the better the mix we can put you in.</span>
+      <button class="btn" data-action="fromTickets">Continue to your details</button>
+    </div>
+  </div></div>
+</section>
+
+<!-- 2a. DETAILS, standard and member -->
+<section class="screen" id="details">
+  <div class="wrap"><div class="inner">
+    <div class="steps">
+      <div class="st done"><b>1</b><span>Ticket</span><i></i></div>
+      <div class="st now"><b>2</b><span>Details</span><i></i></div>
+      <div class="st"><b>3</b><span>Transfer and proof</span><i></i></div>
+      <div class="st"><b>4</b><span>Ticket issued</span></div>
+    </div>
+    <div class="cols">
+      <div class="main"><form class="card" id="f-details" novalidate>
+        <h1>Your details</h1>
+        <p style="margin:6px 0 20px">Your ticket goes to the email you give here, once we have verified your transfer.</p>
+        <div class="grid2">
+          <div><label class="f" for="d-name">Full name</label><input type="text" id="d-name" name="name" autocomplete="name" maxlength="120" placeholder="As it should appear on your ticket" required></div>
+          <div><label class="f" for="d-email">Email</label><input type="email" id="d-email" name="email" autocomplete="email" maxlength="160" placeholder="name@organisation.com" required></div>
+          <div><label class="f" for="d-phone">Phone</label><input type="tel" id="d-phone" name="phone" autocomplete="tel" maxlength="30" placeholder="0800 000 0000" required></div>
+          <div><label class="f" for="d-org">Organisation <span style="font-weight:400;color:var(--mute)">(optional)</span></label><input type="text" id="d-org" name="organisation" autocomplete="organization" maxlength="160" placeholder="Where you work or your business"></div>
+        </div>
+        <div id="memberBox" style="margin-top:14px" hidden>
+          <div class="note" style="background:#E8F4F5;align-items:flex-start;flex-direction:column;gap:10px">
+            <span class="lbl" style="color:var(--teal)">Member check</span>
+            <div class="grid2" style="width:100%">
+              <div><label class="f" for="d-mno">Membership number <span style="font-weight:400;color:var(--mute)">(if you know it)</span></label><input type="text" id="d-mno" name="memberNo" maxlength="40" placeholder="JCIA/2026/000"></div>
+              <div><label class="f" for="d-myr">Year you joined JCI Aso</label><input type="text" id="d-myr" name="memberYear" inputmode="numeric" maxlength="4" placeholder="2024"></div>
+            </div>
+            <span class="fine">We check this against the JCI Aso register. If you are not on it we will move you to the standard rate and tell you before anything is issued.</span>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <label class="f" for="d-sit">Which is closest to your situation?</label>
+          <select id="d-sit" name="situation" class="js-sit" data-long="1"></select>
+          <span class="fine" style="display:block;margin-top:6px">This decides which three questions you answer after payment, and helps us build the right mix in each team.</span>
+        </div>
+        <div class="note" style="margin-top:14px"><input type="checkbox" id="d6" name="understand" required><label for="d6">I understand that teams are announced on day one, that my team's task is handed out at the start of the sprint on day two, and that I need to attend both days.</label></div>
+        <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="formerr" style="margin-top:14px" data-err hidden></div>
+        <div class="row" style="margin-top:22px">
+          <button type="button" class="back" data-go="tickets">&larr; Back to tickets</button>
+          <button type="submit" class="btn">Continue to transfer details</button>
+        </div>
+        <p class="privacy js-privacy" style="margin-top:16px"></p>
+      </form></div>
+      <div class="side">
+        <div class="sum">
+          <div class="hd"><span>Your order</span><span class="chip gold" data-bind="tierName">Standard</span></div>
+          <div class="bd">
+            <div class="li"><span data-bind="line">One seat, both days</span><b data-bind="amount">&#8358;10,000</b></div>
+            <div class="hr"></div>
+            <div class="tot"><b>Total</b><s data-bind="amount">&#8358;10,000</s></div>
+            <span class="fine">Bank transfer to JCI Aso. Account details on the next screen.</span>
+          </div>
+        </div>
+        <div class="card" style="padding:16px">
+          <span class="lbl">What you leave with</span>
+          <ul style="margin:10px 0 0;padding-left:18px;font-size:12px;color:var(--body);line-height:1.7">
+            <li>A written plan for a real workplace problem, built by your team</li>
+            <li>A written critique of that plan from another team</li>
+            <li>Lunch and materials on day two</li>
+            <li>A certificate, and a report to your employer if they sent you</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- 2b. CORPORATE -->
+<section class="screen" id="corporate">
+  <div class="wrap"><div class="inner">
+    <div class="steps">
+      <div class="st done"><b>1</b><span>Ticket</span><i></i></div>
+      <div class="st now"><b>2</b><span>Details</span><i></i></div>
+      <div class="st"><b>3</b><span>Transfer and proof</span><i></i></div>
+      <div class="st"><b>4</b><span>Tickets issued</span></div>
+    </div>
+    <div class="cols">
+      <form class="main" id="f-corporate" novalidate>
+        <div class="card">
+          <h1>Corporate seats</h1>
+          <p style="margin:6px 0 16px">Enter each person now. Every one of them gets their own ticket by email once we have verified the transfer.</p>
+          <div class="grid2" role="radiogroup" aria-label="Pack size">
+            <div class="tier sel" id="p3" data-pack="3" role="radio" tabindex="0" aria-checked="true" style="padding:16px">
+              <div class="nm">Team of three</div>
+              <div class="pr" style="font-size:22px">&#8358;40,000</div>
+              <span class="fine">Three seats, plus the perks below</span>
+            </div>
+            <div class="tier" id="p5" data-pack="5" role="radio" tabindex="0" aria-checked="false" style="padding:16px">
+              <div class="nm">Team of five</div>
+              <div class="pr" style="font-size:22px">&#8358;60,000</div>
+              <span class="fine">Five seats, plus the perks below</span>
+            </div>
+          </div>
+          <div style="background:var(--panel);border-radius:9px;padding:16px 18px;margin-top:14px;display:flex;flex-direction:column;gap:10px">
+            <span class="lbl">What the pack adds</span>
+            <div class="perk"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="#1F7D87" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:12.5px;color:var(--body);line-height:1.55">A free seat for a senior colleague, who serves as a judge or mentor on day two rather than as a participant</span></div>
+            <div class="perk"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="#1F7D87" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:12.5px;color:var(--body);line-height:1.55">Your organisation named from the front on both days</span></div>
+            <div class="perk"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="#1F7D87" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:12.5px;color:var(--body);line-height:1.55">A report after the event on what your people produced</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <span class="lbl">Billing contact</span>
+          <div class="grid2" style="margin-top:12px">
+            <div><label class="f" for="c-org">Organisation</label><input type="text" id="c-org" name="organisation" autocomplete="organization" maxlength="160" placeholder="Registered name, for the receipt" required></div>
+            <div><label class="f" for="c-email">Contact email</label><input type="email" id="c-email" name="email" autocomplete="email" maxlength="160" placeholder="Where the receipt and the report go" required></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row" style="margin-bottom:12px"><span class="lbl">Who is attending</span><span class="fine" data-bind="seatCount">Three paid seats and your judge or mentor</span></div>
+          <div style="display:flex;flex-direction:column;gap:12px" id="seatList"></div>
+          <p class="fine" style="margin-top:12px">Mix your levels if you can. No team on the day holds more than two people from the same organisation, so your group will be split across tables.</p>
+        </div>
+        <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="formerr" data-err hidden></div>
+        <div class="row">
+          <button type="button" class="back" data-go="tickets">&larr; Back to tickets</button>
+          <button type="submit" class="btn">Continue to transfer details</button>
+        </div>
+        <p class="privacy js-privacy"></p>
+      </form>
+      <div class="side"><div class="sum">
+        <div class="hd"><span>Your order</span><span class="chip navy">Corporate</span></div>
+        <div class="bd">
+          <div class="li"><span data-bind="line">Three seats, both days</span><b data-bind="amount">&#8358;40,000</b></div>
+          <div class="li"><span style="color:var(--body)">Judge or mentor seat</span><b style="color:var(--teal)">Free</b></div>
+          <div class="li"><span style="color:var(--body)">Named on both days</span><b style="color:var(--teal)">Included</b></div>
+          <div class="li"><span style="color:var(--body)">Employer report</span><b style="color:var(--teal)">Included</b></div>
+          <div class="hr"></div>
+          <div class="tot"><b>Total</b><s data-bind="amount">&#8358;40,000</s></div>
+          <span class="fine" data-bind="coNote">Four tickets issue to the emails above once the transfer is verified.</span>
+        </div>
+      </div></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- 2c. SPONSORED -->
+<section class="screen" id="sponsored">
+  <div class="wrap"><div class="inner">
+    <div class="steps">
+      <div class="st done"><b>1</b><span>Ticket</span><i></i></div>
+      <div class="st now"><b>2</b><span>Seats and sponsor</span><i></i></div>
+      <div class="st"><b>3</b><span>Transfer and proof</span><i></i></div>
+      <div class="st"><b>4</b><span>Share your link</span></div>
+    </div>
+    <div class="cols">
+      <form class="main" id="f-sponsored" novalidate>
+        <div class="card">
+          <h1>Sponsor seats</h1>
+          <p style="margin:6px 0 18px">Pay for seats now and decide who fills them afterwards. You do not need their details today.</p>
+          <div class="grid3">
+            <div style="background:var(--panel);border-radius:9px;padding:14px 16px"><b style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;align-items:center;justify-content:center;font-size:11px">1</b><p style="font-size:12px;margin-top:7px">You pay for the seats you want to cover.</p></div>
+            <div style="background:var(--panel);border-radius:9px;padding:14px 16px"><b style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;align-items:center;justify-content:center;font-size:11px">2</b><p style="font-size:12px;margin-top:7px">We give you a link to send to the people you are sponsoring.</p></div>
+            <div style="background:var(--panel);border-radius:9px;padding:14px 16px"><b style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;align-items:center;justify-content:center;font-size:11px">3</b><p style="font-size:12px;margin-top:7px">Each one fills their details and their ticket issues to them.</p></div>
+          </div>
+          <div class="hr" style="margin:18px 0"></div>
+          <div class="row">
+            <div>
+              <label class="f" for="qty">How many seats</label>
+              <div class="qty"><button type="button" data-seats="-1" aria-label="Fewer seats">&minus;</button><input id="qty" type="text" value="6" readonly aria-live="polite"><button type="button" data-seats="1" aria-label="More seats">+</button></div>
+              <span class="fine" style="display:block;margin-top:6px;color:var(--teal)">Six is the minimum, because a team on the day is eight people</span>
+            </div>
+            <div style="text-align:right">
+              <span class="fine">&#8358;9,500 per seat</span>
+              <div style="font-size:26px;font-weight:700;color:var(--navy)" data-bind="amount">&#8358;57,000</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <span class="lbl">Who is sponsoring</span>
+          <div class="grid2" style="margin-top:12px">
+            <div><label class="f" for="s-name">Sponsor name</label><input type="text" id="s-name" name="name" autocomplete="organization" maxlength="160" placeholder="Organisation or individual" required></div>
+            <div><label class="f" for="s-contact">Contact person</label><input type="text" id="s-contact" name="contactPerson" autocomplete="name" maxlength="120" placeholder="Who we speak to" required></div>
+            <div><label class="f" for="s-email">Email</label><input type="email" id="s-email" name="email" autocomplete="email" maxlength="160" placeholder="Where the share link and receipt go" required></div>
+            <div><label class="f" for="s-phone">Phone</label><input type="tel" id="s-phone" name="phone" autocomplete="tel" maxlength="30" placeholder="0800 000 0000" required></div>
+          </div>
+          <div class="note" style="margin-top:14px"><input type="checkbox" id="s6" name="namedPublicly" checked><label for="s6">Name us as a sponsor on the day and in the project report. Leave it unticked to stay anonymous.</label></div>
+        </div>
+        <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="formerr" data-err hidden></div>
+        <div class="row">
+          <button type="button" class="back" data-go="tickets">&larr; Back to tickets</button>
+          <button type="submit" class="btn">Continue to transfer details</button>
+        </div>
+        <p class="privacy js-privacy"></p>
+      </form>
+      <div class="side"><div class="sum">
+        <div class="hd" style="background:var(--teal)"><span>Your order</span><span class="chip" style="background:#fff;color:var(--navy)">Sponsored</span></div>
+        <div class="bd">
+          <div class="li"><span data-bind="line">6 seats at &#8358;9,500</span><b data-bind="amount">&#8358;57,000</b></div>
+          <div class="hr"></div>
+          <div class="tot"><b>Total</b><s data-bind="amount">&#8358;57,000</s></div>
+          <div class="hr"></div>
+          <span class="fine">Your claim link is sent once the transfer is verified. Each person gets their ticket when they fill the form on that link.</span>
+          <span class="fine">Unclaimed seats are released on 30 October so they can be sold.</span>
+        </div>
+      </div></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- 3. TRANSFER -->
+<section class="screen" id="transfer">
+  <div class="wrap"><div class="inner">
+    <div class="steps">
+      <div class="st done"><b>1</b><span>Ticket</span><i></i></div>
+      <div class="st done"><b>2</b><span>Details</span><i></i></div>
+      <div class="st now"><b>3</b><span>Transfer and proof</span><i></i></div>
+      <div class="st"><b>4</b><span data-bind="step4">Ticket issued</span></div>
+    </div>
+    <div class="cols">
+      <div class="main">
+        <div class="card" id="queriedBox" style="border-color:var(--yel);background:#FFFDF4" hidden>
+          <span class="lbl" style="color:#6B5A1E">We could not match your transfer yet</span>
+          <p style="margin-top:6px" data-bind="queryNote"></p>
+          <p class="fine" style="margin-top:8px">Upload a clearer screenshot or the bank receipt below and we will check again.</p>
+        </div>
+        <div class="card">
+          <h1>Make the transfer</h1>
+          <p style="margin:6px 0 18px">Send the exact amount to the account below, then upload your proof. Your seat is held while we check it.</p>
+          <div class="acct">
+            <div class="row">
+              <div><div class="lb">Account number</div><div class="no" data-bind="bankNumber">7723913012</div></div>
+              <button type="button" class="btn gold" style="padding:12px 20px;min-height:44px;font-size:12px" data-copy="bankNumber">Copy number</button>
+            </div>
+            <div class="hr" style="background:#27477E"></div>
+            <div style="display:flex;flex-wrap:wrap;gap:30px">
+              <div><div class="lb">Account name</div><div class="v" data-bind="bankName">JCI Aso</div></div>
+              <div><div class="lb">Bank</div><div class="v" data-bind="bankBank">FCMB</div></div>
+              <div><div class="lb">Amount</div><div class="v" style="color:var(--yel)" data-bind="amount">&#8358;10,000</div></div>
+            </div>
+          </div>
+          <div class="ref row" style="margin-top:16px">
+            <div>
+              <b style="font-size:11px">Put this in the narration or remark box</b>
+              <div class="code" data-bind="ref">QLV26-000</div>
+              <span class="fine" style="color:#6B5A1E">It is how we match your transfer to your name. Without it we may not find your payment.</span>
+            </div>
+            <button type="button" class="btn ghost" style="padding:12px 20px;min-height:44px;font-size:12px" data-copy="ref">Copy reference</button>
+          </div>
+        </div>
+        <form class="card" id="f-proof" novalidate>
+          <h2 style="font-size:16px">Upload your proof of payment</h2>
+          <p style="margin:6px 0 16px">A screenshot of the transfer, or the receipt your bank sends you.</p>
+          <div class="drop" id="drop">
+            <svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" fill="none" stroke="#5A80B0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path><path d="M3.5 15v3.5a1.5 1.5 0 001.5 1.5h14a1.5 1.5 0 001.5-1.5V15" fill="none" stroke="#5A80B0" stroke-width="1.8" stroke-linecap="round"></path></svg>
+            <b style="font-size:13px">Drag your file here</b>
+            <span class="fine">JPG, PNG or PDF, up to 5MB</span>
+            <span class="fname" id="fname" hidden></span>
+            <input type="file" id="proofFile" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" hidden>
+            <button type="button" class="btn ghost" style="margin-top:4px" id="pickFile">Choose file</button>
+          </div>
+          <div class="note" style="margin-top:14px"><input type="checkbox" id="tr1" required><label for="tr1">I have sent the amount above to the JCI Aso account and used <span data-bind="ref">QLV26-000</span> as the narration.</label></div>
+          <div class="formerr" style="margin-top:14px" data-err hidden></div>
+          <div class="row" style="margin-top:18px">
+            <button type="button" class="back" data-action="backFromTransfer">&larr; Back</button>
+            <button type="submit" class="btn">Submit proof of payment</button>
+          </div>
+        </form>
+      </div>
+      <div class="side">
+        <div class="sum">
+          <div class="hd"><span>Your order</span><span class="chip gold" data-bind="tierName">Standard</span></div>
+          <div class="bd">
+            <div class="li"><span data-bind="line">One seat, both days</span><b data-bind="amount">&#8358;10,000</b></div>
+            <div class="hr"></div>
+            <div class="tot"><b>To transfer</b><s data-bind="amount">&#8358;10,000</s></div>
+            <span class="fine">Send the exact amount. A different figure is harder to match and slows your ticket down.</span>
+          </div>
+        </div>
+        <div class="card" style="padding:16px">
+          <span class="lbl">After you submit</span>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+            <div style="display:flex;gap:10px"><b style="width:20px;height:20px;flex-shrink:0;border-radius:50%;background:#EEF3F9;color:var(--body);font-size:10px;display:inline-flex;align-items:center;justify-content:center">1</b><span class="fine">The treasurer checks your transfer against the JCI Aso account.</span></div>
+            <div style="display:flex;gap:10px"><b style="width:20px;height:20px;flex-shrink:0;border-radius:50%;background:#EEF3F9;color:var(--body);font-size:10px;display:inline-flex;align-items:center;justify-content:center">2</b><span class="fine" data-bind="after2">Your ticket is emailed to you, usually within one working day.</span></div>
+            <div style="display:flex;gap:10px"><b style="width:20px;height:20px;flex-shrink:0;border-radius:50%;background:#EEF3F9;color:var(--body);font-size:10px;display:inline-flex;align-items:center;justify-content:center">3</b><span class="fine">If anything does not match, we call or email you before cancelling.</span></div>
+          </div>
+        </div>
+        <div style="background:var(--panel);border-radius:10px;padding:15px 17px">
+          <b style="font-size:11px">Paying for someone else?</b>
+          <p class="fine" style="margin-top:6px">That is fine. The narration is what matters, not the name on the sending account.</p>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- 4. PENDING -->
+<section class="screen" id="pending">
+  <div class="wrap"><div class="inner narrow">
+    <div class="row" style="justify-content:flex-start;gap:16px">
+      <span class="dot" style="background:var(--yel)"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="#0F2B63" stroke-width="2"></circle><path d="M12 7v5.3l3.3 2" fill="none" stroke="#0F2B63" stroke-width="2" stroke-linecap="round"></path></svg></span>
+      <div style="flex:999 1 380px;min-width:0">
+        <h1>Proof received</h1>
+        <p style="margin-top:5px" data-show="pendSingle">We are checking your transfer against the JCI Aso account. Your ticket goes to <b style="color:var(--ink)" data-bind="email">your email</b> as soon as it clears, usually within one working day.</p>
+        <p style="margin-top:5px" data-show="pendCorporate" hidden>We are checking your transfer against the JCI Aso account. As soon as it clears, usually within one working day, each person you named gets their own ticket by email and a receipt goes to <b style="color:var(--ink)" data-bind="email">your email</b>.</p>
+        <p style="margin-top:5px" data-show="pendSponsor" hidden>We are checking your transfer against the JCI Aso account. As soon as it clears, usually within one working day, your claim link goes to <b style="color:var(--ink)" data-bind="email">your email</b> for you to send to the people you are sponsoring.</p>
+      </div>
+    </div>
+    <div class="card row" style="padding:20px 24px">
+      <div><span class="fine" style="letter-spacing:1.7px;text-transform:uppercase;font-weight:600">Your reference</span><div style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;color:var(--navy)" data-bind="ref">QLV26-000</div></div>
+      <div><span class="fine" style="letter-spacing:1.7px;text-transform:uppercase;font-weight:600">Ticket</span><div style="font-size:15px;font-weight:600" data-bind="tierName">Standard</div></div>
+      <div><span class="fine" style="letter-spacing:1.7px;text-transform:uppercase;font-weight:600">Transferred</span><div style="font-size:15px;font-weight:600" data-bind="amount">&#8358;10,000</div></div>
+      <span class="badge" data-bind="badge">Awaiting verification</span>
+    </div>
+    <div class="card" id="memberPend" style="padding:18px 24px;border-color:var(--teal);background:#F2FAFA" hidden>
+      <div class="perk"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="#1F7D87" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:13px;color:var(--body);line-height:1.6">We are also checking your name against the JCI Aso member register. If it is not there we will contact you about the standard rate rather than cancel your place.</span></div>
+    </div>
+    <div class="card" style="padding:20px 24px">
+      <span class="lbl">What happens next</span>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+        <div class="tl"><b>Today</b><span>We confirm your payment.</span></div>
+        <div class="tl"><b>1 day</b><span data-bind="pendDay1">Your ticket arrives by email.</span></div>
+        <div class="tl"><b>Fri 6 Nov</b><span>Day one, virtual, 4:00pm. Teams announced and your group chat opens.</span></div>
+        <div class="tl"><b>Sat 7 Nov</b><span>Day two at the Transcorp Hilton, Abuja, 8:30am. Your team's task is handed out as the sprint opens, not before. Bring your reference, lunch is included.</span></div>
+      </div>
+    </div>
+    <div class="cta" data-show="pendQuestions">
+      <div class="t"><span class="eb">While you wait</span><h2>Tell us what to fix</h2><p>The problems your team works on come from answers people send us, not from the committee. Three questions, two minutes.</p></div>
+      <button class="btn gold" data-action="questionsFromPending">Answer the three questions</button>
+    </div>
+    <p class="fine">Nothing in your inbox after a working day? Send your reference to the <a class="js-contact" href="mailto:info@suturaworks.com">registration team</a> and they will look it up.</p>
+    <p class="fine">Registering somebody else as well? <button class="back" style="font-size:11px" data-action="restart">Start a new registration</button></p>
+  </div></div>
+</section>
+
+<!-- 4c. SPONSOR LINK -->
+<section class="screen" id="sponsorlink">
+  <div class="wrap"><div class="inner narrow">
+    <div class="row" style="justify-content:flex-start;gap:16px">
+      <span class="dot" style="background:var(--teal)"><svg width="24" height="24" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.3l3.3 3.3L13 4.8" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+      <div style="flex:999 1 380px;min-width:0">
+        <h1 data-bind="spTitle">Transfer verified, six seats held</h1>
+        <p style="margin-top:5px">Your transfer has been checked against the JCI Aso account and a receipt is on its way to your email. Now send the link below to the people you are sponsoring.</p>
+      </div>
+    </div>
+    <div style="background:var(--navy);border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:14px">
+      <div><span style="font-size:10px;font-weight:700;letter-spacing:1.7px;text-transform:uppercase;color:var(--yel)">Your claim link</span>
+        <p style="color:#CFE0F3;font-size:12px;margin-top:4px">Anyone with this link can take one of your seats, so send it to named people rather than posting it in a group.</p></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <input type="text" readonly id="claimUrl" aria-label="Your claim link" style="flex:999 1 300px;font-family:'IBM Plex Mono',monospace;border:none">
+        <button type="button" class="btn gold" data-copy="claimUrl">Copy link</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="row" style="padding:18px 24px;border-bottom:1px solid var(--line)">
+        <div><b style="font-size:15px" data-bind="spCount">Two of six seats claimed</b><p class="fine" style="margin-top:3px">Unclaimed seats are released on 30 October and refunded</p></div>
+        <div class="pips" id="spPips"></div>
+      </div>
+      <div id="claimRows"></div>
+      <div class="row" style="padding:16px 24px">
+        <span class="fine">We email you whenever somebody claims a seat.</span>
+        <button type="button" class="btn ghost" data-action="refreshSponsor">Refresh</button>
+      </div>
+    </div>
+    <p class="fine">Keep this page's address to yourself. It is how you check on your seats, and it came in the same email as your claim link.</p>
+  </div></div>
+</section>
+
+<!-- 5c. CLAIM, mobile -->
+<section class="screen" id="claim">
+  <div class="phonewrap">
+    <div class="phone">
+      <div class="phonehd">
+        <img src="assets/jci-aso-qlv-lockup-white.png" alt="JCI Aso, Quality Leadership Value" style="height:24px;width:auto;display:block;margin-bottom:18px">
+        <div class="lock"><span>QUALITY</span><span class="y">LEADERSHIP</span><span style="margin-left:52px">VALUE</span></div>
+      </div>
+      <form id="f-claim" novalidate style="padding:18px 20px 22px;display:flex;flex-direction:column;gap:14px">
+        <div><h1 style="font-size:18px">Your sponsor has paid for your seat</h1><p style="font-size:12px;margin-top:5px">Fill this in and your ticket comes straight to your email. Nothing to pay.</p></div>
+        <div class="card" style="padding:13px 15px">
+          <div style="display:flex;gap:10px;margin-bottom:7px"><b style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--blue)">D1</b><span style="font-size:11px;font-weight:500">Fri 6 Nov, 4:00pm. Virtual</span></div>
+          <div style="display:flex;gap:10px"><b style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--blue)">D2</b><span style="font-size:11px;font-weight:500">Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja</span></div>
+        </div>
+        <div><label class="f" for="k-name">Full name</label><input type="text" id="k-name" name="name" autocomplete="name" maxlength="120" placeholder="As it should read on your ticket" required></div>
+        <div><label class="f" for="k-email">Email</label><input type="email" id="k-email" name="email" autocomplete="email" maxlength="160" placeholder="Your ticket goes here" required></div>
+        <div><label class="f" for="k-phone">Phone</label><input type="tel" id="k-phone" name="phone" autocomplete="tel" maxlength="30" placeholder="0800 000 0000" required></div>
+        <div><label class="f" for="k-sit">Which is closest to you?</label><select id="k-sit" name="situation" class="js-sit"></select></div>
+        <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="formerr" data-err hidden></div>
+        <button type="submit" class="btn" style="width:100%;justify-content:center">Claim my seat</button>
+        <p class="fine" style="text-align:center">Seats not claimed by 30 October go back on sale. You will be asked three short questions after this.</p>
+        <p class="privacy js-privacy" style="text-align:center"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- A1. ADVISER -->
+<section class="screen" id="adviser">
+  <div class="wrap"><div class="inner">
+    <div class="steps">
+      <div class="st now"><b>1</b><span>Your details</span><i></i></div>
+      <div class="st"><b>2</b><span>Confirmed</span></div>
+    </div>
+    <div class="cols">
+      <div class="main"><form class="card" id="f-adviser" novalidate>
+        <span class="chip teal" style="display:inline-block">By invitation</span>
+        <h1 style="margin-top:12px">Confirm your place as an adviser and judge</h1>
+        <p style="margin:6px 0 20px">You are not buying a ticket and you are not placed in a team. You rove between tables during the working session, then sit as a judge for the presentations.</p>
+        <div class="grid2">
+          <div><label class="f" for="a-name">Full name</label><input type="text" id="a-name" name="name" autocomplete="name" maxlength="120" placeholder="As it should appear on your badge" required></div>
+          <div><label class="f" for="a-email">Email</label><input type="email" id="a-email" name="email" autocomplete="email" maxlength="160" placeholder="Where the brief and scorecard go" required></div>
+          <div><label class="f" for="a-phone">Phone</label><input type="tel" id="a-phone" name="phone" autocomplete="tel" maxlength="30" placeholder="0800 000 0000" required></div>
+          <div><label class="f" for="a-org">Organisation</label><input type="text" id="a-org" name="organisation" autocomplete="organization" maxlength="160" placeholder="Your organisation" required></div>
+          <div><label class="f" for="a-role">Your role there</label><input type="text" id="a-role" name="role" autocomplete="organization-title" maxlength="120" placeholder="Title as you want it read out" required></div>
+          <div><label class="f" for="a-inv">Who invited you</label><select id="a-inv" name="invitedBy"><option>JCI Aso President</option><option>Chairperson, Quality Leadership Value</option><option>A corporate partner seat</option><option>Someone else</option></select></div>
+        </div>
+        <div style="margin-top:14px">
+          <label class="f" for="a-mode">How would you like to take part?</label>
+          <select id="a-mode" name="mode">
+            <option value="both">Adviser during the sprint and judge at the presentations</option>
+            <option value="judge">Judge at the presentations only</option>
+            <option value="adviser">Adviser during the sprint only</option>
+          </select>
+          <span class="fine" style="display:block;margin-top:6px">Advisers are on their feet for about ninety minutes. Judging is seated and runs just over an hour.</span>
+        </div>
+        <div class="note" style="margin-top:14px"><input type="checkbox" id="a1" name="canAttend" required><label for="a1">I can be at the Transcorp Hilton, Abuja on Saturday 7 November from 10:15am to about 3:00pm.</label></div>
+        <div class="note" style="margin-top:10px"><input type="checkbox" id="a2" name="independence" required><label for="a2">I understand I will not score any table I advised, so that judging stays independent.</label></div>
+        <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="formerr" style="margin-top:14px" data-err hidden></div>
+        <div class="row" style="margin-top:22px">
+          <button type="button" class="back" data-action="backFromAdviser">&larr; Back</button>
+          <button type="submit" class="btn">Confirm my place</button>
+        </div>
+        <p class="privacy js-privacy" style="margin-top:16px"></p>
+      </form></div>
+      <div class="side">
+        <div class="sum">
+          <div class="hd" style="background:var(--teal)"><span>Your place</span><span class="chip" style="background:#fff;color:var(--navy)">Adviser</span></div>
+          <div class="bd">
+            <div class="li"><span>Day two, Sat 7 November</span><b style="color:var(--teal)">Complimentary</b></div>
+            <div class="li"><span style="color:var(--body)">Lunch</span><b style="color:var(--teal)">Included</b></div>
+            <div class="hr"></div>
+            <span class="fine">Nothing to pay and no transfer to make. You are contributing the day.</span>
+          </div>
+        </div>
+        <div class="card" style="padding:16px">
+          <span class="lbl">What we send you</span>
+          <ul style="margin:10px 0 0;padding-left:18px;font-size:12px;color:var(--body);line-height:1.7">
+            <li>A one page brief with the six tasks, a week before. Participants do not see them until the sprint opens</li>
+            <li>Your roving route, so every table gets equal time</li>
+            <li>The scorecard, five criteria, nothing to prepare</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- A2. ADVISER CONFIRMED -->
+<section class="screen" id="adviserdone">
+  <div class="wrap"><div class="inner narrow">
+    <div class="row" style="justify-content:flex-start;gap:16px">
+      <span class="dot" style="background:var(--teal)"><svg width="24" height="24" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.3l3.3 3.3L13 4.8" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+      <div style="flex:999 1 380px;min-width:0">
+        <h1>You are confirmed</h1>
+        <p style="margin-top:5px" data-bind="advLede">Thank you. Your place as an adviser and judge is held, and a calendar invitation is on its way to your email.</p>
+      </div>
+    </div>
+    <div class="card row" style="padding:20px 24px">
+      <div><span class="fine" style="letter-spacing:1.7px;text-transform:uppercase;font-weight:600">Your reference</span><div style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;color:var(--navy)" data-bind="ref">QLV26-A00</div></div>
+      <div><span class="fine" style="letter-spacing:1.7px;text-transform:uppercase;font-weight:600">Role</span><div style="font-size:15px;font-weight:600" data-bind="advRole">Adviser and judge</div></div>
+      <div><span class="fine" style="letter-spacing:1.7px;text-transform:uppercase;font-weight:600">Fee</span><div style="font-size:15px;font-weight:600;color:var(--teal)">None</div></div>
+      <span class="badge ok">Confirmed</span>
+    </div>
+    <div class="card" style="padding:20px 24px">
+      <span class="lbl">Your day two</span>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+        <div class="tl"><b>10:15</b><span>Arrive, collect your badge and your roving route at the desk.</span></div>
+        <div class="tl"><b>10:50</b><span>The sprint opens. You rove two tables, ten minutes each, then move.</span></div>
+        <div class="tl"><b>12:35</b><span>Lunch at a mixed table, and the plans reach you to read.</span></div>
+        <div class="tl"><b>13:30</b><span>Presentations. You score every team except the two you advised.</span></div>
+        <div class="tl"><b>14:50</b><span>You give the panel's feedback and the recognitions are announced.</span></div>
+      </div>
+    </div>
+    <div class="cta" data-show="advQuestions">
+      <div class="t"><span class="eb">One ask before the day</span><h2>Send us a problem</h2><p>The six tasks come from real workplace problems people send in. If you have one worth putting in front of a team, it takes two minutes.</p></div>
+      <button class="btn gold" data-action="questionsFromAdviser">Send a problem</button>
+    </div>
+    <p class="fine">Something changed and you can no longer make it? Reply to the invitation as early as you can, because the roving routes are built around who is coming.</p>
+  </div></div>
+</section>
+
+<!-- 5. THE THREE QUESTIONS -->
+<section class="screen" id="questions">
+  <div class="wrap"><div class="inner narrow">
+    <div class="card" id="claimedBox" style="padding:16px 22px;border-color:var(--teal);background:#F2FAFA" hidden>
+      <div class="perk"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="#1F7D87" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:13px;color:var(--body);line-height:1.6">Your seat is claimed. Ticket <b style="font-family:'IBM Plex Mono',monospace;color:var(--navy)" data-bind="claimRef">QLV26-S00</b> is on its way to <b style="color:var(--ink)" data-bind="claimEmail">your email</b>.</span></div>
+    </div>
+    <div class="row" style="justify-content:flex-start;gap:16px">
+      <span class="dot" style="background:var(--yel)"><svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 6.1a2.4 2.4 0 1 1 3.2 2.3c-.5.2-.8.7-.8 1.2v.5" fill="none" stroke="#0F2B63" stroke-width="1.9" stroke-linecap="round"></path><circle cx="8" cy="12.6" r="1" fill="#0F2B63"></circle></svg></span>
+      <div style="flex:999 1 380px;min-width:0">
+        <h1 data-bind="qTitle">Three questions about where you work</h1>
+        <p style="margin-top:5px">The six tasks teams work on come from answers like yours, not from the committee. Write the way you would say it out loud.</p>
+      </div>
+    </div>
+
+    <div class="note" style="background:#FFF8E2;border:1px solid var(--yel)">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex-shrink:0;margin-top:2px"><path d="M8 2.5l5.2 2.1v3.1c0 3-2.1 5.3-5.2 5.8-3.1-.5-5.2-2.8-5.2-5.8V4.6z" fill="none" stroke="#9A7A14" stroke-width="1.5" stroke-linejoin="round"></path></svg>
+      <label style="color:#6B5A1E">Your answers are read without your name on them. If your problem becomes one of the six tasks, nobody in the room is told whose it was.</label>
+    </div>
+
+    <form id="f-questions" novalidate style="display:flex;flex-direction:column;gap:22px">
+      <div class="card" id="qSitBox" style="padding:16px 22px" hidden>
+        <label class="f" for="q-sit">Which is closest to your situation?</label>
+        <select id="q-sit" class="js-sit" data-long="1"></select>
+        <span class="fine" style="display:block;margin-top:6px">This picks the three questions below.</span>
+      </div>
+      <div class="card" id="qList" style="display:flex;flex-direction:column;gap:24px"></div>
+      <div class="formerr" data-err hidden></div>
+      <div class="row">
+        <button type="button" class="back" data-action="questionsBack">&larr; Not now, go back</button>
+        <button type="submit" class="btn">Send my answers</button>
+      </div>
+    </form>
+    <p class="fine">Two minutes, and it is the single most useful thing you can do before the day.</p>
+  </div></div>
+</section>
+
+<!-- 6. QUESTIONS SENT -->
+<section class="screen" id="questionsdone">
+  <div class="wrap"><div class="inner narrow">
+    <div class="row" style="justify-content:flex-start;gap:16px">
+      <span class="dot" style="background:var(--teal)"><svg width="24" height="24" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.3l3.3 3.3L13 4.8" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+      <div style="flex:999 1 380px;min-width:0">
+        <h1>Thank you, that is the part we cannot make up</h1>
+        <p style="margin-top:5px">Your answers go into the pool the six sprint tasks are drawn from.</p>
+      </div>
+    </div>
+    <div class="card" style="padding:20px 24px">
+      <span class="lbl">What happens to what you wrote</span>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+        <div class="tl"><b>This week</b><span>Answers are grouped by the pattern underneath them rather than by industry.</span></div>
+        <div class="tl"><b>Late Oct</b><span>The six that most teams can act on become the sprint tasks, rewritten so no workplace is identifiable.</span></div>
+        <div class="tl"><b>Fri 6 Nov</b><span>Day one, virtual. You see your team for the first time.</span></div>
+        <div class="tl"><b>Sat 7 Nov</b><span>Day two at the Transcorp Hilton, Abuja. Tasks are handed out as the sprint opens. Fifty minutes to build the plan, then another team takes it apart.</span></div>
+      </div>
+    </div>
+    <div class="row">
+      <span class="fine">Thought of another one? You can send a second answer any time before 30 October.</span>
+      <button type="button" class="btn ghost" data-action="questionsAgain">Send another</button>
+    </div>
+  </div></div>
+</section>
+
+<!-- TICKET VIEW, opened from the ticket email -->
+<section class="screen" id="ticketview">
+  <div class="tview">
+    <div style="display:flex;flex-direction:column;gap:16px;align-items:center;width:100%">
+      <div class="ticket">
+        <div class="tk-hd">
+          <img src="assets/jci-aso-qlv-lockup-white.png" alt="JCI Aso, Quality Leadership Value">
+          <div class="tk-word"><span>QUALITY</span><span class="y">LEADERSHIP</span><span class="v">VALUE</span></div>
+          <p class="tk-tag">Building Systems That Outlive You</p>
+        </div>
+        <div class="tk-cut"><i></i></div>
+        <div class="tk-bd">
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:4px;min-width:0"><span class="tk-lbl">Admit</span><span class="tk-name" data-bind="tkName">Name</span></div>
+            <span class="tk-chip" id="tkChip">Standard</span>
+          </div>
+          <div class="tk-line"></div>
+          <div style="display:flex;flex-direction:column;gap:14px" id="tkDays">
+            <div class="tk-day" data-show="tkD1"><b>D1</b><div><strong>Friday 6 November, 4:00pm</strong><span>Virtual. Joining link sent the day before. Teams announced.</span></div></div>
+            <div class="tk-day"><b>D2</b><div><strong data-bind="tkD2Time">Saturday 7 November, 8:30am to 4:00pm</strong><span data-bind="tkD2Note">Transcorp Hilton, Abuja. Lunch included. Your task is given out as the sprint opens.</span></div></div>
+          </div>
+          <div class="tk-line"></div>
+          <div style="display:flex;gap:28px;flex-wrap:wrap">
+            <div style="display:flex;flex-direction:column;gap:3px"><span class="tk-lbl">Ticket reference</span><span class="tk-ref" data-bind="tkRef">QLV26-000</span></div>
+            <div style="display:flex;flex-direction:column;gap:3px"><span class="tk-lbl" data-bind="tkSideLbl">Team</span><span style="font-size:12px;font-weight:500;color:var(--ink)" data-bind="tkSide">Announced on day one</span></div>
+          </div>
+        </div>
+        <div class="tk-ft"><span data-bind="tkPaid">Paid by transfer</span><code data-bind="tkVer">VERIFIED</code></div>
+      </div>
+      <p class="fine center" style="max-width:380px">Show this, or just say your reference, at the desk on day two.</p>
+      <button type="button" class="btn gold" data-action="questionsFromTicket" data-show="tkQuestions">Answer the three questions</button>
+    </div>
+  </div>
+</section>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+# QLV 2026 registration: setup and admin guide
+
+The JCI Aso QLV 2026 registration page lives at `qlv2026/` and is published at
+**suturaworks.com/qlv2026/**. It is unlisted: `noindex, nofollow`, disallowed in `robots.txt`, not in the
+sitemap and not linked from any other page. Anyone with the link can open it. That is intended.
+
+It carries JCI Aso's identity, not Sutura's. The design and copy come from the approved prototype and
+the build spec. The only Sutura presence is "Registration hosted by Sutura Works" in the top bar.
+
+## How it fits together
+
+| Part | File | What it does |
+|---|---|---|
+| Page | `qlv2026/index.html`, `app.js`, `qlv.css` | All twelve screens plus closed, ticket view and message screens |
+| Prices, dates, bank | `qlv2026/event.js` | One place for every price and date. The Worker recalculates amounts from it |
+| Questions | `qlv2026/questions.js` | The four question sets, verbatim from the prototype. Add questions here |
+| Endpoint and privacy line | `qlv2026/config.js` | Worker address, contact email, the approved privacy line |
+| Worker | `qlv-worker/src/index.js` | Registration, proof upload, claims, advisers, answers |
+| Admin | `qlv-worker/src/admin.js` | Sign-in, list, verify, preview, send, query, release, CSV |
+| Emails | `qlv-worker/src/emails.js` | The five emails in the spec, plus the adviser confirmation, the corporate receipt and the admin sign-in link |
+| Proof cleaning | `qlv-worker/src/strip.js` | Checks the file really is a JPG, PNG or PDF and removes photo metadata |
+| Database | `qlv-worker/schema.sql` | Registrations, tickets, answers (no names), email log, reference counters |
+
+Cloudflare (Sutura Works account): Worker `qlv2026` at `https://qlv2026.suturaworks.workers.dev`,
+D1 database `qlv2026` (Western Europe), KV namespace `qlv2026` for proof files and sign-in links.
+Secrets on the Worker: `RESEND_API_KEY` and `SESSION_SECRET`. Emails go from
+`qlv2026@suturaworks.com` with replies to `info@suturaworks.com`.
+
+## Admin
+
+Open **https://qlv2026.suturaworks.workers.dev/admin**, enter `hadeezah@suturaworks.com` and use the
+link that arrives (it works once and lasts 15 minutes). You stay signed in for 12 hours. To add the
+treasurer later, add their address to `ADMIN_EMAILS` in `qlv-worker/wrangler.toml`, separated by a
+comma, and redeploy.
+
+### Daily routine
+
+1. Download **Registrations CSV** and send it to the treasurer. Each row has the reference, name,
+   amount and status. The treasurer matches the narration on the FCMB statement and tells you which
+   references have cleared.
+2. For each one that cleared, open it and press **Payment verified**. This makes the ticket or tickets
+   (or a sponsor's claim link) and sends nothing.
+3. Read the previews. Each one is the exact email that will go out.
+4. Press **Send tickets** (or **Send claim link**). The status becomes Confirmed.
+   If you verified the wrong one, press **Undo verification** before sending.
+5. If a transfer cannot be found, press **Query**, write what is missing, preview, then send. The
+   email links them back to upload a clearer proof, which puts them back in the Awaiting list.
+6. Members: check the name against the JCI Aso register before verifying. If they are not on it,
+   use Query to tell them about the standard rate.
+
+### Release rule
+
+Anything still Awaiting 3 days after it was registered shows **Flagged for release**. Nothing is
+released automatically. **Release seat** moves it to Released without emailing anyone, and
+**Reopen** undoes it.
+
+### Other buttons
+
+- **Resend** next to a sent ticket: send it again, optionally to a corrected email address.
+- **Answers** tab and **Answers CSV**: the three-question answers grouped by situation, with no names
+  or references, so the promise on the questions screen holds when you build the six tasks.
+- **Tickets CSV**: every issued ticket, for the desk on day two.
+
+## What happens without you
+
+- **Advisers** are confirmed as soon as they submit and get their reference, a confirmation email and
+  a calendar invitation. There is no payment, so there is nothing for a person to check.
+- **Claimed sponsored seats** get their ticket straight away, and the sponsor gets a "seat claimed"
+  email each time. The sponsor's money was verified by you before the claim link existed.
+- Everything that depends on money (standard, member, corporate, the sponsor's link) waits for you.
+
+## Dates built in
+
+- Registration, claims and new answers close at the end of **30 October 2026** (Abuja time). After
+  that the page shows a closed screen, not a 404. Advisers can still confirm until 5 November.
+- To preview the closed screen before then, open the page with `?closed=1` on the end.
+- To change a date or price, edit `qlv2026/event.js`, then publish the site and redeploy the Worker.
+
+## Deploying changes
+
+```sh
+cd qlv-worker
+npm ci
+npx wrangler deploy          # needs CLOUDFLARE_API_TOKEN in the environment
+```
+
+The page itself publishes with the rest of the site when `main` changes.
+
+## Testing locally
+
+```sh
+cd qlv-worker && npm ci
+npx wrangler d1 execute qlv2026 --local --file=schema.sql
+echo 'SESSION_SECRET=local-test-secret' > .dev.vars
+npx wrangler dev --var ALLOWED_ORIGINS:http://localhost:8000 --var SITE_URL:http://localhost:8000/qlv2026/ --var ADMIN_EMAILS:admin@example.com
+# in another terminal, from the repo root
+python build.py && python -m http.server 8000 --directory _site
+```
+
+Without `RESEND_API_KEY`, emails are not sent: they are stored in the local KV under `outbox:` so you
+can read them with `npx wrangler kv key list --prefix outbox: --binding KV --local`.
+
+## Deleting someone's data
+
+```sh
+npx wrangler d1 execute qlv2026 --remote --command "DELETE FROM tickets WHERE reg_ref='QLV26-014'; DELETE FROM answers WHERE holder='r:QLV26-014'; DELETE FROM registrations WHERE ref='QLV26-014'"
+npx wrangler kv key delete --binding KV --remote "proof:QLV26-014"
+```
+
+Answers sent from a ticket link are stored under `t:<ticket id>`; look the id up in the tickets table.
