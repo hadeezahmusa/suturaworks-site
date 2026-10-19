@@ -14,7 +14,7 @@ NOTIFY_FROM = "Sutura Works Research <research@suturaworks.com>"
 [[d1_databases]]
 binding = "DB"
 database_name = "sutura-research"
-database_id = "REPLACE-AFTER-CREATE"
+database_id = "7c9d45a0-3f1c-4bd4-8168-fb4c7f1829bd"
 
 # Secrets (set with `wrangler secret put`, never stored in this file):
 #   EXPORT_KEY      long random key that protects the CSV download links

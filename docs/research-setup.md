@@ -28,6 +28,15 @@ Changes agreed with Hadeezah to the original questionnaire:
 Points Hadeezah should confirm before launch: the 12 month retention period for contact
 details, the 18 or older condition and the "15 to 25 minutes" time estimate.
 
+## Status on 19 October 2026
+
+- Deployed: Worker `sutura-research` at `https://sutura-research.suturaworks.workers.dev`, D1
+  database `sutura-research` with `schema.sql` applied, and `RESEND_API_KEY` set so each new
+  response emails socials@suturaworks.com (reference and respondent type only).
+- Still to do: Hadeezah adds `EXPORT_KEY` in the dashboard (step 2 below) to switch on the CSV downloads.
+- It shares nothing with the QLV 2026 registration (`qlv2026/`, `qlv-worker/`): separate Worker,
+  separate database.
+
 ## Status on 12 October 2026
 
 - Survey page, questions, Worker code and database schema are built and tested locally
