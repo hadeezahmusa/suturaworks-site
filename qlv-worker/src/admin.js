@@ -268,7 +268,7 @@ async function exportCsv(env, name) {
   if (name === "registrations.csv") {
     const { results } = await env.DB.prepare("SELECT * FROM registrations ORDER BY created_at").all();
     body = csv(results.map((r) => ({ ...r, flagged_for_release: flagged(r) ? "yes" : "", proof_uploaded: r.proof_at ? "yes" : "no" })),
-      ["ref", "status", "tier", "size", "amount", "name", "contact_person", "email", "phone", "organisation", "member_no", "member_year", "role", "invited_by", "mode", "named_publicly",
+      ["ref", "status", "tier", "size", "amount", "name", "contact_person", "email", "phone", "organisation", "member_no", "role", "invited_by", "mode", "named_publicly",
         "proof_uploaded", "created_at", "proof_at", "verified_at", "sent_at", "queried_at", "released_at", "query_note", "flagged_for_release"]);
   } else if (name === "tickets.csv") {
     const { results } = await env.DB.prepare("SELECT t.ticket_ref, t.reg_ref, t.kind, t.seat_no, t.name, t.email, t.phone, t.role, t.sent_at, r.organisation FROM tickets t JOIN registrations r ON r.ref = t.reg_ref WHERE t.ticket_ref != 'pending' ORDER BY t.id").all();
@@ -404,7 +404,7 @@ function renderDetail(d) {
   rows.push(["Email", '<a href="mailto:' + esc(r.email) + '">' + esc(r.email) + "</a>"]);
   if (r.phone) rows.push(["Phone", '<a href="tel:' + esc(r.phone) + '">' + esc(r.phone) + "</a>"]);
   if (r.organisation && r.tier !== "corporate") rows.push(["Organisation", esc(r.organisation)]);
-  if (r.tier === "member") rows.push(["Membership number", esc(r.member_no || "Not given")], ["Year joined", esc(r.member_year || "Not given")]);
+  if (r.tier === "member") rows.push(["Member code", '<span class="mono">' + esc(r.member_no || "") + "</span> (checked against the member list)"]);
   if (r.tier === "sponsored") rows.push(["Name publicly", r.named_publicly ? "Yes" : "No, anonymous"]);
   if (r.tier === "adviser") rows.push(["Role", esc(r.role)], ["Invited by", esc(r.invited_by)], ["Taking part as", { both: "Adviser and judge", judge: "Judge only", adviser: "Adviser only" }[r.mode]]);
   rows.push(["Registered", when(r.created_at)]);
@@ -422,7 +422,7 @@ function renderDetail(d) {
   let actions = "";
   if (r.status === "awaiting" || r.status === "queried") {
     actions = '<div class="note">Check the transfer for <b>' + esc(r.amountText) + '</b> with narration <b class="mono">' + esc(r.ref) + "</b> on the statement." +
-      (r.tier === "member" ? " Check the name against the JCI Aso member register too." : "") + (!r.proof_at ? " <b>No proof has been uploaded.</b>" : "") + "</div>" +
+(!r.proof_at ? " <b>No proof has been uploaded.</b>" : "") + "</div>" +
       '<div class="actions"><button class="btn teal" data-act="verify">Payment verified</button><button class="btn ghost" data-act="queryOpen">Query</button><button class="btn warn" data-act="release">Release seat</button></div>' +
       '<div id="queryBox" hidden><textarea id="queryNote" placeholder="What is missing or what to check. This text goes into the email."></textarea>' +
       '<div class="actions"><button class="btn ghost" data-act="queryPreview">Preview email</button><button class="btn" data-act="query">Send query email</button></div><div id="queryFrame"></div></div>';

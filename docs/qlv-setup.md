@@ -7,6 +7,39 @@ sitemap and not linked from any other page. Anyone with the link can open it. Th
 It carries JCI Aso's identity, not Sutura's. The design and copy come from the approved prototype and
 the build spec. The only Sutura presence is "Registration hosted by Sutura Works" in the top bar.
 
+## Landing page
+
+The shared link opens on the landing page from `qlv-2026-landing.html` (approved 19 October): the
+gold scaffold draws around the QLV mark, withdraws and leaves it standing. It plays once per browser
+session and shows at rest after that. Anyone who asks their device for reduced motion sees the
+finished page with no animation. Register leads to the ticket picker.
+
+Sound is off until the visitor presses **Sound**, because browsers do not let a page play sound
+before a tap. Pressing it replays the sequence with quiet cues made in the browser (`qlv2026/sound.js`).
+
+The WhatsApp preview uses `qlv2026/assets/og-card.png`. WhatsApp caches previews, so a link
+shared before a change may keep showing the old card for a while.
+
+The QLV logo file is only 324 pixels wide and looks soft on sharp screens. A larger PNG (at least
+1200 wide) or an SVG from JCI Aso would fix it; swap it in at `qlv2026/assets/qlv-white.png`.
+
+## Member codes
+
+The JCI Aso member rate needs the personal code JCI Aso gave each member. On the member ticket the
+page asks for the code, shows the name it belongs to, and once the person confirms it is them,
+fills in their name and code on the details form, locked. The server takes the name from the
+member list whatever the page sends, and a code can only hold one live registration (releasing it
+frees the code).
+
+The list is in the `members` table of the D1 database only. **It is not in this repository**,
+because the repository is public. To add or correct a member:
+
+```sh
+npx wrangler d1 execute qlv2026 --remote --command "INSERT OR REPLACE INTO members (code, name) VALUES ('ABC123', 'Full Name')"
+```
+
+Code checks are limited to 12 an hour per connection so the codes cannot be guessed by trying many.
+
 ## Logos
 
 `qlv2026/assets/jci-aso-white.png` and `qlv-white.png` are the white versions supplied on 19 October,

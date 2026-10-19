@@ -131,7 +131,6 @@ function questionsBlock(url, adviser) {
 // ---------- the emails ----------
 
 export function proofReceived(reg, statusUrl) {
-  const member = reg.tier === "member";
   const what = reg.tier === "sponsored" ? "your claim link goes to this address"
     : reg.tier === "corporate" ? "each person you named gets their own ticket by email"
     : "your ticket comes to this address";
@@ -139,13 +138,12 @@ export function proofReceived(reg, statusUrl) {
     p(`Hello ${esc(first(reg.contact_person || reg.name))}, thank you. We have your proof of payment and are checking it against the JCI Aso account. As soon as it clears, usually within one working day, ${what}.`) +
     refBox("Your reference", reg.ref, "Quote this if you need to get in touch.") +
     rows([["Ticket", esc(TIER_NAME[reg.tier])], ["Amount", ngn(reg.amount)]]) +
-    (member ? p("We are also checking your name against the JCI Aso member register. If it is not there we will contact you about the standard rate rather than cancel your place.") : "") +
     p(`You can check where things stand at any time: <a href="${esc(statusUrl)}" style="color:${C.link};font-weight:600;">your registration</a>.`, "font-size:12px;") +
     p("Nothing more from us after a working day? Reply to this email with your reference and the registration team will look it up.", "font-size:12px;margin:0;");
   return {
     subject: `Proof received for ${reg.ref}`,
     html: shell({ preheader: `We are checking your transfer for ${reg.ref}.`, body, foot: `<span style="font-family:${MONO};">${esc(reg.ref)}</span>` }),
-    text: `Proof received\n\nHello ${first(reg.contact_person || reg.name)}, thank you. We have your proof of payment and are checking it against the JCI Aso account. As soon as it clears, usually within one working day, ${what}.\n\nYour reference: ${reg.ref}\nTicket: ${TIER_NAME[reg.tier]}\nAmount: ${ngn(reg.amount)}\n${member ? "\nWe are also checking your name against the JCI Aso member register. If it is not there we will contact you about the standard rate rather than cancel your place.\n" : ""}\nYour registration: ${statusUrl}\n`,
+    text: `Proof received\n\nHello ${first(reg.contact_person || reg.name)}, thank you. We have your proof of payment and are checking it against the JCI Aso account. As soon as it clears, usually within one working day, ${what}.\n\nYour reference: ${reg.ref}\nTicket: ${TIER_NAME[reg.tier]}\nAmount: ${ngn(reg.amount)}\n\nYour registration: ${statusUrl}\n`,
   };
 }
 

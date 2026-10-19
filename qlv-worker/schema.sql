@@ -94,3 +94,11 @@ CREATE TABLE IF NOT EXISTS email_log (
   detail TEXT,
   created_at TEXT NOT NULL
 );
+
+-- JCI Aso members and their personal codes, loaded from the list JCI Aso
+-- supplied. Not kept in the repository: load it with a generated SQL file.
+CREATE TABLE IF NOT EXISTS members (
+  code TEXT PRIMARY KEY,
+  name TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS registrations_member ON registrations (member_no);

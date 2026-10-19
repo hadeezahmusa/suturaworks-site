@@ -5,12 +5,15 @@
 
 import { API, CONTACT, PRIVACY } from "./config.js";
 import { QBANK, SITUATIONS, MAX_ANSWER } from "./questions.js";
+import { playIntro, playTap, stop as stopSound } from "./sound.js";
 import { PRICES, SPONSORED_MIN, SPONSORED_MAX, TIER_NAME, BANK, CLOSES_AT, amountFor, ngn, word, closeLabel } from "./event.js";
 
 const STORE = "qlv26";
 const MAX_FILE = 5 * 1024 * 1024;
 const FILE_TYPES = { "image/jpeg": 1, "image/png": 1, "application/pdf": 1 };
-const NO_BAR = ["claim", "ticketview"];
+const NO_BAR = ["landing", "claim", "ticketview"];
+const INTRO_SEEN = "qlv26-intro";
+const reducedMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const params = new URLSearchParams(location.search);
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -186,7 +189,8 @@ function message(title, body, restart = true) {
 
 // Which screens the back and forward buttons may land on, given what we know.
 function allowed(id) {
-  if (["tickets", "details", "corporate", "sponsored"].includes(id)) return !closed && !S.proofDone;
+  if (id === "landing") return !S.proofDone;
+  if (["tickets", "membercode", "details", "corporate", "sponsored"].includes(id)) return !closed && !S.proofDone;
   if (id === "adviser") return true;
   if (id === "transfer") return !!S.ref && !S.proofDone;
   if (id === "pending") return !!S.proofDone;
@@ -207,9 +211,31 @@ const RENDER = {
     });
     $('[data-action="fromTickets"]').textContent = S.tier === "adviser" ? "Confirm your place" : "Continue to your details";
   },
+  landing() {
+    // Play the sequence once per session; after that show it at rest.
+    let seen = false;
+    try { seen = sessionStorage.getItem(INTRO_SEEN) === "1"; sessionStorage.setItem(INTRO_SEEN, "1"); } catch {}
+    $("#landing").classList.toggle("rest", seen);
+  },
+  membercode() {
+    const ok = !!S.member;
+    $("#codeOk").hidden = !ok;
+    $("#m-code").value = ok ? S.member.code : "";
+    if (ok) bind("memberName", S.member.name);
+    formError($("#f-code"), "");
+  },
   details() {
-    $("#memberBox").hidden = S.tier !== "member";
+    const member = S.tier === "member";
+    $("#memberBox").hidden = !member;
     fill($("#f-details"), S.details);
+    // Members: name and code come from the JCI Aso list and cannot be edited here.
+    const name = $("#d-name");
+    name.readOnly = member;
+    name.classList.toggle("locked", member);
+    if (member && S.member) {
+      name.value = S.member.name;
+      $("#d-mcode").value = S.member.code;
+    }
     drawSummary();
   },
   corporate() {
@@ -244,7 +270,6 @@ const RENDER = {
     show("pendCorporate", S.tier === "corporate");
     show("pendSponsor", S.tier === "sponsored");
     show("pendQuestions", S.tier !== "sponsored");
-    $("#memberPend").hidden = S.tier !== "member";
     bind("pendDay1",
       S.tier === "sponsored" ? "Your claim link arrives by email." :
       S.tier === "corporate" ? "Each ticket arrives by email." : "Your ticket arrives by email.");
@@ -290,10 +315,47 @@ const ACTIONS = {
   // the server updates the tier and amount until proof is uploaded.
   fromTickets() {
     if (S.tier === "adviser") return go("adviser");
+    if (S.tier === "member") return go(S.member ? "details" : "membercode");
     go(S.tier === "corporate" ? "corporate" : S.tier === "sponsored" ? "sponsored" : "details");
   },
   backFromTransfer() {
     go(S.tier === "corporate" ? "corporate" : S.tier === "sponsored" ? "sponsored" : "details");
+  },
+  backFromDetails() { go(S.tier === "member" ? "membercode" : "tickets"); },
+  // Landing
+  startRegistration() {
+    playTap();
+    go(closed ? "closed" : "tickets");
+  },
+  landingReplay() {
+    const seq = $("#lpSeq");
+    const fresh = seq.cloneNode(true);
+    seq.replaceWith(fresh);
+    $("#landing").classList.remove("rest");
+    if ($("#lpSound").getAttribute("aria-pressed") === "true") playIntro({ reduced: reducedMotion });
+  },
+  landingSound(btn) {
+    const on = btn.getAttribute("aria-pressed") !== "true";
+    btn.setAttribute("aria-pressed", on);
+    btn.querySelector("span").textContent = on ? "Sound on" : "Sound";
+    if (on) ACTIONS.landingReplay();
+    else stopSound();
+  },
+  // Member code
+  notMe() {
+    delete S.member;
+    delete S.memberCheck;
+    save();
+    RENDER.membercode();
+    formError($("#f-code"), "Check the code against the message JCI Aso sent you and try again. If the name shown is still wrong, ask JCI Aso to check it.");
+    $("#m-code").focus();
+  },
+  memberConfirm() {
+    if (!S.memberCheck) return;
+    S.member = S.memberCheck;
+    delete S.memberCheck;
+    save();
+    go("details");
   },
   backFromAdviser() { go(closed ? "closed" : "tickets"); },
   restart() {
@@ -440,6 +502,29 @@ async function register(form, payload) {
   }
 }
 
+$("#f-code").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.currentTarget;
+  const code = $("#m-code").value.replace(/\s+/g, "").toUpperCase();
+  $("#codeOk").hidden = true;
+  if (!code) return formError(f, "Please type the code JCI Aso sent you.");
+  formError(f, "");
+  busy(f, true);
+  try {
+    const body = { code };
+    if (S.ref && S.key) Object.assign(body, { ref: S.ref, key: S.key });
+    const r = await post("/api/member-check", body);
+    S.memberCheck = { code: r.code, name: r.name };
+    bind("memberName", r.name);
+    $("#codeOk").hidden = false;
+    $('[data-action="memberConfirm"]').focus();
+  } catch (err) {
+    formError(f, err.message);
+  } finally {
+    busy(f, false);
+  }
+});
+
 $("#f-details").addEventListener("submit", (e) => {
   e.preventDefault();
   const f = e.currentTarget;
@@ -448,7 +533,8 @@ $("#f-details").addEventListener("submit", (e) => {
   const v = values(f);
   S.details = v;
   save();
-  register(f, { tier: S.tier, ...v });
+  const extra = S.tier === "member" && S.member ? { memberCode: S.member.code, name: S.member.name } : {};
+  register(f, { tier: S.tier, ...v, ...extra });
 });
 
 $("#f-corporate").addEventListener("submit", (e) => {
@@ -810,7 +896,7 @@ async function init() {
   const want = location.hash.slice(1);
   if (want === "adviser") return go("adviser", false);
   if (closed) return go("closed", false);
-  go(allowed(want) ? want : "tickets", false);
+  go(want && allowed(want) ? want : "landing", false);
 }
 
 init();

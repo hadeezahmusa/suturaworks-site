@@ -138,6 +138,7 @@ textarea { min-height: 98px; line-height: 1.65; resize: vertical; }
 }
 
 /* Live build additions */
+input.locked { background: var(--panel); color: var(--ink); border-style: dashed; cursor: default; }
 /* The JCI Aso and QLV logos are white versions, so every place they sit is navy. */
 .bar { background: var(--navy); border-bottom: 3px solid var(--yel); padding: 12px 24px; }
 .brand em { color: #CFE0F3; }

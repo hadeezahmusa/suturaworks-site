@@ -145,11 +145,6 @@ function buildRegistration(b) {
     r.organisation = clean(b.organisation);
     r.situation = SITS.has(b.situation) ? b.situation : "emp";
     if (b.understand !== true) throw new HttpError(400, "Please tick the box to confirm you can attend both days.");
-    if (tier === "member") {
-      r.member_no = clean(b.memberNo, 40);
-      r.member_year = clean(b.memberYear, 4);
-      if (r.member_year && !/^(19|20)\d\d$/.test(r.member_year)) throw new HttpError(400, "Please give the year you joined as four digits, for example 2024.");
-    }
   } else if (tier === "corporate") {
     r.size = Number(b.pack);
     if (r.size !== 3 && r.size !== 5) throw new HttpError(400, "Please choose a team of three or a team of five.");
@@ -187,11 +182,39 @@ function buildRegistration(b) {
 
 const REG_FIELDS = ["tier", "size", "amount", "name", "email", "phone", "organisation", "situation", "member_no", "member_year", "contact_person", "named_publicly", "attendees"];
 
+// Members prove membership with the personal code JCI Aso sent them. The
+// list lives only in the database (table members), never in the site code.
+// A code can hold one live registration at a time; releasing frees it.
+async function memberFor(env, raw, ownRef) {
+  const code = String(raw || "").replace(/\s+/g, "").toUpperCase().slice(0, 12);
+  if (!code) throw new HttpError(400, "Please type the code JCI Aso sent you.");
+  const m = await env.DB.prepare("SELECT code, name FROM members WHERE code = ?").bind(code).first();
+  if (!m) throw new HttpError(404, "We could not find that code. Check it against the message JCI Aso sent you: it is letters followed by three numbers.", "bad_code");
+  const used = await env.DB.prepare("SELECT ref FROM registrations WHERE tier = 'member' AND member_no = ? AND status != 'released' AND ref != ?")
+    .bind(m.code, ownRef || "").first();
+  if (used) throw new HttpError(409, "This code has already been used to register. If that was not you, email the registration team with your code.", "code_used");
+  return m;
+}
+
+async function memberCheck(req, env) {
+  const b = await readJson(req);
+  if (isClosed(await closesAt(env))) throw new HttpError(403, "Registration for QLV 2026 has closed.", "closed");
+  await brake(env, req, "member", 12);
+  const m = await memberFor(env, b.code, b.ref && b.key ? String(b.ref) : "");
+  return { code: m.code, name: m.name };
+}
+
 async function register(req, env) {
   const b = await readJson(req);
   if (b.website) throw new HttpError(400, "We could not accept that registration.");
   if (isClosed(await closesAt(env))) throw new HttpError(403, "Registration for QLV 2026 has closed.", "closed");
   const r = buildRegistration(b);
+  if (r.tier === "member") {
+    // The name always comes from the member list, whatever the page sent.
+    const m = await memberFor(env, b.memberCode, b.ref ? String(b.ref) : "");
+    r.name = m.name;
+    r.member_no = m.code;
+  }
   const values = REG_FIELDS.map((f) => (r[f] === undefined ? null : r[f]));
   const stamp = now();
 
@@ -416,6 +439,7 @@ async function answers(req, env) {
 const ROUTES = {
   "GET /api/config": async (req, env) => ({ closesAt: await closesAt(env) }),
   "POST /api/register": (req, env) => register(req, env),
+  "POST /api/member-check": (req, env) => memberCheck(req, env),
   "POST /api/proof": (req, env, ctx) => uploadProof(req, env, ctx),
   "GET /api/status": (req, env, ctx, url) => status(url, env),
   "POST /api/adviser": (req, env, ctx) => adviser(req, env, ctx),
