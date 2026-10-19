@@ -282,7 +282,38 @@
   .lp-cta { transition: none; }
 }
 
-/* Two control pills need their own row on a phone, clear of the JCI Aso logo. */
+/* ---------- fit on one screen ----------
+   The landing should never need scrolling. Sizes follow the screen height
+   (svh: the height left once the browser's own bars are drawn), and on a
+   phone the pills flank the JCI Aso logo and the day cards sit side by side.
+   app.js scales the block down a little if a very short screen still cannot
+   hold it. */
+#landing { height: 100vh; height: 100svh; min-height: 0; overflow: hidden; }
+.lp-stage { flex: 1 1 auto; min-height: 0; }
+.lp-inner {
+  padding-block: clamp(14px, 3.4svh, 60px) clamp(14px, 3.4svh, 60px);
+  gap: clamp(10px, 2.5svh, 32px);
+  transform-origin: top center;
+}
+.lp-chapter img { width: clamp(84px, min(19vw, 22svh), 176px); }
+.lp-frame { width: min(100%, 520px, 58svh); }
+.lp-mark img { width: clamp(120px, min(34vw, 38svh), 262px); }
+.lp-theme { font-size: clamp(22px, min(6.1vw, 5.4svh), 50px); }
+.lp-strap { font-size: clamp(13.5px, min(2.3vw, 2.25svh), 17.5px); line-height: 1.55; }
+.lp-day { padding: clamp(10px, 1.6svh, 15px) clamp(12px, 1.8svh, 17px); }
+.lp-action { gap: clamp(8px, 1.4svh, 13px); }
+.lp-cta { min-height: 46px; padding: 13px 32px; }
+.lp-note-inner { padding-block: clamp(10px, 2svh, 22px) clamp(12px, 2.2svh, 26px); }
+
 @media (max-width: 640px) {
-  .lp-inner { padding-top: 72px; }
+  .lp-controls { left: calc(12px + env(safe-area-inset-left, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); justify-content: space-between; pointer-events: none; }
+  .lp-controls .lp-pill { pointer-events: auto; padding: 7px 11px; min-height: 34px; }
+  .lp-inner { padding-top: calc(10px + env(safe-area-inset-top, 0px)); }
+  .lp-chapter img { width: clamp(72px, 13svh, 104px); }
+  .lp-days { flex-wrap: nowrap; gap: 10px; }
+  .lp-day { flex: 1 1 0; flex-direction: column; gap: 4px; }
+  .lp-when { font-size: 13px; }
+  .lp-where { font-size: 12px; }
+  .lp-note p { font-size: 12px; line-height: 1.5; }
+  .lp-host { font-size: 9.5px; }
 }
