@@ -14,6 +14,8 @@ Website for Sutura Works Limited.
 - `build.py`: turns everything into the finished site in `_site/`
 - `research/`: the unlisted research survey page (see `docs/research-setup.md`)
 - `worker/`: the Cloudflare Worker and database schema that store survey responses
+- `qlv2026/`: the unlisted JCI Aso QLV 2026 registration page (see `docs/qlv-setup.md`)
+- `qlv-worker/`: the Worker behind it, including the admin pages
 
 ## Posting a new guide
 

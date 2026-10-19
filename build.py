@@ -24,7 +24,7 @@ GUIDES_DIR = ROOT / "guides"
 TEMPLATES = ROOT / "templates"
 SITE_URL = "https://suturaworks.com"
 CALENDLY = "https://calendly.com/hadeezahmusa/free-20-minute-consultation"
-STATIC = ["index.html", "thanks.html", "styles.css", "assets", "research", "CNAME"]
+STATIC = ["index.html", "thanks.html", "styles.css", "assets", "research", "qlv2026", "CNAME"]
 HOME_GUIDE_COUNT = 3
 REQUIRED = ["title", "description", "slug", "last_updated"]
 
@@ -187,7 +187,10 @@ def build():
         '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         + "".join(f"  <url><loc>{u}</loc></url>\n" for u in urls)
         + "</urlset>\n", encoding="utf-8")
-    (OUT / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}/sitemap.xml\n", encoding="utf-8")
+    # The QLV 2026 registration page is unlisted: kept out of the sitemap and
+    # out of search, reachable only by its link.
+    (OUT / "robots.txt").write_text(
+        f"User-agent: *\nDisallow: /qlv2026/\nAllow: /\nSitemap: {SITE_URL}/sitemap.xml\n", encoding="utf-8")
 
     print(f"Built {len(guides)} guide(s) into {OUT.name}/")
 

@@ -1,0 +1,27 @@
+name = "qlv2026"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[observability]
+enabled = true
+
+[vars]
+SITE_URL = "https://suturaworks.com/qlv2026/"
+ALLOWED_ORIGINS = "https://suturaworks.com,https://www.suturaworks.com"
+MAIL_FROM = "QLV 2026 Registration <qlv2026@suturaworks.com>"
+REPLY_TO = "info@suturaworks.com"
+ADMIN_EMAILS = "hadeezah@suturaworks.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "qlv2026"
+database_id = "edd8fccc-cfdc-42be-9357-0e8d1a735944"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "4a754ec7460a40588c96f2168a3bcc50"
+
+# Secrets (set with `wrangler secret put`, never stored in this file):
+#   RESEND_API_KEY  sends the emails through Resend
+#   SESSION_SECRET  long random value that signs the admin sign-in cookie
