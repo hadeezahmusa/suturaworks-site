@@ -7,6 +7,13 @@ sitemap and not linked from any other page. Anyone with the link can open it. Th
 It carries JCI Aso's identity, not Sutura's. The design and copy come from the approved prototype and
 the build spec. The only Sutura presence is "Registration hosted by Sutura Works" in the top bar.
 
+## Logos
+
+`qlv2026/assets/jci-aso-white.png` and `qlv-white.png` are the white versions supplied on 19 October,
+so every place they appear is navy: the top bar, the claim page header, the digital ticket and the
+email header. `favicon.png` is the JCI shield on navy. The older combined lockup files stay in the
+folder only because emails already sent point at them.
+
 ## How it fits together
 
 | Part | File | What it does |

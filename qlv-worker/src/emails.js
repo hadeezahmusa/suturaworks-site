@@ -24,7 +24,11 @@ function shell({ preheader, body, foot }) {
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:12px;overflow:hidden;">
 <tr><td bgcolor="${C.navy}" style="background:${C.navy};background-image:linear-gradient(168deg,#0F2B63 0%,#1A5AA8 100%);padding:20px 28px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-    <td><img src="${ASSETS}/jci-aso-qlv-lockup-white.png" alt="JCI Aso, Quality Leadership Value" height="28" style="height:28px;width:auto;display:block;border:0;"></td>
+    <td><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td><img src="${ASSETS}/jci-aso-white.png" alt="JCI Aso" width="74" height="36" style="height:36px;width:74px;display:block;border:0;"></td>
+      <td style="padding:0 12px;"><div style="width:1px;height:38px;background:#5B79A8;line-height:38px;font-size:1px;">&nbsp;</div></td>
+      <td><img src="${ASSETS}/qlv-white.png" alt="Quality Leadership Value" width="72" height="44" style="height:44px;width:72px;display:block;border:0;"></td>
+    </tr></table></td>
     <td align="right" style="font-family:${FONT};font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${C.yel};">6 &amp; 7 Nov 2026</td>
   </tr></table>
 </td></tr>
