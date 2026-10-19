@@ -138,6 +138,15 @@ textarea { min-height: 98px; line-height: 1.65; resize: vertical; }
 }
 
 /* Live build additions */
+/* The JCI Aso and QLV logos are white versions, so every place they sit is navy. */
+.bar { background: var(--navy); border-bottom: 3px solid var(--yel); padding: 12px 24px; }
+.brand em { color: #CFE0F3; }
+.host { color: #A9C2E2; }
+.logos { display: inline-flex; align-items: center; flex-shrink: 0; }
+.logos img { width: auto; display: block; }
+.logos i { width: 1px; height: 34px; background: rgba(255,255,255,.35); }
+.ticket .tk-hd .logos img { margin: 0; }
+@media (max-width: 480px) { .bar .logos img[alt="JCI Aso"] { height: 32px !important; } .bar .logos img[alt="Quality Leadership Value"] { height: 40px !important; } }
 .grid5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
 .tier.adv { background: #F7FBFB; border-style: dashed; border-color: #B9D8DB; }
 .tier.adv.sel { border-style: solid; border-color: var(--teal); box-shadow: 0 6px 18px rgba(31,125,135,.12); }
@@ -174,7 +183,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .tview { display: flex; justify-content: center; padding: 28px 16px 56px; background: #E3EBF4; min-height: 100vh; }
 .ticket { width: 380px; max-width: 100%; background: #fff; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(14,27,51,.16); }
 .ticket .tk-hd { background: linear-gradient(168deg, #0F2B63 0%, #164A97 55%, #1A5AA8 100%); padding: 22px 24px 28px; color: #fff; }
-.ticket .tk-hd img { height: 28px; width: auto; display: block; margin-bottom: 26px; }
 .ticket .tk-word { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .ticket .tk-word span { font-size: 34px; font-weight: 800; letter-spacing: -.5px; line-height: 1; }
 .ticket .tk-word .y { background: var(--yel); color: var(--navy); padding: 3px 10px; margin-left: 14px; }
@@ -197,3 +205,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .ticket .tk-ft { background: var(--yel); padding: 11px 24px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .ticket .tk-ft span { font-size: 10px; font-weight: 600; color: var(--navy); }
 .ticket .tk-ft code { font-family: 'IBM Plex Mono', monospace; font-size: 9px; font-weight: 500; color: #3A4A2E; }
+
+/* On a phone the questions prompt sits straight under "Proof received" and
+   stays compact, so it is on screen without scrolling. */
+@media (max-width: 480px) {
+  .cta.cta-first { padding: 18px; gap: 14px; }
+  .cta.cta-first .btn { width: 100%; justify-content: center; }
+}
