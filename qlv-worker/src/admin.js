@@ -248,6 +248,92 @@ async function setClosing(env, b) {
   return list(env, b.status || "awaiting");
 }
 
+// ---------- answers reminder ----------
+// One reminder per ticket holder who has not sent the three answers.
+// Resend's free plan allows 100 emails a day, so a batch never takes the last
+// 24 hours past DAILY_SAFE and never sends more than REMINDER_BATCH at once:
+// ticket emails sent the same day still have room. The admin sees counts
+// only, never who has or has not answered.
+const DAILY_SAFE = 90;
+const REMINDER_BATCH = 70;
+
+// Participants with a sent ticket who have no answers yet and no reminder
+// yet. Standard and member registrants may have answered from the pending
+// screen, which is stored against the registration (r:REF), so that counts.
+// A corporate billing contact's answers do not count for the attendees.
+const WAITING_SQL = `SELECT t.id, t.token, t.ticket_ref, t.reg_ref, t.name, t.email
+  FROM tickets t JOIN registrations r ON r.ref = t.reg_ref
+  WHERE t.sent_at IS NOT NULL AND r.status = 'confirmed'
+    AND t.kind IN ('standard', 'member', 'corporate', 'sponsored')
+    AND NOT EXISTS (SELECT 1 FROM answers a WHERE a.holder = 't:' || t.id)
+    AND NOT (t.kind IN ('standard', 'member') AND EXISTS (SELECT 1 FROM answers a WHERE a.holder = 'r:' || t.reg_ref))
+    AND NOT EXISTS (SELECT 1 FROM email_log l WHERE l.kind = 'answers_reminder' AND l.ok = 1 AND l.ref = t.reg_ref AND l.recipient = t.email)
+  ORDER BY t.id`;
+
+async function reminderStatus(env) {
+  const since = new Date(Date.now() - 86400000).toISOString();
+  const [waiting, reminded, recent] = await env.DB.batch([
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM (${WAITING_SQL})`),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM email_log WHERE kind = 'answers_reminder' AND ok = 1"),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM email_log WHERE ok = 1 AND created_at > ?").bind(since),
+  ]);
+  const close = await closesAt(env);
+  const w = waiting.results[0].n;
+  const sent24h = recent.results[0].n;
+  return {
+    waiting: w,
+    reminded: reminded.results[0].n,
+    sent24h,
+    batch: Math.min(w, REMINDER_BATCH, Math.max(0, DAILY_SAFE - sent24h)),
+    dailySafe: DAILY_SAFE,
+    closed: Date.now() >= Date.parse(close),
+    closeDate: closeLabel(close),
+  };
+}
+
+async function reminderPreview(env) {
+  const close = closeLabel(await closesAt(env));
+  const m = mail.answersReminder({ name: "Ada Obi", ticket_ref: "QLV26-000" }, `${env.SITE_URL}?answer=example`, close);
+  return { subject: m.subject, html: m.html };
+}
+
+async function sendReminders(env) {
+  const st = await reminderStatus(env);
+  if (st.closed) throw new HttpError(409, "Answers have closed, so there is nothing to remind people about.");
+  if (!st.waiting) throw new HttpError(409, "Everyone with a ticket has either answered or been reminded already.");
+  if (!st.batch) throw new HttpError(409, `${st.sent24h} emails have gone out in the last 24 hours, which is the safe limit on the free plan. Try again tomorrow.`);
+  const rows = (await env.DB.prepare(`${WAITING_SQL} LIMIT ?`).bind(st.batch).all()).results;
+  const msgs = rows.map((t) => ({ t, ...mail.answersReminder(t, ticketLinks(env, t).answer, st.closeDate) }));
+
+  let ok = false;
+  let detail = "";
+  if (env.RESEND_API_KEY) {
+    // One request for the whole batch keeps the Worker inside Cloudflare's
+    // per-request limits however many people are in it.
+    try {
+      const res = await fetch("https://api.resend.com/emails/batch", {
+        method: "POST",
+        headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
+        body: JSON.stringify(msgs.map((m) => ({ from: env.MAIL_FROM, to: [m.t.email], reply_to: env.REPLY_TO, subject: m.subject, html: m.html, text: m.text }))),
+      });
+      ok = res.ok;
+      detail = (await res.text()).slice(0, 300);
+    } catch (err) {
+      detail = String(err).slice(0, 300);
+    }
+  } else {
+    for (const m of msgs) await env.KV.put(`outbox:${Date.now()}:${token(6)}`, JSON.stringify({ kind: "answers_reminder", ref: m.t.reg_ref, to: m.t.email, subject: m.subject, html: m.html, text: m.text }), { expirationTtl: 86400 });
+    ok = true;
+    detail = "dev outbox";
+  }
+  // One insert for the whole batch, whatever its size.
+  await env.DB.prepare(`INSERT INTO email_log (ref, kind, recipient, ok, detail, created_at)
+      SELECT json_extract(value, '$.ref'), 'answers_reminder', json_extract(value, '$.to'), ?, ?, ? FROM json_each(?)`)
+    .bind(ok ? 1 : 0, ok ? "batch" : detail, now(), JSON.stringify(rows.map((t) => ({ ref: t.reg_ref, to: t.email })))).run();
+  if (!ok) throw new HttpError(502, "Resend did not accept the batch, so nobody was emailed. Try again in a few minutes.");
+  return { sent: rows.length, ...(await reminderStatus(env)) };
+}
+
 async function answerList(env) {
   const { results } = await env.DB.prepare("SELECT branch, a1, a2, a3, created_at FROM answers ORDER BY created_at DESC").all();
   return { answers: results, titles: Object.fromEntries(Object.entries(QBANK).map(([k, v]) => [k, { title: v.title, q: v.q.map((q) => q.t) }])) };
@@ -485,7 +571,41 @@ async function resend(btn) {
   try { renderDetail(await call("resend-ticket", { id: Number(btn.dataset.resend), email })); msg("Ticket sent to " + email + ".", true); } catch (err) { msg(err.message); }
 }
 
+async function loadReminders() {
+  const r = await call("reminders");
+  const box = $("#remind");
+  let state;
+  if (r.closed) state = "Answers have closed, so reminders are off.";
+  else if (!r.waiting) state = "Nobody is waiting for a reminder: everyone with a ticket has answered or already been reminded.";
+  else if (!r.batch) state = r.sent24h + " emails have gone out in the last 24 hours, the safe limit on the free plan. The next batch can go tomorrow.";
+  else state = "The next batch is " + r.batch + (r.batch === 1 ? " person." : " people.") + (r.batch < r.waiting ? " Press again tomorrow for the rest." : "");
+  box.innerHTML = '<h2>Remind people to send their three answers</h2>' +
+    '<p class="small" style="margin:0 0 6px"><b>' + r.waiting + '</b>' + (r.waiting === 1 ? ' ticket holder has' : ' ticket holders have') + ' not answered and not been reminded. ' + r.reminded + ' reminded so far. ' +
+    r.sent24h + ' of the ' + r.dailySafe + ' emails a day kept for the free plan used in the last 24 hours.</p>' +
+    '<p class="small" style="margin:0">' + esc(state) + ' Each person is reminded once. Judges, advisers and sponsors are not included. Answers close on ' + esc(r.closeDate) + '.</p>' +
+    '<div class="actions"><button class="btn ghost" data-rem="preview">Preview the email</button>' +
+    '<button class="btn gold" data-rem="send"' + (r.batch && !r.closed ? "" : " disabled") + '>Send next batch' + (r.batch ? " (" + r.batch + ")" : "") + '</button></div><div id="remFrame"></div>';
+  box.dataset.batch = r.batch;
+}
+
+async function remind(kind, btn) {
+  msg("");
+  if (kind === "preview") {
+    const m = await call("reminder-preview");
+    $("#remFrame").innerHTML = '<div class="small" style="margin:6px 0">' + esc(m.subject) + ' (shown with a sample name)</div><iframe sandbox="" title="Reminder preview" id="remPv"></iframe>';
+    $("#remPv").srcdoc = m.html;
+    return;
+  }
+  const n = Number($("#remind").dataset.batch || 0);
+  if (!n || !confirm("Send the reminder to the next " + n + (n === 1 ? " person" : " people") + "?")) return;
+  btn.disabled = true;
+  try { const r = await call("reminders", {}); msg("Reminder sent to " + r.sent + (r.sent === 1 ? " person." : " people."), true); }
+  catch (err) { msg(err.message); }
+  loadReminders();
+}
+
 async function loadAnswers() {
+  loadReminders().catch((err) => msg(err.message));
   const d = await call("answers");
   const by = {};
   d.answers.forEach((a) => { (by[a.branch] = by[a.branch] || []).push(a); });
@@ -499,6 +619,7 @@ document.addEventListener("click", (e) => {
   const tr = e.target.closest("tr[data-ref]"); if (tr) { open(tr.dataset.ref); return; }
   const a = e.target.closest("[data-act]"); if (a) { act(a.dataset.act, a); return; }
   const r = e.target.closest("[data-resend]"); if (r) { resend(r); return; }
+  const rm = e.target.closest("[data-rem]"); if (rm) { remind(rm.dataset.rem, rm).catch((err) => msg(err.message)); return; }
   const t = e.target.closest("[data-tab]");
   if (t) {
     tab = t.dataset.tab;
@@ -538,7 +659,7 @@ function appPage(email) {
     <div id="regsView"><div id="chips" class="chips"></div><p class="small" id="flagNote" style="margin:-4px 0 12px"></p>
       <div class="grid"><div class="list card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Ref</th><th>Who</th><th>Ticket</th><th>Amount</th><th class="hide-s">Proof</th><th class="hide-s">Registered</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
       <div class="side" id="detail"><div class="card small">Pick a registration to see its details and proof.</div></div></div></div>
-    <div id="answersView" hidden><div id="answers"></div></div>
+    <div id="answersView" hidden><div class="card" id="remind" style="margin:0 0 14px"></div><div id="answers"></div></div>
   </div>`, APP);
 }
 
@@ -595,6 +716,9 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET reg": () => detail(env, q.get("ref")),
       "GET preview": () => preview(env, q.get("ref")),
       "GET answers": () => answerList(env),
+      "GET reminders": () => reminderStatus(env),
+      "GET reminder-preview": () => reminderPreview(env),
+      "POST reminders": () => sendReminders(env),
       "POST verify": () => verify(env, body.ref),
       "POST unverify": () => unverify(env, body.ref),
       "POST send": () => send(env, body.ref),
