@@ -29,7 +29,7 @@ Secrets on the Worker: `RESEND_API_KEY` and `SESSION_SECRET`. Emails go from
 ## Admin
 
 Open **https://qlv2026.suturaworks.workers.dev/admin**, enter `hadeezah@suturaworks.com` and use the
-link that arrives (it works once and lasts 15 minutes). You stay signed in for 12 hours. To add the
+link that arrives (it works once and lasts 15 minutes). You stay signed in on that device for 7 days, then ask for a new link. Signing out ends it straight away. To add the
 treasurer later, add their address to `ADMIN_EMAILS` in `qlv-worker/wrangler.toml`, separated by a
 comma, and redeploy.
 
@@ -69,12 +69,16 @@ released automatically. **Release seat** moves it to Released without emailing a
   email each time. The sponsor's money was verified by you before the claim link existed.
 - Everything that depends on money (standard, member, corporate, the sponsor's link) waits for you.
 
-## Dates built in
+## Closing date
 
-- Registration, claims and new answers close at the end of **30 October 2026** (Abuja time). After
-  that the page shows a closed screen, not a 404. Advisers can still confirm until 5 November.
+- Registration, claims and new answers close at the end of **30 October 2026** (Abuja time) unless
+  you change it. After that the page shows a closed screen, not a 404. Advisers can still confirm
+  until 5 November.
+- To extend or reopen, change **Registration closes at the end of** at the top of the admin page and
+  press Save date. A past date closes registration straight away; a later date reopens it. Every
+  date on the page and in the sponsor emails follows it. The page picks the change up within a minute.
 - To preview the closed screen before then, open the page with `?closed=1` on the end.
-- To change a date or price, edit `qlv2026/event.js`, then publish the site and redeploy the Worker.
+- To change a price, edit `qlv2026/event.js`, then publish the site and redeploy the Worker.
 
 ## Deploying changes
 

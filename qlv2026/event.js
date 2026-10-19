@@ -22,7 +22,8 @@ export const TIER_NAME = {
 export const BANK = { number: "7723913012", name: "JCI Aso", bank: "FCMB" };
 
 // Registration, claims and new answers close at the end of 30 October 2026,
-// Abuja time (WAT, UTC+1).
+// Abuja time (WAT, UTC+1). This is the default: the admin page can move it,
+// and the Worker serves the current date at /api/config.
 export const CLOSES_AT = "2026-10-30T23:00:00Z";
 // Advisers can still confirm until day one.
 export const ADVISERS_CLOSE_AT = "2026-11-05T23:00:00Z";
@@ -46,4 +47,15 @@ export function ngn(n) {
 const WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
 export function word(n) {
   return WORDS[n] || String(n);
+}
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+// "30 October" for a closing time stored as the end of that day in Abuja.
+export function closeLabel(iso) {
+  const d = new Date(Date.parse(iso) + 3600000 - 60000);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+// The stored closing time for a YYYY-MM-DD date: the end of that day in Abuja.
+export function closeAtFor(date) {
+  return `${date}T23:00:00Z`;
 }

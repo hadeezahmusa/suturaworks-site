@@ -14,7 +14,7 @@
 </head>
 <body>
 
-<div class="bar" id="bar"><div class="brand"><img src="assets/jci-aso-qlv-lockup.png" alt="JCI Aso, Quality Leadership Value" width="135" height="32"><em>6 and 7 November 2026</em></div><span class="host">Registration hosted by Sutura Works</span></div>
+<div class="bar" id="bar"><div class="brand"><img src="assets/jci-aso-qlv-lockup.png" alt="JCI Aso, Quality Leadership Value" width="135" height="32"><em>6 and 7 November 2026</em></div><span class="host">Registration hosted by Sutura Works Limited</span></div>
 
 <noscript><div class="wrap"><div class="inner narrow"><div class="card"><p>This registration page needs JavaScript switched on. If you cannot switch it on, email <a href="mailto:info@suturaworks.com">info@suturaworks.com</a> and the registration team will help.</p></div></div></div></noscript>
 
@@ -38,7 +38,7 @@
     <div class="card closed-panel">
       <span class="chip gold" style="display:inline-block">Registration closed</span>
       <h1 style="margin-top:12px">Registration for QLV 2026 has closed</h1>
-      <p style="margin-top:8px">Registration closed on 30 October. Thank you to everyone who signed up. Teams are announced on day one.</p>
+      <p style="margin-top:8px">Registration closed on <span data-bind="closeDate">30 October</span>. Thank you to everyone who signed up. Teams are announced on day one.</p>
       <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
         <div class="tl"><b>Fri 6 Nov</b><span>Day one, virtual, 4:00pm.</span></div>
         <div class="tl"><b>Sat 7 Nov</b><span>Day two at the Transcorp Hilton, Abuja, 8:30am to 4:00pm.</span></div>
@@ -69,7 +69,7 @@
         <div style="display:flex;gap:9px;align-items:baseline"><b style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--blue)">D2</b><span style="font-size:12.5px;font-weight:500">Saturday 7 November, 8:30am, Transcorp Hilton, Abuja</span></div>
       </div>
     </div>
-    <div class="grid4" role="radiogroup" aria-label="Ticket type">
+    <div class="grid5" role="radiogroup" aria-label="Ticket type">
       <div class="tier sel" id="t-standard" data-tier="standard" role="radio" tabindex="0" aria-checked="true">
         <div class="top"><div class="nm">Standard</div></div>
         <div class="pr">&#8358;10,000</div>
@@ -90,15 +90,14 @@
         <div class="pr">&#8358;9,500 <span style="font-size:13px;font-weight:500;color:var(--body)">each</span></div>
         <p style="font-size:12px">Pay for six or more people. You get a link to share. They fill their own details and get their tickets.</p>
       </div>
-    </div>
-    <div class="card" style="padding:16px 20px">
-      <div class="row">
-        <p style="font-size:12px">Invited to serve as an adviser or judge on day two? You do not pay and you do not need a ticket.</p>
-        <button class="btn ghost" style="padding:12px 20px;min-height:44px;font-size:13px" data-go="adviser">Confirm your place &rarr;</button>
+      <div class="tier adv" id="t-adviser" data-tier="adviser" role="radio" tabindex="0" aria-checked="false">
+        <div class="top"><div class="nm">Adviser or judge</div><span class="chip pill">By invitation</span></div>
+        <div class="pr" style="color:var(--teal)">Free</div>
+        <p style="font-size:12px">Invited to advise or judge on day two? Confirm your place here. No ticket and nothing to pay.</p>
       </div>
     </div>
     <div class="row">
-      <span class="fine">Registration closes 30 October. Teams are built as seats fill, so the earlier you register the better the mix we can put you in.</span>
+      <span class="fine">Registration closes <span data-bind="closeDate">30 October</span>. Teams are built as seats fill, so the earlier you register the better the mix we can put you in.</span>
       <button class="btn" data-action="fromTickets">Continue to your details</button>
     </div>
   </div></div>
@@ -298,7 +297,7 @@
           <div class="tot"><b>Total</b><s data-bind="amount">&#8358;57,000</s></div>
           <div class="hr"></div>
           <span class="fine">Your claim link is sent once the transfer is verified. Each person gets their ticket when they fill the form on that link.</span>
-          <span class="fine">Unclaimed seats are released on 30 October so they can be sold.</span>
+          <span class="fine">Unclaimed seats are released on <span data-bind="closeDate">30 October</span> so they can be sold.</span>
         </div>
       </div></div>
     </div>
@@ -425,7 +424,7 @@
       <div class="t"><span class="eb">While you wait</span><h2>Tell us what to fix</h2><p>The problems your team works on come from answers people send us, not from the committee. Three questions, two minutes.</p></div>
       <button class="btn gold" data-action="questionsFromPending">Answer the three questions</button>
     </div>
-    <p class="fine">Nothing in your inbox after a working day? Send your reference to the <a class="js-contact" href="mailto:info@suturaworks.com">registration team</a> and they will look it up.</p>
+    <p class="fine">Nothing in your inbox after a working day? Check your junk or spam folder first. If it is not there, send your reference to the <a class="js-contact" href="mailto:info@suturaworks.com">registration team</a> and they will look it up.</p>
     <p class="fine">Registering somebody else as well? <button class="back" style="font-size:11px" data-action="restart">Start a new registration</button></p>
   </div></div>
 </section>
@@ -450,7 +449,7 @@
     </div>
     <div class="card" style="padding:0;overflow:hidden">
       <div class="row" style="padding:18px 24px;border-bottom:1px solid var(--line)">
-        <div><b style="font-size:15px" data-bind="spCount">Two of six seats claimed</b><p class="fine" style="margin-top:3px">Unclaimed seats are released on 30 October and refunded</p></div>
+        <div><b style="font-size:15px" data-bind="spCount">Two of six seats claimed</b><p class="fine" style="margin-top:3px">Unclaimed seats are released on <span data-bind="closeDate">30 October</span> and refunded</p></div>
         <div class="pips" id="spPips"></div>
       </div>
       <div id="claimRows"></div>
@@ -484,7 +483,7 @@
         <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
         <div class="formerr" data-err hidden></div>
         <button type="submit" class="btn" style="width:100%;justify-content:center">Claim my seat</button>
-        <p class="fine" style="text-align:center">Seats not claimed by 30 October go back on sale. You will be asked three short questions after this.</p>
+        <p class="fine" style="text-align:center">Seats not claimed by <span data-bind="closeDate">30 October</span> go back on sale. You will be asked three short questions after this.</p>
         <p class="privacy js-privacy" style="text-align:center"></p>
       </form>
     </div>
@@ -583,6 +582,7 @@
       <div class="t"><span class="eb">One ask before the day</span><h2>Send us a problem</h2><p>The six tasks come from real workplace problems people send in. If you have one worth putting in front of a team, it takes two minutes.</p></div>
       <button class="btn gold" data-action="questionsFromAdviser">Send a problem</button>
     </div>
+    <p class="fine">No email from us within a few minutes? Check your junk or spam folder, and mark it as not spam so the brief reaches you too.</p>
     <p class="fine">Something changed and you can no longer make it? Reply to the invitation as early as you can, because the roving routes are built around who is coming.</p>
   </div></div>
 </section>
@@ -643,7 +643,7 @@
       </div>
     </div>
     <div class="row">
-      <span class="fine">Thought of another one? You can send a second answer any time before 30 October.</span>
+      <span class="fine">Thought of another one? You can send a second answer any time before <span data-bind="closeDate">30 October</span>.</span>
       <button type="button" class="btn ghost" data-action="questionsAgain">Send another</button>
     </div>
   </div></div>
