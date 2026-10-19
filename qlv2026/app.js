@@ -212,6 +212,7 @@ const RENDER = {
     $('[data-action="fromTickets"]').textContent = S.tier === "adviser" ? "Confirm your place" : "Continue to your details";
   },
   landing() {
+    requestAnimationFrame(fitLanding);
     // Play the sequence once per session; after that show it at rest.
     let seen = false;
     try { seen = sessionStorage.getItem(INTRO_SEEN) === "1"; sessionStorage.setItem(INTRO_SEEN, "1"); } catch {}
@@ -281,6 +282,26 @@ const RENDER = {
   questions() { drawQuestions(); },
 };
 
+// ---------- landing fit ----------
+
+// The landing should sit on one screen. CSS sizes it from the screen height;
+// if a very short screen still cannot hold it, shrink the block to fit
+// rather than make anyone scroll. Never below 70%, so text stays readable.
+function fitLanding() {
+  const stage = $(".lp-stage");
+  const inner = $("#lpSeq");
+  if (!stage || !inner || !$("#landing").classList.contains("on")) return;
+  inner.style.transform = "";
+  inner.style.marginTop = "";
+  const room = stage.clientHeight;
+  const need = inner.offsetHeight;
+  const scale = Math.max(0.7, Math.min(1, room / need));
+  if (scale < 1) inner.style.transform = `scale(${scale})`;
+  inner.style.marginTop = Math.max(0, (room - need * scale) / 2) + "px";
+}
+window.addEventListener("resize", fitLanding);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitLanding);
+
 // ---------- tickets screen ----------
 
 function pickTier(tier) {
@@ -331,6 +352,7 @@ const ACTIONS = {
     const seq = $("#lpSeq");
     const fresh = seq.cloneNode(true);
     seq.replaceWith(fresh);
+    fitLanding();
     $("#landing").classList.remove("rest");
     if ($("#lpSound").getAttribute("aria-pressed") === "true") playIntro({ reduced: reducedMotion });
   },
