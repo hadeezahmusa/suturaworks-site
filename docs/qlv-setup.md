@@ -94,6 +94,19 @@ Anything still Awaiting 3 days after it was registered shows **Flagged for relea
 released automatically. **Release seat** moves it to Released without emailing anyone, and
 **Reopen** undoes it.
 
+### Reminding people to send their three answers
+
+In the **Answers** tab, **Send next batch** emails a reminder to ticket holders who have not sent
+their three answers. Each person is reminded once. People who answered from the Proof received
+screen count as answered. Judges, advisers, sponsors and anyone without a sent ticket are left out.
+The tab shows counts only, never who has or has not answered.
+
+Resend's free plan allows 100 emails a day, so a batch is at most 70 and never takes the last 24
+hours past 90, which keeps room for that day's ticket emails. If more people are waiting, the tab
+says so: press it again the next day. A good moment is about a week before answers close, with a
+second press for any batch left over. If you move to Resend Pro, raise `DAILY_SAFE` and
+`REMINDER_BATCH` at the top of the reminder section in `qlv-worker/src/admin.js`.
+
 ### Other buttons
 
 - **Resend** next to a sent ticket: send it again, optionally to a corrected email address.

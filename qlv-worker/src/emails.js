@@ -233,6 +233,21 @@ export function seatClaimed(reg, t, taken, manageUrl, closeDate = "30 October") 
   };
 }
 
+// The one reminder to ticket holders who have not sent their three answers.
+// Worded so it still reads well to someone who answered on the same day.
+export function answersReminder(t, answerUrl, closeDate) {
+  const body = h1("Two minutes before QLV 2026") +
+    p(`Hello ${esc(first(t.name))}, the six problems teams work on at QLV 2026 come from answers people send us, not from the committee. If you have not sent yours yet, it is three short questions and takes about two minutes.`) +
+    button(answerUrl, "Answer the three questions", true) +
+    p("Your answers are read without your name on them. If your problem becomes one of the six tasks, nobody in the room is told whose it was.", "font-size:12px;") +
+    p(`Answers close on ${esc(closeDate)}. If you have already sent yours, thank you, and please ignore this email.`, "font-size:12px;margin:0;");
+  return {
+    subject: "Three questions before QLV 2026",
+    html: shell({ preheader: "The six sprint tasks come from answers like yours. Two minutes.", body, foot: `<span style="font-family:${MONO};">${esc(t.ticket_ref)}</span>` }),
+    text: `Two minutes before QLV 2026\n\nHello ${first(t.name)}, the six problems teams work on at QLV 2026 come from answers people send us, not from the committee. If you have not sent yours yet, it is three short questions and takes about two minutes.\n\nAnswer the three questions: ${answerUrl}\n\nYour answers are read without your name on them. Answers close on ${closeDate}. If you have already sent yours, thank you, and please ignore this email.\n`,
+  };
+}
+
 export function adminLogin(url) {
   const body = h1("Sign in to QLV 2026 admin") +
     p("Use the button below to sign in. It works once and expires in 15 minutes.") +
