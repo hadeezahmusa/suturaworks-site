@@ -38,6 +38,17 @@ because the repository is public. To add or correct a member:
 npx wrangler d1 execute qlv2026 --remote --command "INSERT OR REPLACE INTO members (code, name) VALUES ('ABC123', 'Full Name')"
 ```
 
+Members' emails sit in the same table (column `email`). The admin page's **Member codes** tab
+emails each member with an email on file their own code, once, with a preview first. Members who
+have already registered with their code are skipped. It uses the same daily allowance as the
+reminder button. To add an email later:
+
+```sh
+npx wrangler d1 execute qlv2026 --remote --command "UPDATE members SET email = 'name@example.com' WHERE code = 'ABC123'"
+```
+
+Then press **Send codes** again: only the newly added members are emailed.
+
 Code checks are limited to 12 an hour per connection so the codes cannot be guessed by trying many.
 
 ## Logos

@@ -99,6 +99,9 @@ CREATE TABLE IF NOT EXISTS email_log (
 -- supplied. Not kept in the repository: load it with a generated SQL file.
 CREATE TABLE IF NOT EXISTS members (
   code TEXT PRIMARY KEY,
-  name TEXT NOT NULL
+  name TEXT NOT NULL,
+  email TEXT
 );
+-- Databases created before 21 October 2026 need the email column added once:
+--   ALTER TABLE members ADD COLUMN email TEXT;
 CREATE INDEX IF NOT EXISTS registrations_member ON registrations (member_no);

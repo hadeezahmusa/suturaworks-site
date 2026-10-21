@@ -248,6 +248,24 @@ export function answersReminder(t, answerUrl, closeDate) {
   };
 }
 
+// A JCI Aso member's personal code for the member rate.
+export function memberCode(m, siteUrl, closeDate) {
+  const body = h1("Your member code for QLV 2026") +
+    p(`Hello ${esc(first(m.name))}, as a JCI Aso member you can register for QLV 2026 at the member rate of ${ngn(8000)} instead of ${ngn(10000)}. Here is your personal code.`) +
+    refBox("Your member code", m.code, "It is yours alone and works once, so please keep it to yourself.") +
+    p("Open the registration page, choose <b>JCI Aso member</b>, enter your code and confirm your name. Then fill in the rest and make the transfer.") +
+    button(siteUrl, "Register for QLV 2026") +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">${[["D1", "Fri 6 Nov, 4:00pm. Virtual, you meet your team"], ["D2", "Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja"]].map(([k, v]) =>
+      `<tr><td valign="top" style="width:28px;padding:0 0 8px;font-family:${MONO};font-size:10px;font-weight:600;color:${C.blue};">${k}</td><td style="padding:0 0 8px;font-family:${FONT};font-size:12px;font-weight:500;color:${C.ink};">${v}</td></tr>`).join("")}</table>` +
+    p(`Registration closes on ${esc(closeDate)}. Teams are built as seats fill, so the earlier you register the better the mix. If the name on this code is not yours, reply to this email.`, "font-size:12px;") +
+    p("Hadeezah Balarabe Musa<br>Chairperson, QLV 2026", "font-size:12px;margin:0;");
+  return {
+    subject: "Your JCI Aso member code for QLV 2026",
+    html: shell({ preheader: `Your code for the ${ngn(8000)} member rate.`, body, foot: `Member code &middot; <span style="font-family:${MONO};">${esc(m.code)}</span>` }),
+    text: `Your member code for QLV 2026\n\nHello ${first(m.name)}, as a JCI Aso member you can register for QLV 2026 at the member rate of ${ngn(8000)} instead of ${ngn(10000)}.\n\nYour member code: ${m.code}\nIt is yours alone and works once, so please keep it to yourself.\n\nOpen ${siteUrl}, choose JCI Aso member, enter your code and confirm your name. Then fill in the rest and make the transfer.\n\nD1: Fri 6 Nov, 4:00pm. Virtual\nD2: Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja\n\nRegistration closes on ${closeDate}. If the name on this code is not yours, reply to this email.\n\nHadeezah Balarabe Musa\nChairperson, QLV 2026\n`,
+  };
+}
+
 export function adminLogin(url) {
   const body = h1("Sign in to QLV 2026 admin") +
     p("Use the button below to sign in. It works once and expires in 15 minutes.") +
