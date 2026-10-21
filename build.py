@@ -24,7 +24,7 @@ GUIDES_DIR = ROOT / "guides"
 TEMPLATES = ROOT / "templates"
 SITE_URL = "https://suturaworks.com"
 CALENDLY = "https://calendly.com/hadeezahmusa/free-20-minute-consultation"
-STATIC = ["index.html", "thanks.html", "styles.css", "assets", "research", "qlv2026", "CNAME"]
+STATIC = ["index.html", "thanks.html", "styles.css", "assets", "research", "qlv2026", "card", "CNAME"]
 HOME_GUIDE_COUNT = 3
 REQUIRED = ["title", "description", "slug", "last_updated"]
 

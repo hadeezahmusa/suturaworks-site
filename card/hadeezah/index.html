@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Hadeezah Balarabe Musa | Sutura Works Limited</title>
+  <meta name="description" content="Hadeezah Balarabe Musa, Founder, Process Design Lead at Sutura Works Limited. Save the contact or get in touch.">
+  <meta property="og:title" content="Hadeezah Balarabe Musa | Sutura Works Limited">
+  <meta property="og:description" content="Founder, Process Design Lead. Tap to save my contact.">
+  <meta property="og:image" content="https://suturaworks.com/assets/team/hadeezah.jpg">
+  <meta name="theme-color" content="#0F1E1A">
+  <link rel="icon" href="../../assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="../../assets/favicon.png">
+  <link rel="stylesheet" href="../card.css">
+</head>
+<body>
+  <main class="card">
+    <div class="top"><a href="https://suturaworks.com"><img src="../../assets/lockup-white.png" alt="Sutura Works Limited" width="108" height="30"></a></div>
+    <div class="photo"><img src="../../assets/team/hadeezah.jpg" alt="Hadeezah Balarabe Musa" width="800" height="1000"></div>
+    <h1>Hadeezah Balarabe Musa</h1>
+    <p class="role">Founder<br>Process Design Lead</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="hadeezah.vcf" download="Hadeezah Balarabe Musa.vcf">Save my contact <span>&darr;</span></a>
+      <a class="btn btn-line" href="tel:+2347033901986">Call +234 703 390 1986 <span>&rarr;</span></a>
+      <a class="btn btn-line" href="mailto:hadeezah@suturaworks.com">hadeezah@suturaworks.com <span>&rarr;</span></a>
+      <a class="btn btn-line" href="https://calendly.com/hadeezahmusa/free-20-minute-consultation" target="_blank" rel="noopener">Book a free 20 minute call <span>&rarr;</span></a>
+      <button class="btn btn-line" type="button" id="share">Share this card <span>&rarr;</span></button>
+    </div>
+    <p class="toast" id="toast" role="status"></p>
+    <div class="co">
+      <b>Sutura Works Limited</b><br>RC 8908551<br>25, Aliyu Turaki Road off Isa Kaita Road,<br>Malali GRA, Kaduna, Kaduna State<br><a href="https://suturaworks.com">suturaworks.com</a>
+    </div>
+  </main>
+  <script>
+    document.getElementById("share").addEventListener("click", async () => {
+      const data = { title: "Hadeezah Balarabe Musa, Sutura Works Limited", url: location.href };
+      try {
+        if (navigator.share) await navigator.share(data);
+        else { await navigator.clipboard.writeText(location.href); document.getElementById("toast").textContent = "Link copied."; }
+      } catch (e) {}
+    });
+  </script>
+</body>
+</html>
