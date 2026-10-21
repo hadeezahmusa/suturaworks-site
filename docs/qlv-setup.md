@@ -84,6 +84,21 @@ link that arrives (it works once and lasts 15 minutes). You stay signed in on th
 treasurer later, add their address to `ADMIN_EMAILS` in `qlv-worker/wrangler.toml`, separated by a
 comma, and redeploy.
 
+### Who can sign in
+
+- **Admins** (`ADMIN_EMAILS` in `wrangler.toml`): everything.
+- **Verifiers** (`VERIFIER_EMAILS`, a Worker secret so personal addresses stay out of the code):
+  the Registrations tab only. They can open registrations, view proofs, press **Payment verified**,
+  undo their own verification before tickets go out and download the Registrations CSV. Sending
+  tickets, queries, releases, settings, answers and member codes stay with admins, and the server
+  enforces it. Each registration shows who verified it.
+
+The treasurer is a verifier. To change verifiers: `npx wrangler secret put VERIFIER_EMAILS` with a
+comma separated list.
+
+When the treasurer verifies, the registration moves to **Verified, not sent**: check that filter
+daily, preview and press Send.
+
 ### Daily routine
 
 1. Download **Registrations CSV** and send it to the treasurer. Each row has the reference, name,

@@ -25,3 +25,4 @@ id = "4a754ec7460a40588c96f2168a3bcc50"
 # Secrets (set with `wrangler secret put`, never stored in this file):
 #   RESEND_API_KEY  sends the emails through Resend
 #   SESSION_SECRET  long random value that signs the admin sign-in cookie
+#   VERIFIER_EMAILS comma separated; can verify payments only (kept out of the code)
