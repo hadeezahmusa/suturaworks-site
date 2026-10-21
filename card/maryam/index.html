@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Maryam Baba-Ahmed | Sutura Works Limited</title>
+  <meta name="description" content="Maryam Baba-Ahmed, Company Secretary at Sutura Works Limited. Save the contact or get in touch.">
+  <meta property="og:title" content="Maryam Baba-Ahmed | Sutura Works Limited">
+  <meta property="og:description" content="Company Secretary. Tap to save my contact.">
+  <meta property="og:image" content="https://suturaworks.com/assets/team/maryam.jpg">
+  <meta name="theme-color" content="#0F1E1A">
+  <link rel="icon" href="../../assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="../../assets/favicon.png">
+  <link rel="stylesheet" href="../card.css">
+</head>
+<body>
+  <main class="card">
+    <div class="top"><a href="https://suturaworks.com"><img src="../../assets/lockup-white.png" alt="Sutura Works Limited" width="108" height="30"></a></div>
+    <div class="photo"><img src="../../assets/team/maryam.jpg" alt="Maryam Baba-Ahmed" width="800" height="1000"></div>
+    <h1>Maryam <span style="white-space:nowrap">Baba-Ahmed</span></h1>
+    <p class="role">Company Secretary</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="maryam.vcf" download="Maryam Baba-Ahmed.vcf">Save my contact <span>&darr;</span></a>
+      <a class="btn btn-line" href="tel:+2348033488915">Call +234 803 348 8915 <span>&rarr;</span></a>
+      <a class="btn btn-line" href="mailto:maryam@suturaworks.com">maryam@suturaworks.com <span>&rarr;</span></a>
+      <button class="btn btn-line" type="button" id="share">Share this card <span>&rarr;</span></button>
+    </div>
+    <p class="toast" id="toast" role="status"></p>
+    <div class="co">
+      <b>Sutura Works Limited</b><br>RC 8908551<br>25, Aliyu Turaki Road off Isa Kaita Road,<br>Malali GRA, Kaduna, Kaduna State<br><a href="https://suturaworks.com">suturaworks.com</a>
+    </div>
+  </main>
+  <script>
+    document.getElementById("share").addEventListener("click", async () => {
+      const data = { title: "Maryam Baba-Ahmed, Sutura Works Limited", url: location.href };
+      try {
+        if (navigator.share) await navigator.share(data);
+        else { await navigator.clipboard.writeText(location.href); document.getElementById("toast").textContent = "Link copied."; }
+      } catch (e) {}
+    });
+  </script>
+</body>
+</html>

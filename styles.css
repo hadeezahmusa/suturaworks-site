@@ -283,3 +283,4 @@ h3 { font-size: clamp(22px, 2vw, 30px); line-height: 1.2; }
 
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
 .list-grid { margin-top: 64px; }
+.nowrap { white-space: nowrap; }
