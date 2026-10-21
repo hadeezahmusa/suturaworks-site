@@ -265,9 +265,14 @@ export function answersReminder(t, answerUrl, closeDate) {
 }
 
 // A JCI Aso member's personal code for the member rate.
-export function memberCode(m, siteUrl, closeDate) {
-  const body = h1("Your member code for QLV 2026") +
-    p(`Hello ${esc(first(m.name))}, as a JCI Aso member you can register for QLV 2026 at the member rate of ${ngn(8000)} instead of ${ngn(10000)}. Here is your personal code.`) +
+// fix: null for the first send; { codeChanged } when the admin corrected the
+// member's name, code or email and is sending the code again.
+export function memberCode(m, siteUrl, closeDate, fix = null) {
+  const intro = !fix ? `Hello ${esc(first(m.name))}, as a JCI Aso member you can register for QLV 2026 at the member rate of ${ngn(8000)} instead of ${ngn(10000)}. Here is your personal code.`
+    : fix.codeChanged ? `Hello ${esc(first(m.name))}, thank you for letting us know. We have corrected your name on the JCI Aso list to <b>${esc(m.name)}</b>, and your code has changed to match it. Please use the code below from now on. You can register at the member rate of ${ngn(8000)} instead of ${ngn(10000)}.`
+    : `Hello ${esc(first(m.name))}, thank you for letting us know. We have updated your details on the JCI Aso list, and your name now reads <b>${esc(m.name)}</b>. Your code is below. You can register at the member rate of ${ngn(8000)} instead of ${ngn(10000)}.`;
+  const body = h1(fix ? "Your corrected member code for QLV 2026" : "Your member code for QLV 2026") +
+    p(intro) +
     refBox("Your member code", m.code, "It is yours alone and works once, so please keep it to yourself.") +
     p("Open the registration page, choose <b>JCI Aso member</b>, enter your code and confirm your name. Then fill in the rest and make the transfer.") +
     button(siteUrl, "Register for QLV 2026") +
@@ -276,9 +281,9 @@ export function memberCode(m, siteUrl, closeDate) {
     p(`Registration closes on ${esc(closeDate)}. Teams are built as seats fill, so the earlier you register the better the mix. If the name on this code is not yours, reply to this email.`, "font-size:12px;") +
     p("Hadeezah Balarabe Musa<br>Chairperson, QLV 2026", "font-size:12px;margin:0;");
   return {
-    subject: "Your JCI Aso member code for QLV 2026",
+    subject: fix ? "Your corrected JCI Aso member code for QLV 2026" : "Your JCI Aso member code for QLV 2026",
     html: shell({ preheader: `Your code for the ${ngn(8000)} member rate.`, body, foot: `Member code &middot; <span style="font-family:${MONO};">${esc(m.code)}</span>` }),
-    text: `Your member code for QLV 2026\n\nHello ${first(m.name)}, as a JCI Aso member you can register for QLV 2026 at the member rate of ${ngn(8000)} instead of ${ngn(10000)}.\n\nYour member code: ${m.code}\nIt is yours alone and works once, so please keep it to yourself.\n\nOpen ${siteUrl}, choose JCI Aso member, enter your code and confirm your name. Then fill in the rest and make the transfer.\n\nD1: Fri 6 Nov, 4:00pm. Virtual\nD2: Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja\n\nRegistration closes on ${closeDate}. If the name on this code is not yours, reply to this email.\n\nHadeezah Balarabe Musa\nChairperson, QLV 2026\n`,
+    text: `${fix ? "Your corrected member code for QLV 2026" : "Your member code for QLV 2026"}\n\n${intro.replace(/<[^>]+>/g, "")}\n\nYour member code: ${m.code}\nIt is yours alone and works once, so please keep it to yourself.\n\nOpen ${siteUrl}, choose JCI Aso member, enter your code and confirm your name. Then fill in the rest and make the transfer.\n\nD1: Fri 6 Nov, 4:00pm. Virtual\nD2: Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja\n\nRegistration closes on ${closeDate}. If the name on this code is not yours, reply to this email.\n\nHadeezah Balarabe Musa\nChairperson, QLV 2026\n`,
   };
 }
 

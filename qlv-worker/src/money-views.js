@@ -13,7 +13,7 @@ export const MONEY_STYLE = String.raw`
 #mForm textarea{min-height:70px}#mForm [hidden]{display:none!important}#mForm input[type=file]{margin-top:6px;font-size:12px;max-width:100%}
 .pill.kind{background:#EDE6F6;color:#4B2C7A}
 .exp div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--line);font-size:12px}.exp div:first-child{border-top:0}
-.printhead{display:none}#moneyView .btn.phone{display:none}
+.printhead{display:none}#moneyView .btn.phone{display:none}#moneyView.ro .side,#moneyView.ro .btn.phone{display:none!important}#moneyView.ro tbody tr{cursor:default}
 @media (max-width:760px){#moneyView .btn.phone{display:inline-flex}#moneyView .side{position:static}}
 @media print{
   body{background:#fff;font-size:11px}.top,.tabs,#msg,.wrap>.card,.noprint{display:none!important}
@@ -27,7 +27,7 @@ export const MONEY_HTML = String.raw`
 <div id="moneyView" hidden>
   <div class="printhead">JCI Aso · QLV 2026 · Money summary · <span id="mPrinted"></span></div>
   <div class="noprint" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;margin:0 0 12px">
-    <p class="small" style="margin:0;max-width:640px">Ticket sales and partnerships are counted automatically once a payment is verified or a partner is confirmed. Record spending, in-kind support and any other income here. Only admin sees this page.</p>
+    <p class="small" style="margin:0;max-width:640px">Ticket sales and partnerships are counted automatically once a payment is verified or a partner is confirmed. Record spending, in-kind support and any other income here. Admin and the treasurer can see this page; only admin records entries.</p>
     <div class="actions" style="margin:0"><a class="btn phone" href="#mForm" style="text-decoration:none;align-items:center">Record an entry</a><a class="btn ghost" href="/admin/export/money.csv" style="text-decoration:none;display:inline-flex;align-items:center">Download money CSV</a><button class="btn ghost" data-mprint="1">Print summary</button></div>
   </div>
   <div class="tiles" id="mTiles"></div>
@@ -103,6 +103,7 @@ function setKind(kind) {
 
 async function loadMoney() {
   const d = mData = await call("money");
+  $("#moneyView").classList.toggle("ro", ROLE !== "admin");
   const t = d.totals, f = $("#mForm");
   if (!mReady) {
     mReady = true;
@@ -192,7 +193,7 @@ document.addEventListener("click", async (e) => {
     if (el("[data-mkind]")) { setKind(el("[data-mkind]").dataset.mkind); return; }
     if (el("[data-mf]")) { mFilter = el("[data-mf]").dataset.mf; drawEntries(); return; }
     if (el("[data-mprint]")) { $("#mPrinted").textContent = new Date().toLocaleString("en-GB", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" }); window.print(); return; }
-    if (el("tr[data-mentry]") && !el("a")) { editEntry(Number(el("tr[data-mentry]").dataset.mentry)); return; }
+    if (el("tr[data-mentry]") && !el("a") && ROLE === "admin") { editEntry(Number(el("tr[data-mentry]").dataset.mentry)); return; }
     if (el("[data-mcancel]")) { resetEntryForm(); return; }
     if (el("[data-mdelete]")) {
       const f = $("#mForm");

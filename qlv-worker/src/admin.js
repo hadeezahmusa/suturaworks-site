@@ -18,6 +18,14 @@ import { seatPending } from "./seating.js";
 import * as ops from "./admin-ops.js";
 import * as money from "./money.js";
 import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
+import { MONEY_HTML, MONEY_JS } from "./money-views.js";
+
+// The treasurer's only page besides Registrations: Money, to read.
+const READ_ONLY_VIEWS = `
+function showView(tab) {
+  $("#moneyView").hidden = tab !== "money";
+  if (tab === "money") loadMoney().catch((err) => msg(err.message));
+}`;
 
 const COOKIE = "qlv_admin";
 const SESSION_HOURS = 24 * 7;
@@ -40,7 +48,7 @@ function roleOf(env, email) {
 function adminList(env) {
   return [...emails(env.ADMIN_EMAILS), ...emails(env.VERIFIER_EMAILS)];
 }
-const VERIFIER_CAN = new Set(["GET list", "GET reg", "POST verify", "POST unverify"]);
+const VERIFIER_CAN = new Set(["GET list", "GET reg", "POST verify", "POST unverify", "GET money"]);
 function b64url(bytes) {
   return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -371,6 +379,86 @@ async function sendCodes(env) {
   return { sent: rows.length, ...(await codesStatus(env)) };
 }
 
+// Correcting a member: spelling or order of the name, the code to match
+// (initials plus the same three numbers), and the email. Everything is kept
+// in member_changes, and the old code keeps working on the registration page.
+// A member who has already registered gets the corrected name on their
+// registration and ticket; their ticket reference does not change.
+function initials(name) {
+  return (String(name).match(/[A-Za-z][A-Za-z'-]*/g) || []).map((w) => w[0]).join("").toUpperCase();
+}
+
+async function membersList(env) {
+  const { results } = await env.DB.prepare(`SELECT m.code, m.name, m.email,
+      (SELECT r.ref FROM registrations r WHERE r.tier = 'member' AND r.member_no = m.code AND r.status != 'released' LIMIT 1) AS reg_ref,
+      (SELECT MAX(l.created_at) FROM email_log l WHERE l.kind = 'member_code' AND l.ok = 1 AND l.ref = m.code) AS sent_at,
+      (SELECT group_concat(c.old_code, ', ') FROM member_changes c WHERE c.code = m.code AND c.old_code != m.code) AS old_codes,
+      (SELECT MAX(c.changed_at) FROM member_changes c WHERE c.code = m.code) AS changed_at
+    FROM members m ORDER BY m.name COLLATE NOCASE`).all();
+  return { members: results, closed: Date.now() >= Date.parse(await closesAt(env)) };
+}
+
+async function memberFix(env, b, who) {
+  const m = await env.DB.prepare("SELECT code, name, email FROM members WHERE code = ?").bind(String(b.code || "")).first();
+  if (!m) throw new HttpError(404, "That member is no longer on the list. Refresh the page.");
+  const name = String(b.name || "").replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
+  if (initials(name).length < 2) throw new HttpError(400, "Type the member's full name, at least two names.");
+  const email = String(b.email || "").trim().toLowerCase().slice(0, 160) || null;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, "That email address does not look right.");
+  const code = String(b.newCode || "").replace(/\s+/g, "").toUpperCase();
+  if (!/^[A-Z]{1,8}\d{3}$/.test(code)) throw new HttpError(400, "A code is letters followed by three numbers, for example AMS892.");
+  const codeChanged = code !== m.code, nameChanged = name !== m.name, emailChanged = email !== (m.email || null);
+  if (!codeChanged && !nameChanged && !emailChanged && !b.send) throw new HttpError(400, "Nothing has changed.");
+  if (codeChanged) {
+    const clash = await env.DB.prepare(`SELECT code FROM members WHERE code = ?1
+      UNION SELECT code FROM member_changes WHERE old_code = ?1 AND code != ?2 LIMIT 1`).bind(code, m.code).first();
+    if (clash) throw new HttpError(409, `${code} is already used by another member, now or before. Change one of the numbers.`);
+  }
+  const stamp = now();
+  if (codeChanged || nameChanged || emailChanged) {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE member_changes SET code = ? WHERE code = ?").bind(code, m.code),
+      env.DB.prepare(`INSERT INTO member_changes (old_code, code, old_name, new_name, old_email, new_email, changed_at, changed_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(m.code, code, m.name, name, m.email || null, email, stamp, who),
+      env.DB.prepare("UPDATE members SET code = ?, name = ?, email = ? WHERE code = ?").bind(code, name, email, m.code),
+      env.DB.prepare("UPDATE registrations SET member_no = ?, name = ?, updated_at = ? WHERE tier = 'member' AND member_no = ?").bind(code, name, stamp, m.code),
+      env.DB.prepare("UPDATE tickets SET name = ? WHERE kind = 'member' AND reg_ref IN (SELECT ref FROM registrations WHERE tier = 'member' AND member_no = ?)").bind(name, code),
+    ]);
+  }
+  const reg = await env.DB.prepare("SELECT ref, status, sent_at FROM registrations WHERE tier = 'member' AND member_no = ? AND status != 'released' LIMIT 1").bind(code).first();
+  // Once saved, a reason the email could not go is a warning, not an error,
+  // so the page still shows the saved correction.
+  let emailed = false, warning = "";
+  if (b.send) {
+    const close = await closesAt(env);
+    if (!email) warning = "Saved, but there is no email address to send the code to.";
+    else if (reg) warning = `Saved. ${name} has already registered as ${reg.ref}, so a code email would only confuse them. Resend their ticket from Registrations instead.`;
+    else if (Date.now() >= Date.parse(close)) warning = "Saved, but registration has closed, so the code was not sent.";
+    else if (!(await dailyRoom(env)).room) warning = `Saved, but ${DAILY_SAFE} emails have gone out in the last 24 hours, the safe limit on the free plan. Send it tomorrow.`;
+    else {
+      // The corrected wording only if the name or code was ever corrected; adding
+      // a missing email alone sends the ordinary code email.
+      const h = await env.DB.prepare("SELECT SUM(old_name IS NOT new_name OR old_code != code) AS fixed, SUM(old_code != code) AS moved FROM member_changes WHERE code = ?").bind(code).first();
+      const fix = h.fixed ? { codeChanged: !!h.moved } : null;
+      emailed = await sendMail(env, { to: email, ...mail.memberCode({ code, name }, env.SITE_URL, closeLabel(close), fix) }, code, "member_code");
+      if (!emailed) warning = "Saved, but the email did not go. Try sending again in a few minutes.";
+    }
+  }
+  return { code, name, email, emailed, warning, reg: reg ? { ref: reg.ref, status: reg.status, ticketSent: !!reg.sent_at } : null, ...(await membersList(env)) };
+}
+
+async function memberPreview(env, b) {
+  const m = await env.DB.prepare("SELECT code, name FROM members WHERE code = ?").bind(String(b.code || "")).first();
+  if (!m) throw new HttpError(404, "That member is no longer on the list. Refresh the page.");
+  const name = String(b.name || "").replace(/\s+/g, " ").trim().slice(0, 120) || m.name;
+  const code = String(b.newCode || "").replace(/\s+/g, "").toUpperCase() || m.code;
+  const h = await env.DB.prepare("SELECT SUM(old_name IS NOT new_name OR old_code != code) AS fixed, SUM(old_code != code) AS moved FROM member_changes WHERE code = ?").bind(m.code).first();
+  const moved = code !== m.code || !!h.moved;
+  const fix = name !== m.name || moved || h.fixed ? { codeChanged: moved } : null;
+  const r = mail.memberCode({ code, name }, env.SITE_URL, closeLabel(await closesAt(env)), fix);
+  return { subject: r.subject, html: r.html };
+}
+
 async function reminderStatus(env) {
   const [waiting, reminded] = await env.DB.batch([
     env.DB.prepare(`SELECT COUNT(*) AS n FROM (${WAITING_SQL})`),
@@ -678,6 +766,89 @@ async function loadCodes() {
   $("#codesBox").dataset.batch = r.batch;
 }
 
+let members = [], mbCur = null, mbCodeTouched = false;
+const initials = (n) => (String(n).match(/[A-Za-z][A-Za-z'-]*/g) || []).map((w) => w[0]).join("").toUpperCase();
+const digits = (c) => (String(c).match(/\d{3}$/) || [""])[0];
+async function loadMembers(d) {
+  const r = d || await call("members");
+  members = r.members; $("#mbRows").dataset.closed = r.closed ? "1" : "";
+  drawMembers();
+  if (mbCur) { const m = members.find((x) => x.code === mbCur); if (m) openMember(m.code); else mbCur = null; }
+}
+function mbStatus(m) {
+  if (m.reg_ref) return '<span class="st confirmed">Registered</span>';
+  if (!m.email) return '<span class="st released">No email</span>';
+  return m.sent_at ? '<span class="st verified">Code sent</span>' : '<span class="st awaiting">Not sent</span>';
+}
+function drawMembers() {
+  const q = $("#mbFind").value.trim().toLowerCase();
+  const rows = members.filter((m) => !q || (m.code + " " + m.name + " " + (m.email || "") + " " + (m.old_codes || "")).toLowerCase().includes(q));
+  $("#mbRows").innerHTML = rows.map((m) => '<tr data-mb="' + esc(m.code) + '"' + (m.code === mbCur ? ' class="sel"' : "") + '><td class="mono">' + esc(m.code) + "</td><td><b>" + esc(m.name) + "</b>" +
+    (m.changed_at ? '<div class="small">Corrected ' + when(m.changed_at) + (m.old_codes ? ", was " + esc(m.old_codes) : "") + "</div>" : "") + '</td><td class="hide-s small">' + esc(m.email || "") + "</td><td>" + mbStatus(m) + "</td></tr>").join("") ||
+    '<tr><td colspan="4" class="small">No member matches that search.</td></tr>';
+}
+function openMember(code) {
+  const m = members.find((x) => x.code === code);
+  if (!m) return;
+  mbCur = code; mbCodeTouched = false;
+  document.querySelectorAll("#mbRows tr").forEach((tr) => tr.classList.toggle("sel", tr.dataset.mb === code));
+  const closed = $("#mbRows").dataset.closed === "1";
+  $("#mbSide").innerHTML = '<form class="card" id="mbForm"><h2>' + esc(m.name) + '</h2><p class="small" style="margin:0 0 12px">Code <b class="mono">' + esc(m.code) + "</b>" +
+    (m.old_codes ? " · earlier code " + esc(m.old_codes) + " still works" : "") + (m.sent_at ? " · code last emailed " + when(m.sent_at) : "") + "</p>" +
+    '<label class="fl">Full name, spelled and ordered correctly<input type="text" name="name" maxlength="120" value="' + esc(m.name) + '"></label>' +
+    '<label class="fl">Code<input type="text" name="newCode" maxlength="12" class="mono" value="' + esc(m.code) + '" autocapitalize="characters"></label>' +
+    '<p class="small" id="mbCodeNote" style="margin:-4px 0 10px"></p>' +
+    '<label class="fl">Email<input type="email" name="email" maxlength="160" value="' + esc(m.email || "") + '" placeholder="No email on file yet"></label>' +
+    (m.reg_ref
+      ? '<div class="note">Already registered as <b class="mono">' + esc(m.reg_ref) + '</b>. Saving puts the corrected name on their registration and ticket; the ticket number stays the same. No code email goes out. To send them the corrected ticket, open ' + esc(m.reg_ref) + ' in Registrations and use Resend.</div>'
+      : closed ? '<div class="note">Registration has closed, so no code email can go out. The correction is still saved.</div>'
+      : '<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;margin:4px 0 6px"><input type="checkbox" name="send"' + (m.email ? " checked" : "") + ' style="margin-top:3px"> <span id="mbSendLabel">Email them the code now</span></label><p class="small" style="margin:0 0 6px">The email thanks them for letting us know and asks them to use the new code.</p>') +
+    '<div class="actions"><button class="btn" id="mbSave">Save correction</button><button type="button" class="btn ghost" id="mbPreview"' + (m.reg_ref || closed ? " hidden" : "") + '>Preview the email</button></div><div id="mbFrame"></div></form>';
+  mbNote();
+}
+function mbNote() {
+  const f = $("#mbForm"), m = members.find((x) => x.code === mbCur);
+  if (!f || !m) return;
+  const want = initials(f.name.value) + digits(m.code);
+  if (!mbCodeTouched) f.newCode.value = want;
+  const code = f.newCode.value.replace(/\s+/g, "").toUpperCase();
+  if (f.send) {
+    const has = /@/.test(f.email.value);
+    if (!has) f.send.checked = false;
+    f.send.disabled = !has;
+    $("#mbSendLabel").textContent = has ? "Email them the code now" : "Add an email above to send them the code";
+  }
+  const send = f.send && f.send.checked;
+  $("#mbCodeNote").textContent = code === m.code ? "The code stays " + m.code + "." : "The code changes from " + m.code + " to " + code + ". " + m.code + " will still be accepted." + (code !== want ? " This does not match the initials, " + want + "." : "");
+  $("#mbSave").textContent = send ? (code === m.code && f.name.value.trim() === m.name ? "Save and email the code" : "Save and email the corrected code") : "Save correction";
+}
+async function saveMember(f) {
+  const m = members.find((x) => x.code === mbCur);
+  const body = { code: m.code, name: f.name.value, newCode: f.newCode.value, email: f.email.value, send: !!(f.send && f.send.checked) };
+  const what = body.send ? " and email the code to " + body.email : "";
+  if (!confirm("Save " + body.name.trim() + " with code " + body.newCode.trim().toUpperCase() + what + "?")) return;
+  $("#mbSave").disabled = true;
+  try {
+    const r = await call("member-fix", body);
+    mbCur = r.code; await loadMembers(r);
+    if (r.warning) msg(r.warning);
+    else msg("Saved " + r.name + " as " + r.code + "." + (r.emailed ? " The code has gone to " + r.email + "." : "") + (r.reg ? " Their registration " + r.reg.ref + " and ticket now show the corrected name." : ""), true);
+  } catch (err) { msg(err.message); loadMembers().catch(() => {}); }
+}
+
+async function mbPreview() {
+  const f = $("#mbForm");
+  const r = await call("member-preview", { code: mbCur, name: f.name.value, newCode: f.newCode.value });
+  $("#mbFrame").innerHTML = '<div class="small" style="margin:6px 0">' + esc(r.subject) + '</div><iframe sandbox="" title="Corrected code email preview" id="mbPv"></iframe>';
+  $("#mbPv").srcdoc = r.html;
+}
+document.addEventListener("input", (e) => {
+  if (e.target.id === "mbFind") drawMembers();
+  if (e.target.closest("#mbForm")) { if (e.target.name === "newCode") mbCodeTouched = true; mbNote(); }
+});
+document.addEventListener("change", (e) => { if (e.target.closest("#mbForm") && e.target.name === "send") mbNote(); });
+document.addEventListener("submit", (e) => { if (e.target.id === "mbForm") { e.preventDefault(); saveMember(e.target); } });
+
 async function codes(kind, btn) {
   msg("");
   if (kind === "preview") {
@@ -742,16 +913,18 @@ document.addEventListener("click", (e) => {
   const tr = e.target.closest("tr[data-ref]"); if (tr) { open(tr.dataset.ref); return; }
   const a = e.target.closest("[data-act]"); if (a) { act(a.dataset.act, a); return; }
   const r = e.target.closest("[data-resend]"); if (r) { resend(r); return; }
+  const mb = e.target.closest("tr[data-mb]"); if (mb) { openMember(mb.dataset.mb); return; }
+  if (e.target.closest("#mbPreview")) { mbPreview().catch((err) => msg(err.message)); return; }
   const cd = e.target.closest("[data-codes]"); if (cd) { codes(cd.dataset.codes, cd).catch((err) => msg(err.message)); return; }
   const rm = e.target.closest("[data-rem]"); if (rm) { remind(rm.dataset.rem, rm).catch((err) => msg(err.message)); return; }
   const t = e.target.closest("[data-tab]");
   if (t) {
     tab = t.dataset.tab;
     document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
-    $("#regsView").hidden = tab !== "regs"; $("#answersView").hidden = tab !== "answers"; $("#codesView").hidden = tab !== "codes";
+    $("#regsView").hidden = tab !== "regs"; $("#answersView").hidden = tab !== "answers"; if ($("#codesView")) $("#codesView").hidden = tab !== "codes";
     showView(tab);
     if (tab === "answers") loadAnswers();
-    if (tab === "codes") loadCodes().catch((err) => msg(err.message));
+    if (tab === "codes") { loadCodes().catch((err) => msg(err.message)); loadMembers().catch((err) => msg(err.message)); }
   }
 });
 async function saveClosing(btn) {
@@ -774,6 +947,7 @@ function appPage(email, role) {
     &middot; <a href="/admin/export/registrations.csv">Registrations CSV</a>${admin ? ` &middot; <a href="/admin/export/tickets.csv">Tickets CSV</a> &middot; <a href="/admin/export/answers.csv">Answers CSV</a>` : ""}
     &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
   <div class="wrap">
+    ${!admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="money">Money</button></div>` : ""}
     ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="staff">Staff</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button></div>` : ""}
     <div id="msg" class="msg" hidden role="status"></div>
     ${admin ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
@@ -786,10 +960,16 @@ function appPage(email, role) {
     <div id="regsView"><div id="chips" class="chips"></div><p class="small" id="flagNote" style="margin:-4px 0 12px"></p>
       <div class="grid"><div class="list card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Ref</th><th>Who</th><th>Ticket</th><th>Amount</th><th class="hide-s">Proof</th><th class="hide-s">Registered</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
       <div class="side" id="detail"><div class="card small">Pick a registration to see its details and proof.</div></div></div></div>
-    <div id="codesView" hidden><div class="card" id="codesBox"></div></div>
-    ${admin ? VIEWS_HTML : ""}
+    ${admin ? `<div id="codesView" hidden><div class="card" id="codesBox"></div>
+      <div class="grid" style="margin-top:14px"><div class="list card" style="padding:0;overflow-x:auto">
+        <div style="padding:14px 16px 0"><h2>Correct a member's name, code or email</h2>
+          <p class="small" style="margin:0 0 10px">Pick a member to fix how their name is spelled or ordered. Their code follows the corrected initials and keeps its three numbers. The old code keeps working too, because the old list was shared on WhatsApp.</p>
+          <input type="search" id="mbFind" placeholder="Search by name, code or email" aria-label="Search members" style="width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;padding:10px 12px;min-height:42px;margin:0 0 10px"></div>
+        <table><thead><tr><th>Code</th><th>Name</th><th class="hide-s">Email</th><th>Status</th></tr></thead><tbody id="mbRows"></tbody></table></div>
+      <div class="side" id="mbSide"><div class="card small">Pick a member to correct their details.</div></div></div></div>` : ""}
+    ${admin ? VIEWS_HTML : MONEY_HTML}
     <div id="answersView" hidden><div class="card" id="remind" style="margin:0 0 14px"></div><div id="answers"></div></div>
-  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(email)};\n` + APP + (admin ? VIEWS_JS : "function showView() {}"));
+  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(email)};\n` + APP + (admin ? VIEWS_JS : MONEY_JS + READ_ONLY_VIEWS));
 }
 
 // ---------- router ----------
@@ -838,13 +1018,16 @@ export async function handleAdmin(req, env, ctx, url) {
     }
     if (path === "/admin/proof") return proof(env, url.searchParams.get("ref"));
     if (path === "/admin/receipt") {
-      if (role !== "admin") return json({ error: "Not available to your account." }, 403);
-      if (req.method === "POST") return json(await money.putReceipt(env, req, url.searchParams.get("id")));
+      // The treasurer can open receipts; only admin can attach them.
+      if (req.method === "POST") {
+        if (role !== "admin") return json({ error: "Not available to your account." }, 403);
+        return json(await money.putReceipt(env, req, url.searchParams.get("id")));
+      }
       return money.getReceipt(env, url.searchParams.get("id"));
     }
     if (path.startsWith("/admin/export/")) {
       const name = path.slice("/admin/export/".length);
-      if (role !== "admin" && name !== "registrations.csv") return json({ error: "Not available to your account." }, 403);
+      if (role !== "admin" && name !== "registrations.csv" && name !== "money.csv") return json({ error: "Not available to your account." }, 403);
       if (name === "badges.csv") return new Response(await ops.badgesCsv(env), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="qlv2026-badges.csv"', ...SECURITY } });
       return exportCsv(env, name);
     }
@@ -862,6 +1045,9 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET codes": () => codesStatus(env),
       "GET codes-preview": () => codesPreview(env),
       "POST codes": () => sendCodes(env),
+      "GET members": () => membersList(env),
+      "POST member-fix": () => memberFix(env, body, who),
+      "POST member-preview": () => memberPreview(env, body),
       "POST verify": () => verify(env, body.ref, who),
       "POST unverify": () => unverify(env, body.ref, who, role),
       "POST send": () => send(env, body.ref),

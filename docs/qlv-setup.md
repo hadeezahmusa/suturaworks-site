@@ -172,7 +172,7 @@ page, email or ticket mentions a table.
 
 Database changes are in `qlv-worker/migrations/2026-10-21-admin-additions.sql` (additive only).
 
-## Money (admin only)
+## Money (admin; the treasurer can read it)
 
 Added 22 October 2026 for the board and general assembly report.
 
@@ -193,7 +193,28 @@ Added 22 October 2026 for the board and general assembly report.
 - **Download money CSV** gives one row per payment, partnership, expense and in-kind item, with
   plain numbers that add up in a spreadsheet. **Print summary** prints the page without the form.
 
+- **The treasurer** (VERIFIER_EMAILS) sees the Money tab, opens receipts and downloads the money
+  CSV, but cannot record, change or remove entries.
+
 Database change: `qlv-worker/migrations/2026-10-22-money.sql` (one new table, additive only).
+
+## Correcting a member (Member codes tab)
+
+Added 23 October 2026 after members reported names spelled or ordered wrongly.
+
+- Pick a member, correct the name, and the code follows the new initials with the same three
+  numbers (Muhammad Sani Abdulmumin, MSA892, becomes Abdulmumin Muhammad Sani, AMS892). The code
+  can be typed by hand if needed; it must be unique and end in three numbers.
+- The email can be added or corrected here too, which is how the missing member emails go in.
+- Tick "Email them the code now" to send the corrected code. The email thanks them and asks them to
+  use the new code. Adding only an email sends the ordinary code email.
+- **Old codes keep working.** The old list went round the WhatsApp group, so an old code typed on
+  the registration page leads to the member's current code and corrected name.
+- **Already registered?** Their registration and ticket take the corrected name; the ticket number
+  stays the same and no code email goes. Resend the ticket from Registrations if needed.
+- Every correction is kept in `member_changes` with who made it and when.
+
+Database change: `qlv-worker/migrations/2026-10-23-member-corrections.sql` (one new table, additive only).
 
 ## Closing date
 
