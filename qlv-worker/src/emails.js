@@ -175,7 +175,7 @@ export function ticketIssued(t, reg, links) {
         : `Hello ${first(t.name)}, your payment has come through and your seat is held. Your ticket is below. Keep the reference, it is how we find you at the desk.`;
   const heading = adviser ? "You are confirmed for QLV 2026" : "You are registered for QLV 2026";
   const after = adviser
-    ? p("A one page brief with the six tasks reaches you a week before. Participants do not see them until the sprint opens, so please keep them to yourself. If something changes and you can no longer make it, reply as early as you can, because the roving routes are built around who is coming.", "font-size:12px;")
+    ? p("Your brief, your tables and the tasks arrive by email. The link opens at 7:00am on Saturday 7 November. Participants do not see the tasks until the sprint opens, so please keep them to yourself. If something changes and you can no longer make it, reply as early as you can, because the roving routes are built around who is coming.", "font-size:12px;")
     : p("Day one is virtual and the joining link comes the day before. Your team is announced on day one, and its task is handed out as the sprint opens on day two, so there is nothing to prepare.", "font-size:12px;");
   const body = h1(heading) + p(esc(intro)) + ticketCard(t) +
     button(links.ticket, "Open your ticket") + after + questionsBlock(links.answer, adviser);
