@@ -191,7 +191,10 @@ const REG_FIELDS = ["tier", "size", "amount", "name", "email", "phone", "organis
 async function memberFor(env, raw, ownRef) {
   const code = String(raw || "").replace(/\s+/g, "").toUpperCase().slice(0, 12);
   if (!code) throw new HttpError(400, "Please type the code JCI Aso sent you.");
-  const m = await env.DB.prepare("SELECT code, name FROM members WHERE code = ?").bind(code).first();
+  // A code corrected in the admin still works in its old form, because the
+  // old list went round the WhatsApp group. It leads to the current code.
+  const m = await env.DB.prepare("SELECT code, name FROM members WHERE code = ?").bind(code).first()
+    || await env.DB.prepare("SELECT m.code, m.name FROM member_changes c JOIN members m ON m.code = c.code WHERE c.old_code = ? ORDER BY c.id DESC LIMIT 1").bind(code).first();
   if (!m) throw new HttpError(404, "We could not find that code. Check it against the message JCI Aso sent you: it is letters followed by three numbers.", "bad_code");
   const used = await env.DB.prepare("SELECT ref FROM registrations WHERE tier = 'member' AND member_no = ? AND status != 'released' AND ref != ?")
     .bind(m.code, ownRef || "").first();
