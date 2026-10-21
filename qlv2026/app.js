@@ -734,9 +734,36 @@ $("#f-adviser").addEventListener("submit", async (e) => {
 // ---------- sponsored claim ----------
 
 let claimToken = null;
+let claimKind = "sponsored";
+
+function claimLook(kind) {
+  claimKind = kind;
+  const partner = kind === "partner";
+  bind("claimTitle", partner ? "Your seat at QLV 2026 is covered" : "Your sponsor has paid for your seat");
+  show("claimOrg", !partner);
+  show("claimSponsorNote", !partner);
+  show("claimPartnerNote", partner);
+}
+
+// Partner seats: one link per seat, same claim form.
+async function openPartnerSeat(token) {
+  claimToken = token;
+  try {
+    const r = await api("/api/partner-seat?t=" + encodeURIComponent(token));
+    if (r.state === "claimed") return message("This seat has already been claimed", "The link has been used. If you were expecting this seat, ask the person who sent it to you for a new link.", false);
+    if (r.state === "closed") return message("This link has closed", "Ask the person who sent it to you.", false);
+    if (r.state !== "open") return message("This link is not ready yet", "Try it again later today.", false);
+    claimLook("partner");
+    go("claim", false);
+  } catch (err) {
+    if (err.status === 404) return message("This link has not worked", "It may have been replaced with a new one. Check you have the latest link from the person who sent it.", false);
+    message("We could not load your seat", err.message, false);
+  }
+}
 
 async function openClaim(token) {
   claimToken = token;
+  claimLook("sponsored");
   try {
     const r = await api("/api/claim?t=" + encodeURIComponent(token));
     if (r.state === "full") return message("All the seats on this link have been claimed", "Every seat your sponsor paid for now has a name on it. If you were expecting one, ask the person who sent you the link.", false);
@@ -757,14 +784,14 @@ $("#f-claim").addEventListener("submit", async (e) => {
   busy(f, true);
   const v = values(f);
   try {
-    const r = await post("/api/claim", { t: claimToken, ...v });
+    const r = await post(claimKind === "partner" ? "/api/partner-seat" : "/api/claim", { t: claimToken, ...v });
     bind("claimRef", r.ref);
     bind("claimEmail", r.email);
     Q.claimRef = r.ref;
     Q.claimEmail = r.email;
     openQuestions({ key: r.key, branch: v.situation, back: "claimed" });
   } catch (err) {
-    if (err.code === "full") message("All the seats on this link have been claimed", "Somebody took the last seat a moment before you. Ask the person who sent you the link.", false);
+    if (err.code === "full") message(claimKind === "partner" ? "This seat has already been claimed" : "All the seats on this link have been claimed", "Somebody took it a moment before you. Ask the person who sent you the link.", false);
     else formError(f, err.message);
   } finally {
     busy(f, false);
@@ -804,6 +831,8 @@ const TICKET = {
   judge: { chip: "Judge or mentor", bg: "#184E9E", fg: "#fff" },
   sponsored: { chip: "Sponsored seat", bg: "#16537A", fg: "#fff" },
   adviser: { chip: "Adviser", bg: "transparent", fg: "#0F2B63", border: "1.5px solid #0F2B63" },
+  partner: { chip: "Partner", bg: "#1F5F5B", fg: "#fff" },
+  facilitator: { chip: "Facilitator", bg: "#EFC22D", fg: "#0F2B63" },
 };
 
 async function openTicket(token) {
@@ -818,19 +847,21 @@ async function openTicket(token) {
     bind("tkName", t.name);
     bind("tkRef", t.ref);
     const adviser = t.kind === "adviser";
-    show("tkD1", !adviser);
+    const dayList = t.days || ["D1", "D2"];
+    show("tkD1", dayList.includes("D1"));
+    $('[data-bind="tkD2Time"]').closest(".tk-day").hidden = !dayList.includes("D2");
     bind("tkD2Time", adviser ? "Saturday 7 November, 10:15am to about 3:00pm" : "Saturday 7 November, 8:30am to 4:00pm");
     bind("tkD2Note", adviser ? "Transcorp Hilton, Abuja. Collect your badge and roving route at the desk. Lunch included."
       : "Transcorp Hilton, Abuja. Lunch included. Your task is given out as the sprint opens.");
-    if (adviser || t.kind === "judge") {
+    if (adviser || t.kind === "judge" || t.kind === "facilitator") {
       bind("tkSideLbl", "Role");
-      bind("tkSide", adviser ? (MODE[t.mode] || MODE.both).role : "Judge or mentor, not in a team");
+      bind("tkSide", adviser ? (MODE[t.mode] || MODE.both).role : t.kind === "facilitator" ? "Facilitator, not in a team" : "Judge or mentor, not in a team");
     } else {
       bind("tkSideLbl", "Team");
       bind("tkSide", "Announced on day one");
     }
     bind("tkPaid", t.paidLine);
-    bind("tkVer", (t.kind === "sponsored" ? "CLAIMED " : adviser ? "CONFIRMED " : "VERIFIED ") + t.ref);
+    bind("tkVer", (t.kind === "sponsored" || t.kind === "partner" ? "CLAIMED " : adviser || t.kind === "facilitator" ? "CONFIRMED " : "VERIFIED ") + t.ref);
     Q.ticketKey = token;
     Q.ticketBranch = t.situation || null;
     show("tkQuestions", !closed);
@@ -905,6 +936,7 @@ async function init() {
   if (S.details && S.details.situation) $("#d-sit").value = S.details.situation;
 
   if (params.get("claim")) return openClaim(params.get("claim"));
+  if (params.get("seat")) return openPartnerSeat(params.get("seat"));
   if (params.get("sponsor")) return openSponsor(params.get("sponsor"));
   if (params.get("ticket")) return openTicket(params.get("ticket"));
   if (params.get("answer")) return openAnswerLink(params.get("answer"));

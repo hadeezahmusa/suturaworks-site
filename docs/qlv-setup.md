@@ -148,6 +148,30 @@ second press for any batch left over. If you move to Resend Pro, raise `DAILY_SA
   email each time. The sponsor's money was verified by you before the claim link existed.
 - Everything that depends on money (standard, member, corporate, the sponsor's link) waits for you.
 
+## Tables, partners, staff and badges (admin only)
+
+Added 21 October 2026 from `QLV-2026-Admin-Build-Spec.md`. Nothing here reaches a participant: no
+page, email or ticket mentions a table.
+
+- **Tables.** A seat fills when a payment is verified (standard, member, corporate) or when a
+  sponsored or partner seat is claimed. Judges and mentors, advisers and facilitators never sit.
+  The rule is in `qlv-worker/src/placement.js` with tests in `qlv-worker/test` (`node --test
+  qlv-worker/test/*.test.mjs`). Seats never move; cancelling a ticket frees only its seat. The
+  page refreshes every 15 seconds. Table names, capacity, partner levels, ignorable organisation
+  answers and the admin colours are in `qlv-worker/src/config.js`.
+- **Partners.** Add the partner, check the payment, press confirm with a payment note: the contact
+  gets one email with a claim link per seat. Each link works once (Void link replaces it). Partner
+  income is shown on the Partners page only and never counts as ticket income. The level never
+  appears on a ticket, email, badge or export.
+- **Staff.** Register facilitators (references QLV26-F01 onward; ticket emailed at once). Advisers
+  and judges from the sign-up page and corporate judges or mentors are listed too.
+- **Badge export.** Edit badge names, download the CSV (no emails or phones), and lock and stamp
+  before printing. Anyone seated after the lock is listed as a late addition.
+- **Cancel ticket** (on a registration's ticket list) is the refund action: the ticket stops working
+  and its seat is freed.
+
+Database changes are in `qlv-worker/migrations/2026-10-21-admin-additions.sql` (additive only).
+
 ## Closing date
 
 - Registration, claims and new answers close at the end of **30 October 2026** (Abuja time) unless

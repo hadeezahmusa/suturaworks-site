@@ -566,7 +566,7 @@
         <div class="lock"><span>QUALITY</span><span class="y">LEADERSHIP</span><span style="margin-left:52px">VALUE</span></div>
       </div>
       <form id="f-claim" novalidate style="padding:18px 20px 22px;display:flex;flex-direction:column;gap:14px">
-        <div><h1 style="font-size:18px">Your sponsor has paid for your seat</h1><p style="font-size:12px;margin-top:5px">Fill this in and your ticket comes straight to your email. Nothing to pay.</p></div>
+        <div><h1 style="font-size:18px" data-bind="claimTitle">Your sponsor has paid for your seat</h1><p style="font-size:12px;margin-top:5px">Fill this in and your ticket comes straight to your email. Nothing to pay.</p></div>
         <div class="card" style="padding:13px 15px">
           <div style="display:flex;gap:10px;margin-bottom:7px"><b style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--blue)">D1</b><span style="font-size:11px;font-weight:500">Fri 6 Nov, 4:00pm. Virtual</span></div>
           <div style="display:flex;gap:10px"><b style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--blue)">D2</b><span style="font-size:11px;font-weight:500">Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja</span></div>
@@ -574,11 +574,13 @@
         <div><label class="f" for="k-name">Full name</label><input type="text" id="k-name" name="name" autocomplete="name" maxlength="120" placeholder="As it should read on your ticket" required></div>
         <div><label class="f" for="k-email">Email</label><input type="email" id="k-email" name="email" autocomplete="email" maxlength="160" placeholder="Your ticket goes here" required></div>
         <div><label class="f" for="k-phone">Phone</label><input type="tel" id="k-phone" name="phone" autocomplete="tel" maxlength="30" placeholder="0800 000 0000" required></div>
+        <div data-show="claimOrg"><label class="f" for="k-org">Organisation <span style="font-weight:400;color:var(--mute)">(optional)</span></label><input type="text" id="k-org" name="organisation" autocomplete="organization" maxlength="160" placeholder="Where you work or your business"></div>
         <div><label class="f" for="k-sit">Which is closest to you?</label><select id="k-sit" name="situation" class="js-sit"></select></div>
         <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
         <div class="formerr" data-err hidden></div>
         <button type="submit" class="btn" style="width:100%;justify-content:center">Claim my seat</button>
-        <p class="fine" style="text-align:center">Seats not claimed by <span data-bind="closeDate">30 October</span> go back on sale. You will be asked three short questions after this.</p>
+        <p class="fine" style="text-align:center" data-show="claimSponsorNote">Seats not claimed by <span data-bind="closeDate">30 October</span> go back on sale. You will be asked three short questions after this.</p>
+        <p class="fine" style="text-align:center" data-show="claimPartnerNote" hidden>This link is for one person. You will be asked three short questions after this.</p>
         <p class="privacy js-privacy" style="text-align:center"></p>
       </form>
     </div>
