@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS registrations (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   verified_at TEXT,
+  verified_by TEXT,        -- the admin or verifier who pressed Payment verified
   sent_at TEXT,
   queried_at TEXT,
   released_at TEXT
@@ -102,6 +103,7 @@ CREATE TABLE IF NOT EXISTS members (
   name TEXT NOT NULL,
   email TEXT
 );
--- Databases created before 21 October 2026 need the email column added once:
+-- Databases created before 21 October 2026 need these added once:
 --   ALTER TABLE members ADD COLUMN email TEXT;
+--   ALTER TABLE registrations ADD COLUMN verified_by TEXT;
 CREATE INDEX IF NOT EXISTS registrations_member ON registrations (member_no);

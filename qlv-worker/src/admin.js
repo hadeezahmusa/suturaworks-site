@@ -20,9 +20,22 @@ const enc = new TextEncoder();
 
 // ---------- session ----------
 
-function adminList(env) {
-  return (env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+function emails(v) {
+  return (v || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 }
+// Two roles. Admins (ADMIN_EMAILS) can do everything. Verifiers
+// (VERIFIER_EMAILS, a secret so personal addresses stay out of the code) see
+// the registrations list and proofs, mark payments verified and undo their
+// own verification. Sending tickets and everything else stays with admins.
+function roleOf(env, email) {
+  if (emails(env.ADMIN_EMAILS).includes(email)) return "admin";
+  if (emails(env.VERIFIER_EMAILS).includes(email)) return "verifier";
+  return null;
+}
+function adminList(env) {
+  return [...emails(env.ADMIN_EMAILS), ...emails(env.VERIFIER_EMAILS)];
+}
+const VERIFIER_CAN = new Set(["GET list", "GET reg", "POST verify", "POST unverify"]);
 function b64url(bytes) {
   return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -118,7 +131,7 @@ async function detail(env, ref) {
 
 // Makes the tickets for a verified booking, or the claim link for a sponsor.
 // Nothing is sent here.
-async function verify(env, ref) {
+async function verify(env, ref, who) {
   const r = await reg(env, ref);
   if (!["awaiting", "queried"].includes(r.status)) throw new HttpError(409, `This registration is ${r.status}, so it cannot be verified now.`);
   const stamp = now();
@@ -130,18 +143,19 @@ async function verify(env, ref) {
   else if (r.tier === "sponsored") {
     stmts.push(env.DB.prepare("UPDATE registrations SET claim_token = COALESCE(claim_token, ?), manage_token = COALESCE(manage_token, ?) WHERE ref = ?").bind(token(10), token(24), r.ref));
   } else throw new HttpError(409, "Advisers are confirmed when they sign up.");
-  stmts.push(env.DB.prepare("UPDATE registrations SET status = 'verified', verified_at = ?, updated_at = ? WHERE ref = ?").bind(stamp, stamp, r.ref));
+  stmts.push(env.DB.prepare("UPDATE registrations SET status = 'verified', verified_at = ?, verified_by = ?, updated_at = ? WHERE ref = ?").bind(stamp, who, stamp, r.ref));
   await env.DB.batch(stmts);
   return detail(env, r.ref);
 }
 
-async function unverify(env, ref) {
+async function unverify(env, ref, who, role) {
   const r = await reg(env, ref);
   if (r.status !== "verified") throw new HttpError(409, "Only a verification that has not been sent can be undone.");
+  if (role === "verifier" && r.verified_by !== who) throw new HttpError(403, "Only the person who verified this can undo it.");
   const stamp = now();
   await env.DB.batch([
     env.DB.prepare("DELETE FROM tickets WHERE reg_ref = ? AND sent_at IS NULL").bind(r.ref),
-    env.DB.prepare("UPDATE registrations SET status = 'awaiting', verified_at = NULL, updated_at = ? WHERE ref = ?").bind(stamp, r.ref),
+    env.DB.prepare("UPDATE registrations SET status = 'awaiting', verified_at = NULL, verified_by = NULL, updated_at = ? WHERE ref = ?").bind(stamp, r.ref),
   ]);
   return detail(env, r.ref);
 }
@@ -505,11 +519,15 @@ function msg(text, ok) { const m = $("#msg"); m.className = "msg " + (ok ? "ok" 
 async function loadList() {
   const d = await call("list?status=" + filter);
   const labels = { awaiting: "Awaiting", flagged: "Flagged for release", verified: "Verified, not sent", queried: "Queried", confirmed: "Confirmed", released: "Released", all: "All", adviser: "Advisers" };
+  if (ROLE === "verifier") { delete labels.flagged; delete labels.adviser; delete labels.released; }
   $("#chips").innerHTML = Object.keys(labels).map((k) => '<button data-f="' + k + '" class="' + (k === filter ? "on" : "") + '">' + labels[k] + " (" + d.counts[k] + ")</button>").join("");
   const day = new Date(Date.parse(d.closesAt) + 3600000 - 60000).toISOString().slice(0, 10);
-  if (document.activeElement !== $("#closeDate")) $("#closeDate").value = day;
-  $("#closeState").textContent = d.closed ? "Registration is closed." : "Registration is open.";
-  $("#closeState").style.color = d.closed ? "#8A2A20" : "#19646D";
+  if ($("#closeDate")) {
+    if (document.activeElement !== $("#closeDate")) $("#closeDate").value = day;
+    $("#closeState").textContent = d.closed ? "Registration is closed." : "Registration is open.";
+    $("#closeState").style.color = d.closed ? "#8A2A20" : "#19646D";
+  }
+  $("#flagNote").hidden = ROLE === "verifier";
   $("#flagNote").textContent = "Flagged means still awaiting " + d.releaseAfterDays + " days after registering. Nothing is released until you press Release.";
   $("#rows").innerHTML = d.rows.map((r) => '<tr data-ref="' + esc(r.ref) + '" class="' + (current && current.reg.ref === r.ref ? "sel" : "") + '">' +
     '<td class="mono">' + esc(r.ref) + "</td><td>" + esc(r.contact_person ? r.name + " (" + r.contact_person + ")" : r.name) + '<div class="small">' + esc(r.email) + "</div></td>" +
@@ -529,7 +547,7 @@ function ticketRows(d) {
   return '<div class="hr"></div><h2>' + (d.reg.tier === "sponsored" ? "Claimed seats" : "Tickets") + "</h2>" + d.tickets.map((t) =>
     '<div style="margin:0 0 8px"><span class="mono">' + esc(t.ticket_ref) + "</span> " + esc(t.name) + ", " + esc(t.email) +
     ' <span class="small">' + (t.kind === "judge" ? "judge or mentor, " : "") + (t.sent_at ? "sent " + when(t.sent_at) : "not sent") + "</span>" +
-    (t.sent_at ? ' <button class="link" data-resend="' + t.id + '" data-email="' + esc(t.email) + '">Resend</button>' : "") + "</div>").join("");
+    (t.sent_at && ROLE === "admin" ? ' <button class="link" data-resend="' + t.id + '" data-email="' + esc(t.email) + '">Resend</button>' : "") + "</div>").join("");
 }
 
 function renderDetail(d) {
@@ -558,7 +576,18 @@ function renderDetail(d) {
   }
 
   let actions = "";
-  if (r.status === "awaiting" || r.status === "queried") {
+  if (r.verified_by && r.status !== "awaiting") rows.push(["Verified by", esc(r.verified_by) + (r.verified_at ? ", " + when(r.verified_at) : "")]);
+  if (ROLE === "verifier") {
+    if (r.status === "awaiting" || r.status === "queried") {
+      actions = '<div class="note">Look on the FCMB statement for <b>' + esc(r.amountText) + '</b> with narration <b class="mono">' + esc(r.ref) + "</b>." +
+        (!r.proof_at ? " <b>No proof has been uploaded.</b>" : " Their proof of payment is below.") + "</div>" +
+        '<div class="actions"><button class="btn teal" data-act="verify">Payment verified</button></div>' +
+        '<p class="small">Cannot find the transfer? Send the reference to Hadeezah and she will contact the person.</p>';
+    } else if (r.status === "verified") {
+      actions = '<div class="note">Payment verified. Hadeezah sends the tickets.</div>' +
+        (r.verified_by === ME ? '<div class="actions"><button class="btn ghost" data-act="unverify">Undo verification</button></div>' : "");
+    }
+  } else if (r.status === "awaiting" || r.status === "queried") {
     actions = '<div class="note">Check the transfer for <b>' + esc(r.amountText) + '</b> with narration <b class="mono">' + esc(r.ref) + "</b> on the statement." +
 (!r.proof_at ? " <b>No proof has been uploaded.</b>" : "") + "</div>" +
       '<div class="actions"><button class="btn teal" data-act="verify">Payment verified</button><button class="btn ghost" data-act="queryOpen">Query</button><button class="btn warn" data-act="release">Release seat</button></div>' +
@@ -575,7 +604,7 @@ function renderDetail(d) {
   $("#detail").innerHTML = '<div class="card"><h1 style="margin-bottom:12px">' + esc(r.ref) + "</h1><dl>" + rows.map((x) => "<dt>" + x[0] + "</dt><dd>" + x[1] + "</dd>").join("") + "</dl>" +
     actions + people(d) + ticketRows(d) + proof +
     (d.log.length ? '<div class="hr"></div><h2>Emails</h2>' + d.log.map((l) => '<div class="small">' + when(l.created_at) + ", " + esc(l.kind.replace(/_/g, " ")) + " to " + esc(l.recipient) + (l.ok ? "" : ' <b style="color:#8A2A20">failed</b>') + "</div>").join("") : "") + "</div>";
-  if (r.status === "verified") loadPreviews(r.ref);
+  if (r.status === "verified" && ROLE === "admin") loadPreviews(r.ref);
   document.querySelectorAll("#rows tr").forEach((tr) => tr.classList.toggle("sel", tr.dataset.ref === r.ref));
 }
 
@@ -611,6 +640,7 @@ async function act(name, btn) {
     const body = name === "query" ? { ref, note: $("#queryNote").value } : { ref };
     const d = await call(name, body);
     if (d.failed && d.failed.length) msg("These did not send: " + d.failed.join(", ") + ". Press Send again to retry just those.");
+    else if (name === "verify" && ROLE === "verifier") msg(current.reg.ref + " marked as verified. Hadeezah will send the tickets.", true);
     else msg({ verify: "Tickets made. Nothing sent yet: check the previews.", send: "Sent.", query: "Query email sent.", release: "Released.", unverify: "Verification undone.", reopen: "Reopened." }[name] || "Done.", true);
     renderDetail(d);
     loadList();
@@ -728,26 +758,27 @@ document.addEventListener("click", (e) => { const b = e.target.closest("#saveClo
 loadList().catch((err) => msg(err.message));
 `;
 
-function appPage(email) {
-  return page("QLV 2026 admin", `<div class="top"><b>QLV 2026 admin</b><span class="who">Signed in as ${e(email)}
-    &middot; <a href="/admin/export/registrations.csv">Registrations CSV</a> &middot; <a href="/admin/export/tickets.csv">Tickets CSV</a> &middot; <a href="/admin/export/answers.csv">Answers CSV</a>
+function appPage(email, role) {
+  const admin = role === "admin";
+  return page("QLV 2026 admin", `<div class="top"><b>QLV 2026 ${admin ? "admin" : "payment verification"}</b><span class="who">Signed in as ${e(email)}
+    &middot; <a href="/admin/export/registrations.csv">Registrations CSV</a>${admin ? ` &middot; <a href="/admin/export/tickets.csv">Tickets CSV</a> &middot; <a href="/admin/export/answers.csv">Answers CSV</a>` : ""}
     &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
   <div class="wrap">
-    <div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button></div>
+    ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button></div>` : ""}
     <div id="msg" class="msg" hidden role="status"></div>
-    <div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+    ${admin ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="closeDate" style="font-weight:600">Registration closes at the end of</label>
       <input type="date" id="closeDate" min="2026-10-01" max="2026-11-06" style="width:auto;min-height:40px;padding:6px 10px">
       <button class="btn ghost" id="saveClose">Save date</button>
       <span id="closeState" class="small" style="font-weight:600"></span>
       <span class="small">Abuja time. Moves registration, sponsored claims and new answers together. A past date closes it now; a later date reopens it.</span>
-    </div>
+    </div>` : ""}
     <div id="regsView"><div id="chips" class="chips"></div><p class="small" id="flagNote" style="margin:-4px 0 12px"></p>
       <div class="grid"><div class="list card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Ref</th><th>Who</th><th>Ticket</th><th>Amount</th><th class="hide-s">Proof</th><th class="hide-s">Registered</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
       <div class="side" id="detail"><div class="card small">Pick a registration to see its details and proof.</div></div></div></div>
     <div id="codesView" hidden><div class="card" id="codesBox"></div></div>
     <div id="answersView" hidden><div class="card" id="remind" style="margin:0 0 14px"></div><div id="answers"></div></div>
-  </div>`, APP);
+  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(email)};\n` + APP);
 }
 
 // ---------- router ----------
@@ -786,7 +817,8 @@ export async function handleAdmin(req, env, ctx, url) {
     }
 
     const who = await session(req, env);
-    if (path === "/admin") return who ? html(appPage(who)) : html(loginPage());
+    const role = who ? roleOf(env, who) : null;
+    if (path === "/admin") return who ? html(appPage(who, role)) : html(loginPage());
     if (!who) return path.startsWith("/admin/api/") ? json({ error: "Signed out." }, 401) : new Response(null, { status: 303, headers: { location: "/admin" } });
 
     if (req.method === "POST") {
@@ -794,7 +826,11 @@ export async function handleAdmin(req, env, ctx, url) {
       if (req.headers.get("x-admin") !== "1" || (origin && origin !== url.origin)) return json({ error: "Refused." }, 403);
     }
     if (path === "/admin/proof") return proof(env, url.searchParams.get("ref"));
-    if (path.startsWith("/admin/export/")) return exportCsv(env, path.slice("/admin/export/".length));
+    if (path.startsWith("/admin/export/")) {
+      const name = path.slice("/admin/export/".length);
+      if (role !== "admin" && name !== "registrations.csv") return json({ error: "Not available to your account." }, 403);
+      return exportCsv(env, name);
+    }
 
     const q = url.searchParams;
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : null;
@@ -809,8 +845,8 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET codes": () => codesStatus(env),
       "GET codes-preview": () => codesPreview(env),
       "POST codes": () => sendCodes(env),
-      "POST verify": () => verify(env, body.ref),
-      "POST unverify": () => unverify(env, body.ref),
+      "POST verify": () => verify(env, body.ref, who),
+      "POST unverify": () => unverify(env, body.ref, who, role),
       "POST send": () => send(env, body.ref),
       "POST query-preview": () => queryPreview(env, body),
       "POST query": () => query(env, body),
@@ -820,6 +856,7 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST closing": () => setClosing(env, body),
     }[`${req.method} ${path.slice("/admin/api/".length)}`];
     if (!path.startsWith("/admin/api/") || !api) return json({ error: "Not found." }, 404);
+    if (role !== "admin" && !VERIFIER_CAN.has(`${req.method} ${path.slice("/admin/api/".length)}`)) return json({ error: "Not available to your account." }, 403);
     return json(await api());
   } catch (err) {
     if (err instanceof HttpError) return json({ error: err.message }, err.status);
