@@ -161,7 +161,7 @@ page, email or ticket mentions a table.
   answers and the admin colours are in `qlv-worker/src/config.js`.
 - **Partners.** Add the partner, check the payment, press confirm with a payment note: the contact
   gets one email with a claim link per seat. Each link works once (Void link replaces it). Partner
-  income is shown on the Partners page only and never counts as ticket income. The level never
+  income is kept apart from ticket income, on the Partners and Money pages. The level never
   appears on a ticket, email, badge or export.
 - **Staff.** Register facilitators (references QLV26-F01 onward; ticket emailed at once). Advisers
   and judges from the sign-up page and corporate judges or mentors are listed too.
@@ -171,6 +171,29 @@ page, email or ticket mentions a table.
   and its seat is freed.
 
 Database changes are in `qlv-worker/migrations/2026-10-21-admin-additions.sql` (additive only).
+
+## Money (admin only)
+
+Added 22 October 2026 for the board and general assembly report.
+
+- **Counted automatically.** Ticket sales come from registrations that are verified or confirmed,
+  split by ticket type. Partnerships come from confirmed partners. Neither is typed in twice, so
+  the Money page always agrees with the Registrations and Partners pages. Released bookings are
+  never counted.
+- **Recorded by hand.** Spending (paid, or owed and still to pay), in-kind support (something given
+  instead of money, with who gave it and how its value was worked out) and other cash income such
+  as donations. Each entry can carry a receipt or invoice (JPG, PNG or PDF, up to 5MB, stored
+  privately in KV under `receipt:<id>` with photo location data stripped).
+- **Totals.** Cash received, cash spent, cash in hand (and after bills still owed), in-kind value,
+  and the full cost of the event (spent, owed and in-kind together), with a cost by category.
+- **Edits and removals** record who made them. A removed entry stays in the `ledger` table with
+  `deleted_at` set and never counts.
+- **Cancelling a ticket does not change income.** If money was refunded, record it as spending
+  under Refunds.
+- **Download money CSV** gives one row per payment, partnership, expense and in-kind item, with
+  plain numbers that add up in a spreadsheet. **Print summary** prints the page without the form.
+
+Database change: `qlv-worker/migrations/2026-10-22-money.sql` (one new table, additive only).
 
 ## Closing date
 

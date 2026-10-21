@@ -16,6 +16,7 @@ import { HttpError, now, token, links, ticketLinks, sendMail, closesAt } from ".
 import { THEME, tableName } from "./config.js";
 import { seatPending } from "./seating.js";
 import * as ops from "./admin-ops.js";
+import * as money from "./money.js";
 import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
 
 const COOKIE = "qlv_admin";
@@ -431,6 +432,8 @@ async function exportCsv(env, name) {
   } else if (name === "tickets.csv") {
     const { results } = await env.DB.prepare("SELECT t.ticket_ref, t.reg_ref, t.kind, t.seat_no, t.name, t.email, t.phone, t.role, t.sent_at, r.organisation FROM tickets t JOIN registrations r ON r.ref = t.reg_ref WHERE t.ticket_ref != 'pending' AND t.cancelled_at IS NULL ORDER BY t.id").all();
     body = csv(results, ["ticket_ref", "reg_ref", "kind", "seat_no", "name", "email", "phone", "role", "organisation", "sent_at"]);
+  } else if (name === "money.csv") {
+    body = csv(await money.moneyRows(env), money.MONEY_COLS);
   } else if (name === "answers.csv") {
     // No names, no references: the promise on the questions screen.
     const { results } = await env.DB.prepare("SELECT branch, a1, a2, a3, created_at FROM answers ORDER BY created_at").all();
@@ -771,7 +774,7 @@ function appPage(email, role) {
     &middot; <a href="/admin/export/registrations.csv">Registrations CSV</a>${admin ? ` &middot; <a href="/admin/export/tickets.csv">Tickets CSV</a> &middot; <a href="/admin/export/answers.csv">Answers CSV</a>` : ""}
     &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
   <div class="wrap">
-    ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="staff">Staff</button><button data-tab="export">Badge export</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button></div>` : ""}
+    ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="staff">Staff</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button></div>` : ""}
     <div id="msg" class="msg" hidden role="status"></div>
     ${admin ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="closeDate" style="font-weight:600">Registration closes at the end of</label>
@@ -834,6 +837,11 @@ export async function handleAdmin(req, env, ctx, url) {
       if (req.headers.get("x-admin") !== "1" || (origin && origin !== url.origin)) return json({ error: "Refused." }, 403);
     }
     if (path === "/admin/proof") return proof(env, url.searchParams.get("ref"));
+    if (path === "/admin/receipt") {
+      if (role !== "admin") return json({ error: "Not available to your account." }, 403);
+      if (req.method === "POST") return json(await money.putReceipt(env, req, url.searchParams.get("id")));
+      return money.getReceipt(env, url.searchParams.get("id"));
+    }
     if (path.startsWith("/admin/export/")) {
       const name = path.slice("/admin/export/".length);
       if (role !== "admin" && name !== "registrations.csv") return json({ error: "Not available to your account." }, 403);
@@ -875,6 +883,9 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST facilitator": () => ops.createFacilitator(env, body, who),
       "GET export": () => ops.exportRows(env),
       "POST badge-name": () => ops.setBadgeName(env, body),
+      "GET money": () => money.moneyView(env),
+      "POST money-entry": () => money.saveEntry(env, body, who),
+      "POST money-delete": () => money.deleteEntry(env, body, who),
       "POST cancel-ticket": async () => detail(env, (await ops.cancelTicket(env, body)).reg_ref),
     }[`${req.method} ${path.slice("/admin/api/".length)}`];
     if (!path.startsWith("/admin/api/") || !api) return json({ error: "Not found." }, 404);
