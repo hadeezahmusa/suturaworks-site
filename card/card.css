@@ -1,0 +1,31 @@
+/* Digital business cards at /card/<name>/. Same palette, type and square
+   corners as the main site (see docs/brand-identity.md). */
+:root {
+  --forest: #0F1E1A; --panel: #13251F; --line: #2A3D37; --sage: #7CA67F;
+  --pale: #D3DECF; --ink: #12241F; --mist: #EEF2EC; --muted: #A3B3A9;
+  --head: Verdana, Geneva, sans-serif; --body: Georgia, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+html { background: var(--forest); }
+body { margin: 0; font-family: var(--body); color: var(--muted); background: var(--forest); -webkit-text-size-adjust: 100%; }
+.card { max-width: 440px; margin: 0 auto; padding: 20px 16px 40px; }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 18px; border-bottom: 1px solid var(--line); }
+.top img { height: 30px; width: auto; display: block; }
+.photo { margin: 20px 0 0; background: var(--pale); aspect-ratio: 4 / 5; overflow: hidden; }
+.photo img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
+h1 { font-family: var(--head); font-weight: 700; font-size: 26px; line-height: 1.2; color: var(--mist); margin: 22px 0 8px; }
+.role { font-family: var(--head); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--sage); margin: 0 0 22px; line-height: 1.7; }
+.actions { display: grid; gap: 10px; margin: 0 0 26px; }
+.btn { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 18px;
+  font-family: var(--head); font-size: 15px; text-decoration: none; border: 0; border-radius: 0; cursor: pointer; width: 100%; }
+.btn span { font-size: 13px; opacity: 0.85; }
+.btn-primary { background: var(--pale); color: var(--ink); font-weight: 700; }
+.btn-primary:hover { background: var(--mist); }
+.btn-line { background: transparent; color: var(--mist); border: 1px solid var(--line); }
+.btn-line:hover { border-color: var(--sage); }
+.btn:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
+.co { border-top: 1px solid var(--line); padding-top: 18px; font-size: 15px; line-height: 1.6; }
+.co b { font-family: var(--head); color: var(--mist); font-size: 14px; }
+.co a { color: var(--mist); text-decoration: none; border-bottom: 1px solid var(--sage); }
+.small { font-family: var(--head); font-size: 11px; color: var(--muted); margin-top: 26px; }
+.toast { min-height: 18px; font-family: var(--head); font-size: 12px; color: var(--sage); margin: -14px 0 18px; }
