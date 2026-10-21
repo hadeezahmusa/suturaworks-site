@@ -67,11 +67,19 @@ function rows(pairs) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;border:1px solid #D7E2EF;border-radius:10px;">${pairs.map(([k, v], i) =>
     `<tr><td style="padding:10px 16px;${i ? `border-top:1px solid ${C.line};` : ""}font-family:${FONT};font-size:11px;color:${C.body};width:38%;">${k}</td><td style="padding:10px 16px;${i ? `border-top:1px solid ${C.line};` : ""}font-family:${FONT};font-size:12px;font-weight:600;color:${C.ink};">${v}</td></tr>`).join("")}</table>`;
 }
-function days(adviser) {
+// Which days a ticket covers. Advisers come on day two for the sprint and
+// judging; facilitators have whatever admin set; everyone else both days.
+export function dayLines(t) {
+  const d1 = ["D1", "Fri 6 Nov, 4:00pm. Virtual, link sent the day before"];
+  const d2 = ["D2", "Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja"];
+  if (t.kind === "adviser") return [["D2", "Sat 7 Nov, 10:15am to about 3:00pm. Transcorp Hilton, Abuja"]];
+  if (t.days === "sat") return [d2];
+  if (t.days === "fri") return [d1];
+  return [d1, d2];
+}
+function days(t) {
   const line = (k, v) => `<tr><td valign="top" style="width:28px;padding:0 0 8px;font-family:${MONO};font-size:9px;font-weight:600;color:${C.blue};">${k}</td><td style="padding:0 0 8px;font-family:${FONT};font-size:11px;font-weight:500;color:${C.ink};line-height:1.45;">${v}</td></tr>`;
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0">${adviser
-    ? line("D2", "Sat 7 Nov, 10:15am to about 3:00pm. Transcorp Hilton, Abuja")
-    : line("D1", "Fri 6 Nov, 4:00pm. Virtual, link sent the day before") + line("D2", "Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja")}</table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0">${dayLines(t).map(([k, v]) => line(k, v)).join("")}</table>`;
 }
 
 const CHIP = {
@@ -81,6 +89,8 @@ const CHIP = {
   judge: ["Judge or mentor", "#184E9E", "#FFFFFF"],
   sponsored: ["Sponsored seat", "#16537A", "#FFFFFF"],
   adviser: ["Adviser", "#FFFFFF", C.navy],
+  partner: ["Partner", "#1F5F5B", "#FFFFFF"],
+  facilitator: ["Facilitator", C.yel, C.navy],
 };
 
 export function paidLine(ticket, reg) {
@@ -88,6 +98,8 @@ export function paidLine(ticket, reg) {
   if (ticket.kind === "corporate") return `Corporate pack, ${ngn(reg.amount)}`;
   if (ticket.kind === "judge") return "Free with the corporate pack";
   if (ticket.kind === "sponsored") return "Paid by a sponsor";
+  if (ticket.kind === "partner") return "Covered by a QLV partner";
+  if (ticket.kind === "facilitator") return "Facilitator";
   return "By invitation";
 }
 
@@ -113,8 +125,8 @@ function ticketCard(t) {
       <td valign="top" align="right"><span style="font-family:${FONT};font-size:8px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${fg};background:${bg};${border}padding:4px 8px;border-radius:3px;white-space:nowrap;">${chip}</span></td>
     </tr></table>
     <div style="height:1px;background:${C.line};margin:12px 0;line-height:1px;font-size:1px;">&nbsp;</div>
-    ${days(t.kind === "adviser")}
-    <div style="font-family:${FONT};font-size:11px;color:${C.body};">${t.kind === "adviser" || t.kind === "judge" ? "Not placed in a team" : "Team: announced on day one"}</div>
+    ${days(t)}
+    <div style="font-family:${FONT};font-size:11px;color:${C.body};">${["adviser", "judge", "facilitator"].includes(t.kind) ? "Not placed in a team" : "Team: announced on day one"}</div>
   </td></tr></table>`;
 }
 
@@ -154,6 +166,10 @@ export function ticketIssued(t, reg, links) {
     ? `Hello ${first(t.name)}, thank you for giving the day. Your place is held and a calendar invitation is attached. Your reference is below.`
     : t.kind === "sponsored"
       ? `Hello ${first(t.name)}, your seat is claimed and paid for by your sponsor. Your ticket is below. Keep the reference, it is how we find you at the desk.`
+      : t.kind === "partner"
+        ? `Hello ${first(t.name)}, your seat is claimed and covered by a QLV 2026 partner. Your ticket is below. Keep the reference, it is how we find you at the desk.`
+      : t.kind === "facilitator"
+        ? `Hello ${first(t.name)}, thank you for facilitating QLV 2026. You are registered and your ticket is below. Keep the reference, it is how we find you at the desk.`
       : judge
         ? `Hello ${first(t.name)}, ${reg.organisation} has named you as its judge or mentor for QLV 2026. You are not placed in a team: you rove and score on day two. Your ticket is below.`
         : `Hello ${first(t.name)}, your payment has come through and your seat is held. Your ticket is below. Keep the reference, it is how we find you at the desk.`;
@@ -166,7 +182,7 @@ export function ticketIssued(t, reg, links) {
   return {
     subject: adviser ? `You are confirmed for QLV 2026, ${t.ticket_ref}` : `Your QLV 2026 ticket, ${t.ticket_ref}`,
     html: shell({ preheader: `${heading}. Reference ${t.ticket_ref}.`, body, foot: `${esc(paidLine(t, reg))} &middot; <span style="font-family:${MONO};">${esc(t.ticket_ref)}</span>` }),
-    text: `${heading}\n\n${intro}\n\nAdmit: ${t.name}\nReference: ${t.ticket_ref}\n${adviser ? "D2: Sat 7 Nov, 10:15am to about 3:00pm. Transcorp Hilton, Abuja" : "D1: Fri 6 Nov, 4:00pm. Virtual, link sent the day before\nD2: Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja\nTeam: announced on day one"}\n\nOpen your ticket: ${links.ticket}\n${adviser ? "Send a problem" : "Answer the three questions"}: ${links.answer}\n`,
+    text: `${heading}\n\n${intro}\n\nAdmit: ${t.name}\nReference: ${t.ticket_ref}\n${dayLines(t).map(([k, v]) => `${k}: ${v}`).join("\n")}${["adviser", "judge", "facilitator"].includes(t.kind) ? "" : "\nTeam: announced on day one"}\n\nOpen your ticket: ${links.ticket}\n${adviser ? "Send a problem" : "Answer the three questions"}: ${links.answer}\n`,
   };
 }
 
@@ -263,6 +279,24 @@ export function memberCode(m, siteUrl, closeDate) {
     subject: "Your JCI Aso member code for QLV 2026",
     html: shell({ preheader: `Your code for the ${ngn(8000)} member rate.`, body, foot: `Member code &middot; <span style="font-family:${MONO};">${esc(m.code)}</span>` }),
     text: `Your member code for QLV 2026\n\nHello ${first(m.name)}, as a JCI Aso member you can register for QLV 2026 at the member rate of ${ngn(8000)} instead of ${ngn(10000)}.\n\nYour member code: ${m.code}\nIt is yours alone and works once, so please keep it to yourself.\n\nOpen ${siteUrl}, choose JCI Aso member, enter your code and confirm your name. Then fill in the rest and make the transfer.\n\nD1: Fri 6 Nov, 4:00pm. Virtual\nD2: Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja\n\nRegistration closes on ${closeDate}. If the name on this code is not yours, reply to this email.\n\nHadeezah Balarabe Musa\nChairperson, QLV 2026\n`,
+  };
+}
+
+// To a partner's contact once their payment is confirmed: one claim link per
+// seat. The partner level is never mentioned in any email.
+export function partnerLinks(partner, seats) {
+  const list = seats.map((s) => `<tr><td style="padding:8px 0;border-top:1px solid ${C.line};font-family:${FONT};font-size:12px;color:${C.ink};width:70px;"><b>Seat ${s.seat_no}</b></td>
+    <td style="padding:8px 0;border-top:1px solid ${C.line};font-family:${MONO};font-size:12px;"><a href="${esc(s.url)}" style="color:${C.link};word-break:break-all;">${esc(s.url)}</a></td></tr>`).join("");
+  const n = seats.length;
+  const body = h1(n === 1 ? "Your QLV 2026 seat link" : "Your QLV 2026 seat links") +
+    p(`Hello ${esc(first(partner.contact_name))}, thank you for partnering with QLV 2026. ${n === 1 ? "Here is the link for the seat" : `Here are the links for the ${word(n).toLowerCase()} seats`} that come with ${esc(partner.name)}'s partnership. Send each link to one person. They fill in their own details and their ticket comes straight to them.`) +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">${list}</table>` +
+    p("Each link works once, for one person, so please send it to a named person rather than posting it in a group. If a link goes astray, reply to this email and we will replace it.", "font-size:12px;") +
+    p("Every seat covers both days: Friday 6 November, virtual, and Saturday 7 November at the Transcorp Hilton, Abuja.", "font-size:12px;margin:0;");
+  return {
+    subject: n === 1 ? "Your QLV 2026 partner seat link" : "Your QLV 2026 partner seat links",
+    html: shell({ preheader: "Send each link to one person.", body, foot: esc(partner.name) }),
+    text: `Your QLV 2026 seat links\n\nHello ${first(partner.contact_name)}, thank you for partnering with QLV 2026. Send each link to one person; they fill in their own details and their ticket comes straight to them.\n\n${seats.map((s) => `Seat ${s.seat_no}: ${s.url}`).join("\n")}\n\nEach link works once, for one person. If a link goes astray, reply to this email and we will replace it.\n`,
   };
 }
 

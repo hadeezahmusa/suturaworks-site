@@ -107,3 +107,7 @@ CREATE TABLE IF NOT EXISTS members (
 --   ALTER TABLE members ADD COLUMN email TEXT;
 --   ALTER TABLE registrations ADD COLUMN verified_by TEXT;
 CREATE INDEX IF NOT EXISTS registrations_member ON registrations (member_no);
+
+-- Admin additions of 21 October 2026 (tables, partners, staff, badge export)
+-- are in migrations/2026-10-21-admin-additions.sql. A fresh database runs this
+-- file first and then that one.

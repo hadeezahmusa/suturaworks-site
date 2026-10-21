@@ -9,6 +9,7 @@ import { CLOSES_AT, ADVISERS_CLOSE_AT, SPONSORED_MIN, SPONSORED_MAX, amountFor, 
 import { sniff, stripMetadata } from "./strip.js";
 import * as mail from "./emails.js";
 import { handleAdmin } from "./admin.js";
+import { seatPending } from "./seating.js";
 
 const MAX_PROOF = 5 * 1024 * 1024;
 const MAX_JSON = 30000;
@@ -49,6 +50,8 @@ export async function nextRef(env, counter) {
   const n = row.n;
   if (counter === "sponsored") return "QLV26-S" + String(n).padStart(2, "0");
   if (counter === "adviser") return "QLV26-A" + String(n).padStart(2, "0");
+  if (counter === "partner") return "QLV26-P" + String(n).padStart(2, "0");
+  if (counter === "facilitator") return "QLV26-F" + String(n).padStart(2, "0");
   return "QLV26-" + String(n).padStart(3, "0");
 }
 
@@ -342,6 +345,7 @@ async function claim(req, env, ctx) {
     email: need(clean(b.email).toLowerCase(), "your email", "email"),
     phone: need(clean(b.phone, 30), "your phone number", "phone"),
     situation: SITS.has(b.situation) ? b.situation : "emp",
+    organisation: clean(b.organisation),
   };
   const s = await claimState(env, reg);
   if (s.state === "closed") throw new HttpError(403, `This claim link closed on ${closeLabel(await closesAt(env))}.`, "closed");
@@ -356,14 +360,15 @@ async function claim(req, env, ctx) {
   const stamp = now();
   // The seat cap is enforced in the insert itself, so two people claiming the
   // last seat at the same moment cannot both get it.
-  const ins = await env.DB.prepare(`INSERT INTO tickets (token, reg_ref, ticket_ref, kind, name, email, phone, situation, created_at)
-      SELECT ?, ?, 'pending', 'sponsored', ?, ?, ?, ?, ?
+  const ins = await env.DB.prepare(`INSERT INTO tickets (token, reg_ref, ticket_ref, kind, name, email, phone, situation, organisation, created_at)
+      SELECT ?, ?, 'pending', 'sponsored', ?, ?, ?, ?, ?, ?
       WHERE (SELECT COUNT(*) FROM tickets WHERE reg_ref = ? AND kind = 'sponsored') < ?`)
-    .bind(t.token, reg.ref, c.name, c.email, c.phone, c.situation, stamp, reg.ref, reg.size).run();
+    .bind(t.token, reg.ref, c.name, c.email, c.phone, c.situation, c.organisation || null, stamp, reg.ref, reg.size).run();
   if (!ins.meta.changes) throw new HttpError(409, "All the seats on this link have been claimed.", "full");
   t.ticket_ref = await nextRef(env, "sponsored");
   const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE reg_ref = ? AND kind = 'sponsored'").bind(reg.ref).first();
   await env.DB.prepare("UPDATE tickets SET ticket_ref = ?, seat_no = ?, sent_at = ? WHERE token = ?").bind(t.ticket_ref, n, stamp, t.token).run();
+  await seatPending(env);
 
   // The sponsor's money was verified by a person before this link went out,
   // so a claimed seat's ticket goes straight to the claimant.
@@ -371,6 +376,57 @@ async function claim(req, env, ctx) {
     await sendMail(env, { to: c.email, ...mail.ticketIssued(t, reg, ticketLinks(env, t)) }, t.ticket_ref, "ticket_issued");
     await sendMail(env, { to: reg.email, ...mail.seatClaimed(reg, t, n, links(env, reg).manage, closeLabel(await closesAt(env))) }, reg.ref, "seat_claimed");
   })());
+  return { ref: t.ticket_ref, key: t.token, email: c.email };
+}
+
+// ---------- partner seats ----------
+// Each partner seat has its own link. Same claim form as sponsored seats; the
+// organisation used for seating is the partner's.
+
+async function seatByToken(env, t) {
+  const s = t ? await env.DB.prepare(`SELECT s.*, p.name AS partner_name, p.status, p.reg_ref FROM partner_seats s JOIN partners p ON p.id = s.partner_id
+    WHERE s.token = ?`).bind(String(t)).first() : null;
+  if (!s) throw new HttpError(404, "This seat link is not valid.");
+  return s;
+}
+
+async function partnerSeatInfo(url, env) {
+  const s = await seatByToken(env, url.searchParams.get("t"));
+  if (s.status !== "confirmed") return { state: "pending" };
+  if (s.ticket_id) return { state: "claimed" };
+  if (isClosed(ADVISERS_CLOSE_AT)) return { state: "closed" };
+  return { state: "open" };
+}
+
+async function partnerSeatClaim(req, env, ctx) {
+  const b = await readJson(req);
+  if (b.website) throw new HttpError(400, "We could not accept that.");
+  const s = await seatByToken(env, b.t);
+  if (s.status !== "confirmed") throw new HttpError(409, "This seat is not ready yet. Try again later.", "pending");
+  if (s.ticket_id) throw new HttpError(409, "This seat has already been claimed.", "full");
+  if (isClosed(ADVISERS_CLOSE_AT)) throw new HttpError(403, "This link has closed.", "closed");
+  const c = {
+    name: need(clean(b.name, 120), "your full name"),
+    email: need(clean(b.email).toLowerCase(), "your email", "email"),
+    phone: need(clean(b.phone, 30), "your phone number", "phone"),
+    situation: SITS.has(b.situation) ? b.situation : "emp",
+  };
+  await brake(env, req, "claim", 20);
+  const stamp = now();
+  const t = { token: token(24), reg_ref: s.reg_ref, kind: "partner", ...c };
+  const row = await env.DB.prepare(`INSERT INTO tickets (token, reg_ref, ticket_ref, kind, name, email, phone, situation, partner_id, created_at)
+    VALUES (?, ?, 'pending', 'partner', ?, ?, ?, ?, ?, ?) RETURNING id`).bind(t.token, s.reg_ref, c.name, c.email, c.phone, c.situation, s.partner_id, stamp).first();
+  // Taking the seat is one conditional update, so two people opening the same
+  // link at once cannot both get it.
+  const took = await env.DB.prepare("UPDATE partner_seats SET ticket_id = ? WHERE id = ? AND ticket_id IS NULL").bind(row.id, s.id).run();
+  if (!took.meta.changes) {
+    await env.DB.prepare("DELETE FROM tickets WHERE id = ?").bind(row.id).run();
+    throw new HttpError(409, "This seat has already been claimed.", "full");
+  }
+  t.ticket_ref = await nextRef(env, "partner");
+  await env.DB.prepare("UPDATE tickets SET ticket_ref = ?, sent_at = ? WHERE id = ?").bind(t.ticket_ref, stamp, row.id).run();
+  await seatPending(env);
+  ctx.waitUntil(sendMail(env, { to: c.email, ...mail.ticketIssued(t, {}, ticketLinks(env, t)) }, t.ticket_ref, "ticket_issued"));
   return { ref: t.ticket_ref, key: t.token, email: c.email };
 }
 
@@ -395,8 +451,8 @@ async function ticketByToken(env, t) {
 
 async function ticketView(url, env) {
   const t = await ticketByToken(env, url.searchParams.get("t"));
-  if (!t || !t.sent_at) throw new HttpError(404, "Ticket not found.");
-  return { name: t.name, ref: t.ticket_ref, kind: t.kind, mode: t.mode, situation: t.situation, paidLine: mail.paidLine(t, t) };
+  if (!t || !t.sent_at || t.cancelled_at) throw new HttpError(404, "Ticket not found.");
+  return { name: t.name, ref: t.ticket_ref, kind: t.kind, mode: t.mode, situation: t.situation, days: mail.dayLines(t).map(([k]) => k), paidLine: mail.paidLine(t, t) };
 }
 
 // An answer key is either a registration secret (standard and member, from
@@ -404,7 +460,7 @@ async function ticketView(url, env) {
 async function answerHolder(env, key) {
   if (!key) throw new HttpError(404, "This link is not valid.");
   const t = await ticketByToken(env, key);
-  if (t && t.sent_at) return { holder: `t:${t.id}`, branch: t.situation };
+  if (t && t.sent_at && !t.cancelled_at) return { holder: `t:${t.id}`, branch: t.situation };
   const reg = await env.DB.prepare("SELECT ref, tier, situation, proof_at, status FROM registrations WHERE secret = ?").bind(String(key)).first();
   if (reg && reg.proof_at && reg.status !== "released" && reg.tier !== "sponsored") {
     return { holder: `r:${reg.ref}`, branch: reg.tier === "corporate" ? null : reg.situation };
@@ -446,6 +502,8 @@ const ROUTES = {
   "GET /api/claim": (req, env, ctx, url) => claimInfo(url, env),
   "POST /api/claim": (req, env, ctx) => claim(req, env, ctx),
   "GET /api/sponsor": (req, env, ctx, url) => sponsorView(url, env),
+  "GET /api/partner-seat": (req, env, ctx, url) => partnerSeatInfo(url, env),
+  "POST /api/partner-seat": (req, env, ctx) => partnerSeatClaim(req, env, ctx),
   "GET /api/ticket": (req, env, ctx, url) => ticketView(url, env),
   "GET /api/answer-context": (req, env, ctx, url) => answerContext(url, env),
   "POST /api/answers": (req, env) => answers(req, env),

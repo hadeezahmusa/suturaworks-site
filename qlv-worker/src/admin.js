@@ -13,6 +13,10 @@ import { RELEASE_AFTER_DAYS, TIER_NAME, ngn, closeLabel, closeAtFor } from "../.
 import { QBANK } from "../../qlv2026/questions.js";
 import * as mail from "./emails.js";
 import { HttpError, now, token, links, ticketLinks, sendMail, closesAt } from "./index.js";
+import { THEME, tableName } from "./config.js";
+import { seatPending } from "./seating.js";
+import * as ops from "./admin-ops.js";
+import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
 
 const COOKIE = "qlv_admin";
 const SESSION_HOURS = 24 * 7;
@@ -100,7 +104,7 @@ async function list(env, filter) {
   const { results } = await env.DB.prepare(`SELECT r.ref, r.tier, r.size, r.amount, r.status, r.name, r.contact_person, r.organisation, r.email,
       r.created_at, r.proof_at, r.verified_at, r.sent_at,
       (SELECT COUNT(*) FROM tickets t WHERE t.reg_ref = r.ref AND t.kind = 'sponsored' AND t.ticket_ref != 'pending') AS claimed
-    FROM registrations r ORDER BY r.created_at DESC`).all();
+    FROM registrations r WHERE r.tier NOT IN ('partner', 'facilitator') ORDER BY r.created_at DESC`).all();
   const rows = results.map((r) => ({ ...r, flagged: flagged(r) }));
   const counts = { all: 0, awaiting: 0, flagged: 0, verified: 0, confirmed: 0, queried: 0, released: 0, adviser: 0 };
   for (const r of rows) {
@@ -123,7 +127,7 @@ async function detail(env, ref) {
   const { secret, ...safe } = r;
   return {
     reg: { ...safe, attendees: r.attendees ? JSON.parse(r.attendees) : null, flagged: flagged(r), tierName: TIER_NAME[r.tier], amountText: ngn(r.amount) },
-    tickets: t.map(({ token: _t, ...rest }) => rest),
+    tickets: t.map(({ token: _t, ...rest }) => ({ ...rest, table: rest.table_index === null || rest.table_index === undefined ? null : `${tableName(rest.table_index)}, seat ${rest.table_seat}` })),
     log,
     claimUrl: r.status === "confirmed" ? links(env, r).claim : null,
   };
@@ -145,6 +149,8 @@ async function verify(env, ref, who) {
   } else throw new HttpError(409, "Advisers are confirmed when they sign up.");
   stmts.push(env.DB.prepare("UPDATE registrations SET status = 'verified', verified_at = ?, verified_by = ?, updated_at = ? WHERE ref = ?").bind(stamp, who, stamp, r.ref));
   await env.DB.batch(stmts);
+  // Standard, member and corporate seats take a table the moment payment is verified.
+  await seatPending(env);
   return detail(env, r.ref);
 }
 
@@ -278,7 +284,7 @@ const REMINDER_BATCH = 70;
 const WAITING_SQL = `SELECT t.id, t.token, t.ticket_ref, t.reg_ref, t.name, t.email
   FROM tickets t JOIN registrations r ON r.ref = t.reg_ref
   WHERE t.sent_at IS NOT NULL AND r.status = 'confirmed'
-    AND t.kind IN ('standard', 'member', 'corporate', 'sponsored')
+    AND t.kind IN ('standard', 'member', 'corporate', 'sponsored', 'partner') AND t.cancelled_at IS NULL
     AND NOT EXISTS (SELECT 1 FROM answers a WHERE a.holder = 't:' || t.id)
     AND NOT (t.kind IN ('standard', 'member') AND EXISTS (SELECT 1 FROM answers a WHERE a.holder = 'r:' || t.reg_ref))
     AND NOT EXISTS (SELECT 1 FROM email_log l WHERE l.kind = 'answers_reminder' AND l.ok = 1 AND l.ref = t.reg_ref AND l.recipient = t.email)
@@ -418,12 +424,12 @@ function csv(rows, cols) {
 async function exportCsv(env, name) {
   let body;
   if (name === "registrations.csv") {
-    const { results } = await env.DB.prepare("SELECT * FROM registrations ORDER BY created_at").all();
+    const { results } = await env.DB.prepare("SELECT * FROM registrations WHERE tier != 'partner' ORDER BY created_at").all();
     body = csv(results.map((r) => ({ ...r, flagged_for_release: flagged(r) ? "yes" : "", proof_uploaded: r.proof_at ? "yes" : "no" })),
       ["ref", "status", "tier", "size", "amount", "name", "contact_person", "email", "phone", "organisation", "member_no", "role", "invited_by", "mode", "named_publicly",
         "proof_uploaded", "created_at", "proof_at", "verified_at", "sent_at", "queried_at", "released_at", "query_note", "flagged_for_release"]);
   } else if (name === "tickets.csv") {
-    const { results } = await env.DB.prepare("SELECT t.ticket_ref, t.reg_ref, t.kind, t.seat_no, t.name, t.email, t.phone, t.role, t.sent_at, r.organisation FROM tickets t JOIN registrations r ON r.ref = t.reg_ref WHERE t.ticket_ref != 'pending' ORDER BY t.id").all();
+    const { results } = await env.DB.prepare("SELECT t.ticket_ref, t.reg_ref, t.kind, t.seat_no, t.name, t.email, t.phone, t.role, t.sent_at, r.organisation FROM tickets t JOIN registrations r ON r.ref = t.reg_ref WHERE t.ticket_ref != 'pending' AND t.cancelled_at IS NULL ORDER BY t.id").all();
     body = csv(results, ["ticket_ref", "reg_ref", "kind", "seat_no", "name", "email", "phone", "role", "organisation", "sent_at"]);
   } else if (name === "answers.csv") {
     // No names, no references: the promise on the questions screen.
@@ -447,7 +453,7 @@ async function proof(env, ref) {
 // ---------- pages ----------
 
 const STYLE = `
-:root{--navy:#0F2B63;--blue:#1A5AA8;--teal:#1F7D87;--yel:#EFC22D;--ink:#0E1B33;--body:#4A5B75;--mute:#5A6B85;--line:#E0E8F2;--rule:#C6D4E6;--panel:#F4F8FC;--bg:#F4F7FB}
+:root{--navy:${THEME.primary};--blue:#1A5AA8;--teal:#1F7D87;--yel:${THEME.accent};--ink:#0E1B33;--body:#4A5B75;--mute:#5A6B85;--line:#E0E8F2;--rule:#C6D4E6;--panel:#F4F8FC;--bg:#F4F7FB}
 *{box-sizing:border-box}body{margin:0;font-family:Poppins,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
 a{color:#14478F}h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 10px}
 .top{background:var(--navy);color:#fff;padding:12px 20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
@@ -482,7 +488,7 @@ textarea,input[type=email],input[type=text]{width:100%;font:inherit;border:1px s
 
 function page(title, body, script = "") {
   return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${e(title)}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Poppins:wght@400;600;700&display=swap"><style>${STYLE}</style></head><body>${body}${script ? `<script>${script}</script>` : ""}</body></html>`;
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Poppins:wght@400;600;700&display=swap"><style>${STYLE}${VIEWS_STYLE}</style></head><body>${body}${script ? `<script>${script}</script>` : ""}</body></html>`;
 }
 
 function loginPage(note) {
@@ -546,8 +552,8 @@ function ticketRows(d) {
   if (!d.tickets.length) return "";
   return '<div class="hr"></div><h2>' + (d.reg.tier === "sponsored" ? "Claimed seats" : "Tickets") + "</h2>" + d.tickets.map((t) =>
     '<div style="margin:0 0 8px"><span class="mono">' + esc(t.ticket_ref) + "</span> " + esc(t.name) + ", " + esc(t.email) +
-    ' <span class="small">' + (t.kind === "judge" ? "judge or mentor, " : "") + (t.sent_at ? "sent " + when(t.sent_at) : "not sent") + "</span>" +
-    (t.sent_at && ROLE === "admin" ? ' <button class="link" data-resend="' + t.id + '" data-email="' + esc(t.email) + '">Resend</button>' : "") + "</div>").join("");
+    ' <span class="small">' + (t.kind === "judge" ? "judge or mentor, " : "") + (t.cancelled_at ? "<b>cancelled</b>" : t.sent_at ? "sent " + when(t.sent_at) : "not sent") + (t.table && ROLE === "admin" ? ", " + esc(t.table) : "") + "</span>" +
+    (t.sent_at && !t.cancelled_at && ROLE === "admin" ? ' <button class="link" data-resend="' + t.id + '" data-email="' + esc(t.email) + '">Resend</button> <button class="link" data-cancel="' + t.id + '" data-name="' + esc(t.name) + '">Cancel ticket</button>' : "") + "</div>").join("");
 }
 
 function renderDetail(d) {
@@ -740,6 +746,7 @@ document.addEventListener("click", (e) => {
     tab = t.dataset.tab;
     document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
     $("#regsView").hidden = tab !== "regs"; $("#answersView").hidden = tab !== "answers"; $("#codesView").hidden = tab !== "codes";
+    showView(tab);
     if (tab === "answers") loadAnswers();
     if (tab === "codes") loadCodes().catch((err) => msg(err.message));
   }
@@ -764,7 +771,7 @@ function appPage(email, role) {
     &middot; <a href="/admin/export/registrations.csv">Registrations CSV</a>${admin ? ` &middot; <a href="/admin/export/tickets.csv">Tickets CSV</a> &middot; <a href="/admin/export/answers.csv">Answers CSV</a>` : ""}
     &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
   <div class="wrap">
-    ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button></div>` : ""}
+    ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="staff">Staff</button><button data-tab="export">Badge export</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button></div>` : ""}
     <div id="msg" class="msg" hidden role="status"></div>
     ${admin ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="closeDate" style="font-weight:600">Registration closes at the end of</label>
@@ -777,8 +784,9 @@ function appPage(email, role) {
       <div class="grid"><div class="list card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Ref</th><th>Who</th><th>Ticket</th><th>Amount</th><th class="hide-s">Proof</th><th class="hide-s">Registered</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
       <div class="side" id="detail"><div class="card small">Pick a registration to see its details and proof.</div></div></div></div>
     <div id="codesView" hidden><div class="card" id="codesBox"></div></div>
+    ${admin ? VIEWS_HTML : ""}
     <div id="answersView" hidden><div class="card" id="remind" style="margin:0 0 14px"></div><div id="answers"></div></div>
-  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(email)};\n` + APP);
+  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(email)};\n` + APP + (admin ? VIEWS_JS : "function showView() {}"));
 }
 
 // ---------- router ----------
@@ -829,6 +837,7 @@ export async function handleAdmin(req, env, ctx, url) {
     if (path.startsWith("/admin/export/")) {
       const name = path.slice("/admin/export/".length);
       if (role !== "admin" && name !== "registrations.csv") return json({ error: "Not available to your account." }, 403);
+      if (name === "badges.csv") return new Response(await ops.badgesCsv(env), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="qlv2026-badges.csv"', ...SECURITY } });
       return exportCsv(env, name);
     }
 
@@ -854,6 +863,19 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST reopen": () => reopen(env, body.ref),
       "POST resend-ticket": () => resendTicket(env, body),
       "POST closing": () => setClosing(env, body),
+      "GET tables": () => ops.tablesView(env),
+      "POST lock": () => ops.lockExport(env, who),
+      "GET partners": () => ops.partnersList(env),
+      "GET partner": () => ops.partnerDetail(env, q.get("id")),
+      "POST partner": () => ops.createPartner(env, body, who),
+      "POST partner-confirm": () => ops.confirmPartner(env, body, who),
+      "POST partner-resend": () => ops.resendPartnerSeats(env, body),
+      "POST partner-void": () => ops.voidPartnerSeat(env, body),
+      "GET staff": () => ops.staffList(env),
+      "POST facilitator": () => ops.createFacilitator(env, body, who),
+      "GET export": () => ops.exportRows(env),
+      "POST badge-name": () => ops.setBadgeName(env, body),
+      "POST cancel-ticket": async () => detail(env, (await ops.cancelTicket(env, body)).reg_ref),
     }[`${req.method} ${path.slice("/admin/api/".length)}`];
     if (!path.startsWith("/admin/api/") || !api) return json({ error: "Not found." }, 404);
     if (role !== "admin" && !VERIFIER_CAN.has(`${req.method} ${path.slice("/admin/api/".length)}`)) return json({ error: "Not available to your account." }, 403);
