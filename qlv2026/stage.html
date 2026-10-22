@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>QLV 2026 · on stage</title>
+<link rel="icon" href="assets/favicon.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Poppins:wght@500;600;700;800&family=Source+Sans+3:wght@400;600&display=swap">
+<link rel="stylesheet" href="landing.css">
+<link rel="stylesheet" href="stage.css">
+<link rel="preload" href="assets/sounds/chime.mp3" as="audio">
+<link rel="preload" href="assets/sounds/gong.mp3" as="audio">
+</head>
+<body>
+<div id="screen">
+  <div class="grid" aria-hidden="true"></div>
+  <header class="top">
+    <div class="logos"><img class="jci" src="assets/jci-aso-white.png" alt="JCI Aso"><span class="rule"></span><img class="qlv" src="assets/qlv-white.png" alt="Quality Leadership Value"></div>
+    <div class="tag"><b>Building Systems That Outlive You</b><span>SAT 7 NOV · TRANSCORP HILTON, ABUJA</span></div>
+  </header>
+  <div id="scene" aria-live="polite"></div>
+  <footer class="progress" id="progress"></footer>
+  <div id="banner"></div>
+  <div id="flash"></div>
+</div>
+<div id="sound" role="dialog" aria-label="Enable sound"><button type="button">Click to enable sound<small>Chimes at the time calls and a gong at zero</small></button></div>
+<div id="toast" class="toast hide" aria-hidden="true">Sound on</div>
+<div id="recon" hidden><i></i>reconnecting</div>
+<button id="fs" type="button">Full screen</button>
+<script type="module" src="stage.js"></script>
+</body>
+</html>

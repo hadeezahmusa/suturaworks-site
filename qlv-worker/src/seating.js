@@ -13,6 +13,7 @@
 // two simultaneous runs safe: if they collide, one fails and recomputes.
 
 import { choose, tablesFrom, orgKey } from "./placement.js";
+import { getSettings, isFrozen } from "./settings.js";
 
 const DUE_SQL = `SELECT t.id, t.kind, t.organisation, r.organisation AS reg_org, p.name AS partner_name,
     CASE WHEN t.kind IN ('sponsored', 'partner') THEN t.created_at ELSE r.verified_at END AS due_at
@@ -22,7 +23,7 @@ const DUE_SQL = `SELECT t.id, t.kind, t.organisation, r.organisation AS reg_org,
       OR t.kind IN ('sponsored', 'partner'))
   ORDER BY due_at, t.id`;
 
-const SEATED_SQL = "SELECT id, kind, table_index, table_seat, org_key FROM tickets WHERE table_index IS NOT NULL";
+const SEATED_SQL = "SELECT id, kind, table_index, table_seat, org_key FROM tickets WHERE table_index IS NOT NULL AND cancelled_at IS NULL";
 
 // The organisation that keeps people apart. Members never are; corporate
 // seats use the booking, partner seats the partner, everyone else what they typed.
@@ -33,15 +34,29 @@ export function orgFor(t) {
   return orgKey(t.organisation || (t.kind === "standard" ? t.reg_org : null));
 }
 
+// After the teams are announced, a late arrival joins a table that already
+// exists, never a new one, even if every table has eight: the same rule,
+// limited to tables in use and with no ceiling. They are flagged so the team
+// can be told directly.
+function chooseFrozen(rows, person) {
+  const inUse = [...new Set(rows.map((r) => r.table_index))].sort((a, b) => a - b);
+  if (!inUse.length) return choose(tablesFrom(rows), person);
+  const all = tablesFrom(rows);
+  const pick = choose(inUse.map((i) => all[i]), person, { capacity: Infinity, initial: 0 });
+  return { table: inUse[pick.table], seat: pick.seat };
+}
+
 export async function seatPending(env) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const [seated, due] = await env.DB.batch([env.DB.prepare(SEATED_SQL), env.DB.prepare(DUE_SQL)]);
     if (!due.results.length) return 0;
+    const frozen = isFrozen(await getSettings(env));
     const rows = [...seated.results];
     const stamp = new Date().toISOString();
     const plan = due.results.map((t) => {
       const org = orgFor(t);
-      const { table, seat } = choose(tablesFrom(rows), { org, member: t.kind === "member" });
+      const person = { org, member: t.kind === "member" };
+      const { table, seat } = frozen ? chooseFrozen(rows, person) : choose(tablesFrom(rows), person);
       rows.push({ id: t.id, kind: t.kind, table_index: table, table_seat: seat, org_key: org });
       return { id: t.id, t: table, s: seat, o: org };
     });
@@ -53,8 +68,8 @@ export async function seatPending(env) {
           table_index = (SELECT json_extract(value, '$.t') FROM json_each(?1) WHERE json_extract(value, '$.id') = tickets.id),
           table_seat = (SELECT json_extract(value, '$.s') FROM json_each(?1) WHERE json_extract(value, '$.id') = tickets.id),
           org_key = (SELECT json_extract(value, '$.o') FROM json_each(?1) WHERE json_extract(value, '$.id') = tickets.id),
-          seated_at = ?2
-        WHERE table_index IS NULL AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?1))`).bind(json, stamp).run();
+          seated_at = ?2, late_after_freeze = ?3
+        WHERE table_index IS NULL AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?1))`).bind(json, stamp, frozen ? 1 : null).run();
       return plan.length;
     } catch (err) {
       // Someone else seated people at the same moment: work it out again.

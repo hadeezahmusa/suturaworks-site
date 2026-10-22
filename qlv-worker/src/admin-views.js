@@ -100,6 +100,7 @@ export const VIEWS_HTML = MONEY_HTML + String.raw`
   </div>
   <div class="card" style="padding:0;overflow-x:auto;margin-top:14px"><div style="padding:14px 16px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><h2>Everyone on staff</h2><span class="small">Advisers and judges come in from the sign-up page and are confirmed there.</span></div>
     <table><thead><tr><th>Name</th><th>Role</th><th>How they came in</th><th>Status</th><th>Reference</th></tr></thead><tbody id="sRows"></tbody></table></div>
+  <div class="card" id="rolesBox" style="padding:0;overflow-x:auto;margin-top:14px"></div>
 </div>
 
 <div id="exportView" hidden>
@@ -120,15 +121,19 @@ export const VIEWS_HTML = MONEY_HTML + String.raw`
 </div>`;
 
 export const VIEWS_JS = MONEY_JS + String.raw`
-const VIEWS = { tables: "tablesView", partners: "partnersView", staff: "staffView", export: "exportView", money: "moneyView" };
+const VIEWS = { tables: "tablesView", partners: "partnersView", staff: "staffView", export: "exportView", money: "moneyView",
+  rebalance: "rebalanceView", checkin: "checkinView", briefings: "briefingsView", scoring: "scoringView", stage: "stageView", settings: "settingsView" };
 const TIER_BG = { J: ["var(--yel)", "var(--ink)"], S: ["var(--navy)", "#fff"], C: ["#2C3E58", "#fff"], P: ["#E8E9EC", "var(--ink)"], T: ["#1F5F5B", "#fff"] };
 let poll = null, curPartner = null, level = "lead", levels = [];
 function showView(tab) {
   Object.entries(VIEWS).forEach(([k, id]) => { $("#" + id).hidden = k !== tab; });
   clearInterval(poll); poll = null;
-  const load = { tables: loadTables, partners: loadPartners, staff: loadStaff, export: loadExport, money: loadMoney }[tab];
+  const load = { tables: loadTables, partners: loadPartners, staff: () => Promise.all([loadStaff(), loadRoles()]), export: loadExport, money: loadMoney,
+    rebalance: loadRebalance, checkin: loadCheckin, briefings: loadBriefings, scoring: loadScoring, stage: loadStage, settings: loadSettings }[tab];
   if (load) load().catch((err) => msg(err.message));
   if (tab === "tables") poll = setInterval(() => { if (!document.hidden) loadTables().catch(() => {}); }, 15000);
+  if (tab === "stage") poll = setInterval(() => { if (!document.hidden) loadStage().catch(() => {}); }, 3000);
+  if (tab === "scoring") poll = setInterval(() => { if (!document.hidden) loadScoring().catch(() => {}); }, 8000);
 }
 function dot(letter, extra) {
   const c = TIER_BG[letter] || ["#ddd", "#000"];
@@ -150,7 +155,7 @@ async function loadTables() {
     '<span><i style="border:3px solid #B3402D;background:var(--navy)"></i>Red ring: two from one organisation share a table</span>';
   $("#tGrid").innerHTML = d.tables.map((t) => {
     const seats = t.seats.map((s, k) => {
-      const a = (-90 + k * 45) * Math.PI / 180;
+      const a = (-90 + k * 360 / t.seats.length) * Math.PI / 180;
       const pos = "left:" + Math.round(125 + 92 * Math.cos(a) - 17) + "px;top:" + Math.round(125 + 92 * Math.sin(a) - 17) + "px;";
       if (!s.letter) return '<span class="seat empty" style="' + pos + '" title="Seat ' + s.n + ', empty">' + s.n + "</span>";
       const c = TIER_BG[s.letter] || ["#ddd", "#000"];
@@ -158,10 +163,10 @@ async function loadTables() {
       return '<span class="seat" style="' + pos + "background:" + c[0] + ";color:" + c[1] + ";" + border + '" title="Seat ' + s.n + ", " + esc(s.tier) + ', verified">' + s.letter + "</span>";
     }).join("");
     return '<article class="tcard' + (t.next ? " next" : "") + '"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><h2>' + esc(t.name) +
-      (t.added ? '<span class="tag new">Added automatically</span>' : "") + (t.next ? '<span class="tag nx">Next seat</span>' : "") + '</h2><span class="small" style="font-weight:700">' + t.count + ' of 8</span></div>' +
-      '<div class="round"><div class="mid"><b>' + t.count + '</b><span>seated</span></div>' + seats + '</div><div class="mix">' + t.mix + "</div></article>";
+      (t.added ? '<span class="tag new">Added automatically</span>' : "") + (t.next ? '<span class="tag nx">Next seat</span>' : "") + '</h2><span class="small" style="font-weight:700">' + t.count + ' of ' + Math.max(8, t.count) + '</span></div>' +
+      '<div class="round"><div class="mid"><b>' + t.count + '</b><span>seated</span></div>' + seats + '</div><div class="mix">' + t.mix + (t.arrived !== null && t.arrived !== undefined ? '<br><b>Arrived ' + t.arrived + ' of ' + t.count + '</b>' : "") + "</div></article>";
   }).join("");
-  $("#tFlags").innerHTML = d.flags.length ? d.flags.map((f) => '<div class="flag"><b>' + esc(f.title) + "</b><span>" + esc(f.text) + "</span></div>").join("")
+  $("#tFlags").innerHTML = d.flags.length ? d.flags.map((f) => '<div class="flag"><b>' + esc(f.title) + "</b><span>" + esc(f.text) + "</span>" + (f.link ? '<button class="btn" style="margin-top:8px;min-height:36px;padding:6px 12px" data-goto="' + f.link + '">Rebalance</button>' : "") + "</div>").join("")
     : '<div class="okbox">Nothing needs your attention. Nobody shares a table with someone from their organisation.</div>';
   $("#tFeed").innerHTML = d.feed.length ? d.feed.map((e) => "<div>" + dot(e.letter, "width:22px;height:22px;flex-shrink:0;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-weight:700;font-size:11px") + esc(e.text) + "</div>").join("") : '<p class="small">No seats filled yet.</p>';
   $("#tLock").textContent = d.lock ? "Last locked " + when(d.lock.created_at) + " by " + d.lock.created_by + ". Anyone seated since is a late addition." : "Not locked yet.";

@@ -10,6 +10,9 @@ import { sniff, stripMetadata } from "./strip.js";
 import * as mail from "./emails.js";
 import { handleAdmin } from "./admin.js";
 import { seatPending } from "./seating.js";
+import { briefFor } from "./briefings.js";
+import { scoringPage, submitScore } from "./scoring.js";
+import { displayPoll } from "./stage.js";
 
 const MAX_PROOF = 5 * 1024 * 1024;
 const MAX_JSON = 30000;
@@ -510,6 +513,11 @@ const ROUTES = {
   "GET /api/ticket": (req, env, ctx, url) => ticketView(url, env),
   "GET /api/answer-context": (req, env, ctx, url) => answerContext(url, env),
   "POST /api/answers": (req, env) => answers(req, env),
+  // Part 2: brief links, judges' scoring links and the projector display.
+  "GET /api/brief": (req, env, ctx, url) => briefFor(env, url),
+  "GET /api/score": (req, env, ctx, url) => scoringPage(env, url),
+  "POST /api/score": async (req, env) => submitScore(env, await readJson(req)),
+  "GET /api/stage": (req, env, ctx, url) => displayPoll(env, url),
 };
 
 export default {

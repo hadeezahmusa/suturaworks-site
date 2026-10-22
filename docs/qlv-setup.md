@@ -216,6 +216,49 @@ Added 23 October 2026 after members reported names spelled or ordered wrongly.
 
 Database change: `qlv-worker/migrations/2026-10-23-member-corrections.sql` (one new table, additive only).
 
+## The day itself: part 2 (from QLV-2026-Admin-Build-Spec-Part-2.md)
+
+Added 22 October 2026. Database change: `qlv-worker/migrations/2026-10-24-part2.sql` (new tables and
+one new ticket column, additive only). Everything participants, mentors, judges and the projector
+see is in the QLV look; admin stays as it is.
+
+- **Settings tab.** Every setting from the spec (minimum table size, when teams are announced, when
+  briefs open, the judges' day, arrival times, spokesperson, chair's name and phone, check-in, the
+  clock lengths and the schedule on the display). Also where desk volunteers and stage operators are
+  added: they sign in with their own email and see only Check-in or only Stage.
+- **Rebalance** (from the flag on the Tables tab). Once registration has closed, a table below the
+  minimum is flagged. Preview "Spread them" or "Share out evenly", then apply in one step; Apply
+  re-checks the preview first. "Share out evenly" stops as soon as every table is within one of the
+  others, which can be one move fewer than the mockup shows. At the announcement time, or when you
+  press "Teams have been announced", tables freeze: nobody already seated moves again, and anyone seated
+  later joins an existing table and is flagged as a late addition. Rules: `src/rebalance-plan.js`,
+  tests in `qlv-worker/test/rebalance.test.mjs`.
+- **Check-in tab** (optional, off by default). Search, Arrived, counts per table. Never moves anyone.
+- **Staff tab, "Roles on the day".** Mentor and judge ticks, lead or floor facilitator, each mentor's
+  pair of tables and start table. "Assign automatically" follows the route rules; it runs again after
+  a rebalance. A mentor who also judges never scores the tables they mentored.
+- **Briefings tab.** Tasks per table (admin only, never emailed). Every template's wording is editable
+  here and kept in the database; the criteria template also drives the judges' screen. "Generate packs"
+  per role, Preview (opens the real brief page past the lock for ten minutes), "Send to all" or
+  "Resend changed" with a confirmation every time. Packs with gaps cannot be sent. Anything that
+  changes the content (a task, a template, a rebalance, a role) marks packs out of date until they are
+  generated again. Printed table sheets open per table as an A4 page set: use "Save as PDF".
+- **Brief links** (`qlv2026/brief.html?k=`). A holding page until the brief opens; then the person's
+  documents. A link can be replaced from the Briefings tab; the old one stops at once.
+- **Judges' links** (`qlv2026/score.html?k=`). Work on the judges' day only. A team opens once the
+  Stage tab has put it on stage. Scores lock on submit; every tap is kept on the phone, and a submitted
+  score waits on the phone until the server has it. Admin unlocks a score on the Scoring tab with a
+  reason (logged in `score_unlocks`). Results are averages of submitted totals; ties go to "Outlives the
+  team", then to the judges.
+- **Stage tab and the projector** (`qlv2026/stage.html?k=`, opened from the Stage tab). One shared
+  state on the server; the clock is stored as its end time, so control and display always agree. The
+  display shows table names and times only, never a person's name and never a score below the top
+  three. Click once to enable sound (`qlv2026/assets/sounds/`: chime and gong, no ticking). Each stage
+  has its own animation (a building rising during the sprint, a plan hopping round the handover chain,
+  a magnifier for the critique, a pen for the response, steam at lunch, spotlights for presentations,
+  a podium and confetti for the results); all of it stops for screens set to reduce motion. If the
+  connection drops the clock keeps running and a small "reconnecting" mark appears.
+
 ## Closing date
 
 - Registration, claims and new answers close at the end of **30 October 2026** (Abuja time) unless
