@@ -6,7 +6,7 @@
 import { API, CONTACT, PRIVACY } from "./config.js";
 import { QBANK, SITUATIONS, MAX_ANSWER } from "./questions.js";
 import { playIntro, playTap, stop as stopSound } from "./sound.js";
-import { PRICES, SPONSORED_MIN, SPONSORED_MAX, TIER_NAME, BANK, CLOSES_AT, amountFor, ngn, word, closeLabel } from "./event.js";
+import { PRICES, SPONSORED_MIN, SPONSORED_MAX, GROUP_MAX, TIER_NAME, BANK, CLOSES_AT, amountFor, ngn, word, closeLabel } from "./event.js";
 
 const STORE = "qlv26";
 const MAX_FILE = 5 * 1024 * 1024;
@@ -147,14 +147,19 @@ function esc(s) {
 // ---------- order summary ----------
 
 function size() {
-  return S.tier === "corporate" ? S.pack : S.tier === "sponsored" ? S.seats : 1;
+  return S.tier === "corporate" ? S.pack : S.tier === "sponsored" ? S.seats : S.tier === "standard" ? gSize() : 1;
 }
+// Standard tickets bought for a group, and how they reach people.
+function gSize() {
+  return Math.min(GROUP_MAX, Math.max(1, Number(S.gseats) || 1));
+}
+const isGroup = () => S.tier === "standard" && gSize() > 1;
 function amount() {
   // The same rule the server applies, so the two can never disagree.
   return amountFor(S.tier, size());
 }
 function lineFor() {
-  if (S.tier === "standard") return "One seat, both days";
+  if (S.tier === "standard") return gSize() > 1 ? word(gSize()) + " seats, both days" : "One seat, both days";
   if (S.tier === "member") return "One member seat, both days";
   if (S.tier === "corporate") return word(S.pack) + " seats, both days";
   return S.seats + " seats at " + ngn(PRICES.sponsoredSeat);
@@ -229,6 +234,8 @@ const RENDER = {
     const member = S.tier === "member";
     $("#memberBox").hidden = !member;
     fill($("#f-details"), S.details);
+    $("#groupBox").hidden = member;
+    drawGroup();
     // Members: name and code come from the JCI Aso list and cannot be edited here.
     const name = $("#d-name");
     name.readOnly = member;
@@ -254,10 +261,12 @@ const RENDER = {
     bind("bankName", BANK.name);
     bind("bankBank", BANK.bank);
     drawSummary();
-    bind("step4", S.tier === "sponsored" ? "Share your link" : S.tier === "corporate" ? "Tickets issued" : "Ticket issued");
+    const link = S.tier === "sponsored" || (isGroup() && S.gmode === "links");
+    bind("step4", link ? "Share your link" : S.tier === "corporate" || isGroup() ? "Tickets issued" : "Ticket issued");
     bind("after2",
       S.tier === "sponsored" ? "Your claim link is emailed to you, usually within one working day." :
-      S.tier === "corporate" ? "Each ticket is emailed to the person it is for, usually within one working day." :
+      link ? "Your link to share is emailed to you, usually within one working day." :
+      S.tier === "corporate" || isGroup() ? "Each ticket is emailed to the person it is for, usually within one working day." :
       "Your ticket is emailed to you, usually within one working day.");
     const queried = S.status === "queried";
     $("#queriedBox").hidden = !queried;
@@ -267,16 +276,20 @@ const RENDER = {
     bind("ref", S.ref);
     bind("email", S.email || "your email");
     drawSummary();
-    show("pendSingle", S.tier === "standard" || S.tier === "member");
-    show("pendCorporate", S.tier === "corporate");
+    const group = isGroup();
+    const link = group && S.gmode === "links";
+    show("pendSingle", (S.tier === "standard" && !group) || S.tier === "member");
+    show("pendCorporate", S.tier === "corporate" || (group && !link));
+    show("pendGroupLink", link);
     show("pendSponsor", S.tier === "sponsored");
     show("pendQuestions", S.tier !== "sponsored");
     bind("pendDay1",
       S.tier === "sponsored" ? "Your claim link arrives by email." :
-      S.tier === "corporate" ? "Each ticket arrives by email." : "Your ticket arrives by email.");
+      link ? "Your link to share arrives by email." :
+      S.tier === "corporate" || group ? "Each ticket arrives by email." : "Your ticket arrives by email.");
     const done = S.status === "confirmed";
     const badge = $('[data-bind="badge"]');
-    badge.textContent = done ? (S.tier === "sponsored" ? "Verified" : "Ticket issued") : "Awaiting verification";
+    badge.textContent = done ? (S.tier === "sponsored" || link ? "Verified" : group ? "Tickets issued" : "Ticket issued") : "Awaiting verification";
     badge.classList.toggle("ok", done);
   },
   questions() { drawQuestions(); },
@@ -316,6 +329,10 @@ document.addEventListener("click", (e) => {
   if (pack) return setPack(Number(pack.dataset.pack));
   const step = e.target.closest("[data-seats]");
   if (step) return setSeats(S.seats + Number(step.dataset.seats));
+  const gstep = e.target.closest("[data-gseats]");
+  if (gstep) return setGroupSize(gSize() + Number(gstep.dataset.gseats));
+  const gmode = e.target.closest("[data-gmode]");
+  if (gmode) return setGroupMode(gmode.dataset.gmode);
   const g = e.target.closest("[data-go]");
   if (g) return go(g.dataset.go);
   const copy = e.target.closest("[data-copy]");
@@ -343,6 +360,11 @@ const ACTIONS = {
     go(S.tier === "corporate" ? "corporate" : S.tier === "sponsored" ? "sponsored" : "details");
   },
   backFromDetails() { go(S.tier === "member" ? "membercode" : "tickets"); },
+  toSponsored() {
+    S.tier = "sponsored";
+    setSeats(SPONSORED_MIN);
+    go("sponsored");
+  },
   // Landing
   startRegistration() {
     playTap();
@@ -485,6 +507,80 @@ function setPack(n) {
   drawPack();
 }
 
+// ---------- standard groups ----------
+
+const PERSON = ["Person one", "Person two", "Person three", "Person four", "Person five"];
+
+function readGroup() {
+  const rows = $$("#gList .seat");
+  if (!rows.length) return S.group || [];
+  return rows.map((row) => ({
+    name: $('[data-k="name"]', row).value.trim(),
+    email: $('[data-k="email"]', row).value.trim(),
+    situation: $('[data-k="situation"]', row).value,
+  }));
+}
+function groupRow(i, a) {
+  const title = PERSON[i];
+  return `<div class="seat"><div class="hd"><b style="font-size:12px;color:var(--navy)">${title}</b></div>
+    <div class="grid2">
+      <input type="text" data-k="name" aria-label="${title}, full name" placeholder="Full name" maxlength="120" required value="${esc(a.name || "")}">
+      <input type="email" data-k="email" aria-label="${title}, email" placeholder="Email, their ticket goes here" maxlength="160" required value="${esc(a.email || "")}">
+    </div>
+    <select data-k="situation" aria-label="${title}, which is closest to their situation"></select>
+  </div>`;
+}
+// Keeps whatever was typed when the count or the "for me" box changes.
+function drawGroup() {
+  const n = gSize();
+  const group = n > 1;
+  $("#gqty").value = n;
+  $("#groupMore").hidden = !group;
+  show("dIntro1", !group);
+  show("dIntroG", group);
+  show("und1", !group);
+  show("undG", group);
+  ["names", "links"].forEach((m) => {
+    const el = $("#g-" + m);
+    el.classList.toggle("sel", S.gmode === m);
+    el.setAttribute("aria-checked", S.gmode === m);
+  });
+  $("#gNames").hidden = !(group && S.gmode === "names");
+  $("#gLinks").hidden = !(group && S.gmode === "links");
+  $("#g-me").checked = S.gme !== false;
+  const prev = readGroup();
+  const rows = group ? n - (S.gme !== false ? 1 : 0) : 0;
+  const list = $("#gList");
+  list.innerHTML = Array.from({ length: rows }, (_, i) => groupRow(i + (S.gme !== false ? 1 : 0), prev[i] || {})).join("");
+  $$("select", list).forEach((sel, i) => {
+    sitOptions(sel, false);
+    if (prev[i] && prev[i].situation) sel.value = prev[i].situation;
+  });
+  drawSummary();
+}
+function keepGroup() {
+  if ($$("#gList .seat").length) S.group = readGroup();
+}
+function setGroupSize(n) {
+  keepGroup();
+  S.gseats = Math.min(GROUP_MAX, Math.max(1, n));
+  save();
+  drawGroup();
+}
+function setGroupMode(m) {
+  keepGroup();
+  formError($("#f-details"), "");
+  S.gmode = m;
+  save();
+  drawGroup();
+}
+$("#g-me").addEventListener("change", (e) => {
+  keepGroup();
+  S.gme = e.target.checked;
+  save();
+  drawGroup();
+});
+
 // ---------- sponsored ----------
 
 function setSeats(n) {
@@ -554,8 +650,22 @@ $("#f-details").addEventListener("submit", (e) => {
   if (msg) return formError(f, msg);
   const v = values(f);
   S.details = v;
-  save();
   const extra = S.tier === "member" && S.member ? { memberCode: S.member.code, name: S.member.name } : {};
+  if (S.tier === "standard") {
+    extra.seats = gSize();
+    if (isGroup()) {
+      if (!S.gmode) return formError(f, "Please choose whether you will fill in everyone's details or get a link to share.");
+      extra.group = S.gmode;
+      if (S.gmode === "names") {
+        keepGroup();
+        const me = S.gme !== false ? [{ name: v.name, email: v.email, situation: v.situation }] : [];
+        extra.attendees = me.concat(readGroup());
+        const emails = extra.attendees.map((a) => a.email.toLowerCase());
+        if (new Set(emails).size !== emails.length) return formError(f, "Each person needs their own email address, because each ticket is sent to the person it is for.");
+      }
+    }
+  }
+  save();
   register(f, { tier: S.tier, ...v, ...extra });
 });
 
@@ -736,12 +846,14 @@ $("#f-adviser").addEventListener("submit", async (e) => {
 let claimToken = null;
 let claimKind = "sponsored";
 
-function claimLook(kind) {
+function claimLook(kind, by) {
   claimKind = kind;
   const partner = kind === "partner";
-  bind("claimTitle", partner ? "Your seat at QLV 2026 is covered" : "Your sponsor has paid for your seat");
+  const group = kind === "group";
+  bind("claimTitle", partner ? "Your seat at QLV 2026 is covered" : group ? `${by} has booked a place for you` : "Your sponsor has paid for your seat");
   show("claimOrg", !partner);
-  show("claimSponsorNote", !partner);
+  show("claimSponsorNote", kind === "sponsored");
+  show("claimGroupNote", group);
   show("claimPartnerNote", partner);
 }
 
@@ -766,6 +878,13 @@ async function openClaim(token) {
   claimLook("sponsored");
   try {
     const r = await api("/api/claim?t=" + encodeURIComponent(token));
+    if (r.group) {
+      claimLook("group", r.by);
+      if (r.state === "full") return message("All the places on this link have been claimed", `Every place ${r.by} booked now has a name on it. If you were expecting one, ask them.`, false);
+      if (r.state === "closed") return message("This link has closed", `Registration closed on ${r.closes}, and the link closed with it. If you were expecting a place, ask ${r.by}.`, false);
+      if (r.state !== "open") return message("This link is not ready yet", "The payment for these tickets is still being checked. Try the link again later today.", false);
+      return go("claim", false);
+    }
     if (r.state === "full") return message("All the seats on this link have been claimed", "Every seat your sponsor paid for now has a name on it. If you were expecting one, ask the person who sent you the link.", false);
     if (r.state === "closed") return message("This claim link has closed", `Seats that were not claimed by ${closeLabel(closeAt)} have been released. If you were expecting one, ask the person who sent you the link.`, false);
     if (r.state !== "open") return message("This link is not ready yet", "Your sponsor's transfer is still being checked. Try the link again later today.", false);
@@ -791,7 +910,7 @@ $("#f-claim").addEventListener("submit", async (e) => {
     Q.claimEmail = r.email;
     openQuestions({ key: r.key, branch: v.situation, back: "claimed" });
   } catch (err) {
-    if (err.code === "full") message(claimKind === "partner" ? "This seat has already been claimed" : "All the seats on this link have been claimed", "Somebody took it a moment before you. Ask the person who sent you the link.", false);
+    if (err.code === "full") message(claimKind === "partner" ? "This seat has already been claimed" : claimKind === "group" ? "All the places on this link have been claimed" : "All the seats on this link have been claimed", "Somebody took it a moment before you. Ask the person who sent you the link.", false);
     else formError(f, err.message);
   } finally {
     busy(f, false);
@@ -804,16 +923,24 @@ async function openSponsor(manage, refresh) {
   Q.manage = manage;
   try {
     const r = await api("/api/sponsor?m=" + encodeURIComponent(manage));
-    if (!r.claimUrl) return message("Your transfer is still being checked", `Your claim link for ${r.ref} arrives by email as soon as the transfer clears, usually within one working day.`, false);
+    const [one, many] = r.group ? ["place", "places"] : ["seat", "seats"];
+    if (!r.claimUrl) return message("Your transfer is still being checked", `Your ${r.group ? "link to share" : "claim link"} for ${r.ref} arrives by email as soon as the transfer clears, usually within one working day.`, false);
     const total = r.seats;
     const taken = r.claims.length;
-    bind("spTitle", `Transfer verified, ${word(total).toLowerCase()} seats held`);
-    bind("spCount", `${word(taken)} of ${word(total).toLowerCase()} seats claimed`);
+    bind("spTitle", `Transfer verified, ${word(total).toLowerCase()} ${many} held`);
+    bind("spCount", `${word(taken)} of ${word(total).toLowerCase()} ${many} claimed`);
+    bind("spWho", r.group ? "booked for" : "are sponsoring");
+    bind("spLinkLabel", r.group ? "Your link to share" : "Your claim link");
+    bind("spOne", one);
+    bind("spMany", many);
+    show("spSponsorFoot", !r.group);
+    show("spGroupFoot", r.group);
     $("#claimUrl").value = r.claimUrl;
     $("#spPips").innerHTML = Array.from({ length: total }, (_, i) => `<i class="${i < taken ? "on" : ""}"></i>`).join("");
     let rows = r.claims.map((c) => `<div class="claimrow"><div><b style="font-size:13px">Claimed</b><div class="fine">Ticket ${esc(c.ref)} issued</div></div><span class="chip" style="background:#E2F2F2;color:#19646D">Claimed</span></div>`).join("");
-    const open = r.closed ? `Released on ${closeLabel(closeAt)}` : "Nobody has used the link for this one yet";
-    for (let i = taken; i < total; i++) rows += `<div class="claimrow"><div><b style="font-size:13px;color:var(--mute)">Open seat</b><div class="fine">${open}</div></div><span class="chip pill">${r.closed ? "Released" : "Open"}</span></div>`;
+    const open = r.closed ? (r.group ? `Link closed on ${r.closes}` : `Released on ${closeLabel(closeAt)}`) : "Nobody has used the link for this one yet";
+    const shut = r.group ? "Closed" : "Released";
+    for (let i = taken; i < total; i++) rows += `<div class="claimrow"><div><b style="font-size:13px;color:var(--mute)">Open ${one}</b><div class="fine">${open}</div></div><span class="chip pill">${r.closed ? shut : "Open"}</span></div>`;
     $("#claimRows").innerHTML = rows;
     go("sponsorlink", false);
   } catch (err) {
@@ -897,13 +1024,17 @@ async function resume(ref, key) {
     });
     if (r.tier === "corporate") S.pack = r.size;
     if (r.tier === "sponsored") S.seats = r.size;
+    if (r.tier === "standard") {
+      S.gseats = r.size;
+      if (r.group) S.gmode = r.group;
+    }
     if (r.situation) S.details = Object.assign(S.details || {}, { situation: r.situation });
     save();
     if (r.status === "released") {
       reset();
       return message("This registration has been released", `We did not receive a transfer for ${r.ref}, so the seat was released. If you did pay, email ${CONTACT} with your proof and we will put it right.`);
     }
-    if (r.status === "confirmed" && r.tier === "sponsored" && r.manage) return openSponsor(r.manage);
+    if (r.status === "confirmed" && r.manage) return openSponsor(r.manage);
     go(S.proofDone ? "pending" : "transfer", false);
   } catch (err) {
     if (err.status === 404) {

@@ -137,7 +137,7 @@
       <div class="tier sel" id="t-standard" data-tier="standard" role="radio" tabindex="0" aria-checked="true">
         <div class="top"><div class="nm">Standard</div></div>
         <div class="pr">&#8358;10,000</div>
-        <p style="font-size:12px">One seat, both days. Lunch and materials on day two. Open to anyone.</p>
+        <p style="font-size:12px">One seat, both days. Lunch and materials on day two. Open to anyone, and you can book up to five at once.</p>
       </div>
       <div class="tier" id="t-member" data-tier="member" role="radio" tabindex="0" aria-checked="false">
         <div class="top"><div class="nm">JCI Aso member</div><span class="chip teal">Members</span></div>
@@ -217,7 +217,8 @@
     <div class="cols">
       <div class="main"><form class="card" id="f-details" novalidate>
         <h1>Your details</h1>
-        <p style="margin:6px 0 20px">Your ticket goes to the email you give here, once we have verified your transfer.</p>
+        <p style="margin:6px 0 20px" data-show="dIntro1">Your ticket goes to the email you give here, once we have verified your transfer.</p>
+        <p style="margin:6px 0 20px" data-show="dIntroG" hidden>These are your details as the person booking. The receipt and anything about this booking go to this email.</p>
         <div class="grid2">
           <div><label class="f" for="d-name">Full name</label><input type="text" id="d-name" name="name" autocomplete="name" maxlength="120" placeholder="As it should appear on your ticket" required></div>
           <div><label class="f" for="d-email">Email</label><input type="email" id="d-email" name="email" autocomplete="email" maxlength="160" placeholder="name@organisation.com" required></div>
@@ -235,7 +236,34 @@
           <select id="d-sit" name="situation" class="js-sit" data-long="1"></select>
           <span class="fine" style="display:block;margin-top:6px">This decides which three questions you answer after payment, and helps us build the right mix in each team.</span>
         </div>
-        <div class="note" style="margin-top:14px"><input type="checkbox" id="d6" name="understand" required><label for="d6">I understand that teams are announced on day one, that my team's task is handed out at the start of the sprint on day two, and that I need to attend both days.</label></div>
+        <div id="groupBox" style="margin-top:18px">
+          <div class="hr" style="margin:0 0 16px"></div>
+          <div class="row" style="align-items:flex-end">
+            <div>
+              <label class="f" for="gqty">How many tickets</label>
+              <div class="qty"><button type="button" data-gseats="-1" aria-label="Fewer tickets">&minus;</button><input id="gqty" type="text" value="1" readonly aria-live="polite"><button type="button" data-gseats="1" aria-label="More tickets">+</button></div>
+            </div>
+            <span class="fine" style="flex:1 1 220px">Up to five on one booking. For six or more, <button type="button" class="back" style="font-size:inherit" data-action="toSponsored">sponsored seats</button> are &#8358;9,500 each.</span>
+          </div>
+          <div id="groupMore" hidden>
+            <div class="grid2" role="radiogroup" aria-label="How the tickets reach people" style="margin-top:16px">
+              <div class="tier" id="g-names" data-gmode="names" role="radio" tabindex="0" aria-checked="false" style="padding:16px">
+                <div class="nm">I will fill in everyone's details</div>
+                <span class="fine">Each person gets their own ticket by email once we have verified the transfer.</span>
+              </div>
+              <div class="tier" id="g-links" data-gmode="links" role="radio" tabindex="0" aria-checked="false" style="padding:16px">
+                <div class="nm">Send me a link to share</div>
+                <span class="fine">You send one link. Each person fills in their own details and their ticket comes to them.</span>
+              </div>
+            </div>
+            <div id="gNames" hidden>
+              <div class="note" style="margin-top:14px"><input type="checkbox" id="g-me" checked><label for="g-me">One of these tickets is for me</label></div>
+              <div id="gList" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"></div>
+            </div>
+            <p class="fine" id="gLinks" style="margin-top:12px" hidden>Once we have verified your transfer, the link comes to your email. It works until registration closes on <span data-bind="closeDate">30 October</span>, so send it early. If one of the places is yours, use the link yourself too.</p>
+          </div>
+        </div>
+        <div class="note" style="margin-top:14px"><input type="checkbox" id="d6" name="understand" required><label for="d6"><span data-show="und1">I understand that teams are announced on day one, that my team's task is handed out at the start of the sprint on day two, and that I need to attend both days.</span><span data-show="undG" hidden>I understand that teams are announced on day one, that each team's task is handed out at the start of the sprint on day two, that everyone on this booking needs to attend both days, and that people on one booking are placed in different teams.</span></label></div>
         <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
         <div class="formerr" style="margin-top:14px" data-err hidden></div>
         <div class="row" style="margin-top:22px">
@@ -497,6 +525,7 @@
         <h1>Proof received</h1>
         <p style="margin-top:5px" data-show="pendSingle">We are checking your transfer against the JCI Aso account. Your ticket goes to <b style="color:var(--ink)" data-bind="email">your email</b> as soon as it clears, usually within one working day.</p>
         <p style="margin-top:5px" data-show="pendCorporate" hidden>We are checking your transfer against the JCI Aso account. As soon as it clears, usually within one working day, each person you named gets their own ticket by email and a receipt goes to <b style="color:var(--ink)" data-bind="email">your email</b>.</p>
+        <p style="margin-top:5px" data-show="pendGroupLink" hidden>We are checking your transfer against the JCI Aso account. As soon as it clears, usually within one working day, your link to share goes to <b style="color:var(--ink)" data-bind="email">your email</b> for you to send to the people you booked for.</p>
         <p style="margin-top:5px" data-show="pendSponsor" hidden>We are checking your transfer against the JCI Aso account. As soon as it clears, usually within one working day, your claim link goes to <b style="color:var(--ink)" data-bind="email">your email</b> for you to send to the people you are sponsoring.</p>
       </div>
     </div>
@@ -531,12 +560,12 @@
       <span class="dot" style="background:var(--teal)"><svg width="24" height="24" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.3l3.3 3.3L13 4.8" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
       <div style="flex:999 1 380px;min-width:0">
         <h1 data-bind="spTitle">Transfer verified, six seats held</h1>
-        <p style="margin-top:5px">Your transfer has been checked against the JCI Aso account and a receipt is on its way to your email. Now send the link below to the people you are sponsoring.</p>
+        <p style="margin-top:5px">Your transfer has been checked against the JCI Aso account and a receipt is on its way to your email. Now send the link below to the people you <span data-bind="spWho">are sponsoring</span>.</p>
       </div>
     </div>
     <div style="background:var(--navy);border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:14px">
-      <div><span style="font-size:10px;font-weight:700;letter-spacing:1.7px;text-transform:uppercase;color:var(--yel)">Your claim link</span>
-        <p style="color:#CFE0F3;font-size:12px;margin-top:4px">Anyone with this link can take one of your seats, so send it to named people rather than posting it in a group.</p></div>
+      <div><span style="font-size:10px;font-weight:700;letter-spacing:1.7px;text-transform:uppercase;color:var(--yel)" data-bind="spLinkLabel">Your claim link</span>
+        <p style="color:#CFE0F3;font-size:12px;margin-top:4px">Anyone with this link can take one of your <span data-bind="spMany">seats</span>, so send it to named people rather than posting it in a group.</p></div>
       <div style="display:flex;flex-wrap:wrap;gap:10px">
         <input type="text" readonly id="claimUrl" aria-label="Your claim link" style="flex:999 1 300px;font-family:'IBM Plex Mono',monospace;border:none">
         <button type="button" class="btn gold" data-copy="claimUrl">Copy link</button>
@@ -544,16 +573,16 @@
     </div>
     <div class="card" style="padding:0;overflow:hidden">
       <div class="row" style="padding:18px 24px;border-bottom:1px solid var(--line)">
-        <div><b style="font-size:15px" data-bind="spCount">Two of six seats claimed</b><p class="fine" style="margin-top:3px">Unclaimed seats are released on <span data-bind="closeDate">30 October</span> and refunded</p></div>
+        <div><b style="font-size:15px" data-bind="spCount">Two of six seats claimed</b><p class="fine" style="margin-top:3px" data-show="spSponsorFoot">Unclaimed seats are released on <span data-bind="closeDate">30 October</span> and refunded</p><p class="fine" style="margin-top:3px" data-show="spGroupFoot" hidden>The link works until registration closes on <span data-bind="closeDate">30 October</span></p></div>
         <div class="pips" id="spPips"></div>
       </div>
       <div id="claimRows"></div>
       <div class="row" style="padding:16px 24px">
-        <span class="fine">We email you whenever somebody claims a seat.</span>
+        <span class="fine">We email you whenever somebody claims a <span data-bind="spOne">seat</span>.</span>
         <button type="button" class="btn ghost" data-action="refreshSponsor">Refresh</button>
       </div>
     </div>
-    <p class="fine">Keep this page's address to yourself. It is how you check on your seats, and it came in the same email as your claim link.</p>
+    <p class="fine">Keep this page's address to yourself. It is how you check on your <span data-bind="spMany">seats</span>, and it came in the same email as your claim link.</p>
   </div></div>
 </section>
 
@@ -579,6 +608,7 @@
         <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
         <div class="formerr" data-err hidden></div>
         <button type="submit" class="btn" style="width:100%;justify-content:center">Claim my seat</button>
+        <p class="fine" style="text-align:center" data-show="claimGroupNote" hidden>This link works until registration closes on <span data-bind="closeDate">30 October</span>. People on one booking join different teams. You will be asked three short questions after this.</p>
         <p class="fine" style="text-align:center" data-show="claimSponsorNote">Seats not claimed by <span data-bind="closeDate">30 October</span> go back on sale. You will be asked three short questions after this.</p>
         <p class="fine" style="text-align:center" data-show="claimPartnerNote" hidden>This link is for one person. You will be asked three short questions after this.</p>
         <p class="privacy js-privacy" style="text-align:center"></p>

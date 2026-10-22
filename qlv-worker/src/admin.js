@@ -12,7 +12,7 @@
 import { RELEASE_AFTER_DAYS, TIER_NAME, ngn, closeLabel, closeAtFor } from "../../qlv2026/event.js";
 import { QBANK } from "../../qlv2026/questions.js";
 import * as mail from "./emails.js";
-import { HttpError, now, token, links, ticketLinks, sendMail, closesAt } from "./index.js";
+import { HttpError, now, token, links, ticketLinks, sendMail, closesAt, sharesLink } from "./index.js";
 import { THEME, tableName } from "./config.js";
 import { seatPending } from "./seating.js";
 import * as ops from "./admin-ops.js";
@@ -120,7 +120,8 @@ function flagged(r) {
 async function list(env, filter) {
   const { results } = await env.DB.prepare(`SELECT r.ref, r.tier, r.size, r.amount, r.status, r.name, r.contact_person, r.organisation, r.email,
       r.created_at, r.proof_at, r.verified_at, r.sent_at,
-      (SELECT COUNT(*) FROM tickets t WHERE t.reg_ref = r.ref AND t.kind = 'sponsored' AND t.ticket_ref != 'pending') AS claimed
+      (SELECT COUNT(*) FROM tickets t WHERE t.reg_ref = r.ref AND t.kind IN ('sponsored', 'standard') AND t.ticket_ref != 'pending' AND t.sent_at IS NOT NULL) AS claimed,
+      (r.attendees IS NULL AND r.tier IN ('sponsored', 'standard') AND r.size > 1) AS shares
     FROM registrations r WHERE r.tier NOT IN ('partner', 'facilitator') ORDER BY r.created_at DESC`).all();
   const rows = results.map((r) => ({ ...r, flagged: flagged(r) }));
   const counts = { all: 0, awaiting: 0, flagged: 0, verified: 0, confirmed: 0, queried: 0, released: 0, adviser: 0 };
@@ -143,7 +144,7 @@ async function detail(env, ref) {
   const log = (await env.DB.prepare("SELECT kind, recipient, ok, created_at FROM email_log WHERE ref = ? ORDER BY id DESC LIMIT 30").bind(r.ref).all()).results;
   const { secret, ...safe } = r;
   return {
-    reg: { ...safe, attendees: r.attendees ? JSON.parse(r.attendees) : null, flagged: flagged(r), tierName: TIER_NAME[r.tier], amountText: ngn(r.amount) },
+    reg: { ...safe, attendees: r.attendees ? JSON.parse(r.attendees) : null, shares: sharesLink(r), flagged: flagged(r), tierName: TIER_NAME[r.tier], amountText: ngn(r.amount) },
     tickets: t.map(({ token: _t, ...rest }) => ({ ...rest, table: rest.table_index === null || rest.table_index === undefined ? null : `${tableName(rest.table_index)}, seat ${rest.table_seat}` })),
     log,
     claimUrl: r.status === "confirmed" ? links(env, r).claim : null,
@@ -157,9 +158,14 @@ async function verify(env, ref, who) {
   if (!["awaiting", "queried"].includes(r.status)) throw new HttpError(409, `This registration is ${r.status}, so it cannot be verified now.`);
   const stamp = now();
   const stmts = [env.DB.prepare("DELETE FROM tickets WHERE reg_ref = ? AND sent_at IS NULL").bind(r.ref)];
-  const add = (kind, seat, p) => env.DB.prepare("INSERT INTO tickets (token, reg_ref, ticket_ref, kind, seat_no, name, email, phone, role, situation, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .bind(token(24), r.ref, r.ref, kind, seat, p.name, p.email, p.phone || null, p.role || null, p.situation || null, stamp);
-  if (r.tier === "standard" || r.tier === "member") stmts.push(add(r.tier, 1, r));
+  const add = (kind, seat, p, ref = r.ref) => env.DB.prepare("INSERT INTO tickets (token, reg_ref, ticket_ref, kind, seat_no, name, email, phone, role, situation, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(token(24), r.ref, ref, kind, seat, p.name, p.email, p.phone || null, p.role || null, p.situation || null, stamp);
+  if (r.tier === "standard" && r.size > 1 && r.attendees) {
+    // A group whose buyer named everyone: one ticket each, QLV26-012-1 and so on.
+    JSON.parse(r.attendees).forEach((p, i) => stmts.push(add("standard", i + 1, p, `${r.ref}-${i + 1}`)));
+  } else if (r.tier === "standard" && r.size > 1) {
+    stmts.push(env.DB.prepare("UPDATE registrations SET claim_token = COALESCE(claim_token, ?), manage_token = COALESCE(manage_token, ?) WHERE ref = ?").bind(token(10), token(24), r.ref));
+  } else if (r.tier === "standard" || r.tier === "member") stmts.push(add(r.tier, 1, r));
   else if (r.tier === "corporate") JSON.parse(r.attendees).forEach((p, i) => stmts.push(add(p.judge ? "judge" : "corporate", i + 1, p)));
   else if (r.tier === "sponsored") {
     stmts.push(env.DB.prepare("UPDATE registrations SET claim_token = COALESCE(claim_token, ?), manage_token = COALESCE(manage_token, ?) WHERE ref = ?").bind(token(10), token(24), r.ref));
@@ -186,9 +192,12 @@ async function unverify(env, ref, who, role) {
 // The emails "Send" would send, built exactly as they will go out.
 async function outgoing(env, r) {
   const out = [];
-  if (r.tier === "sponsored") {
+  if (sharesLink(r)) {
     const l = links(env, r);
-    out.push({ kind: "sponsor_link", to: r.email, ...mail.sponsorLink(r, l.claim, l.manage, closeLabel(await closesAt(env))) });
+    const close = closeLabel(await closesAt(env));
+    out.push(r.tier === "sponsored"
+      ? { kind: "sponsor_link", to: r.email, ...mail.sponsorLink(r, l.claim, l.manage, close) }
+      : { kind: "group_link", to: r.email, ...mail.groupLink(r, l.claim, l.manage, close) });
     return out;
   }
   const t = await tickets(env, r.ref);
@@ -197,6 +206,7 @@ async function outgoing(env, r) {
     out.push({ kind: "ticket_issued", ticketId: tk.id, to: tk.email, ...mail.ticketIssued(tk, r, ticketLinks(env, tk)) });
   }
   if (r.tier === "corporate" && !r.sent_at) out.push({ kind: "corporate_receipt", to: r.email, ...mail.corporateReceipt(r, t) });
+  if (r.tier === "standard" && r.size > 1 && !r.sent_at) out.push({ kind: "group_receipt", to: r.email, ...mail.groupReceipt(r, t) });
   return out;
 }
 
@@ -296,13 +306,13 @@ const REMINDER_BATCH = 70;
 // Participants with a sent ticket who have no answers yet and no reminder
 // yet. Standard and member registrants may have answered from the pending
 // screen, which is stored against the registration (r:REF), so that counts.
-// A corporate billing contact's answers do not count for the attendees.
+// A corporate billing contact's or group buyer's answers do not count for the attendees.
 const WAITING_SQL = `SELECT t.id, t.token, t.ticket_ref, t.reg_ref, t.name, t.email
   FROM tickets t JOIN registrations r ON r.ref = t.reg_ref
   WHERE t.sent_at IS NOT NULL AND r.status = 'confirmed'
     AND t.kind IN ('standard', 'member', 'corporate', 'sponsored', 'partner') AND t.cancelled_at IS NULL
     AND NOT EXISTS (SELECT 1 FROM answers a WHERE a.holder = 't:' || t.id)
-    AND NOT (t.kind IN ('standard', 'member') AND EXISTS (SELECT 1 FROM answers a WHERE a.holder = 'r:' || t.reg_ref))
+    AND NOT (t.kind IN ('standard', 'member') AND r.size = 1 AND EXISTS (SELECT 1 FROM answers a WHERE a.holder = 'r:' || t.reg_ref))
     AND NOT EXISTS (SELECT 1 FROM email_log l WHERE l.kind = 'answers_reminder' AND l.ok = 1 AND l.ref = t.reg_ref AND l.recipient = t.email)
   ORDER BY t.id`;
 
@@ -597,7 +607,7 @@ async function loadList() {
   $("#flagNote").textContent = "Flagged means still awaiting " + d.releaseAfterDays + " days after registering. Nothing is released until you press Release.";
   $("#rows").innerHTML = d.rows.map((r) => '<tr data-ref="' + esc(r.ref) + '" class="' + (current && current.reg.ref === r.ref ? "sel" : "") + '">' +
     '<td class="mono">' + esc(r.ref) + "</td><td>" + esc(r.contact_person ? r.name + " (" + r.contact_person + ")" : r.name) + '<div class="small">' + esc(r.email) + "</div></td>" +
-    "<td>" + TIER[r.tier] + (r.tier === "corporate" ? " of " + r.size : r.tier === "sponsored" ? " x" + r.size + (r.status === "confirmed" ? ", " + r.claimed + " claimed" : "") : "") + "</td>" +
+    "<td>" + TIER[r.tier] + (r.tier === "corporate" ? " of " + r.size : r.size > 1 ? " x" + r.size + (r.shares && r.status === "confirmed" ? ", " + r.claimed + " claimed" : "") : "") + "</td>" +
     "<td>" + (r.amount ? naira(r.amount) : "None") + '</td><td class="hide-s">' + (r.tier === "adviser" ? "" : r.proof_at ? "Yes" : '<span class="small">Not yet</span>') + '</td><td class="hide-s">' + when(r.created_at) + "</td>" +
     '<td><span class="st ' + r.status + '">' + STATUS[r.status] + "</span>" + (r.flagged ? '<div class="flag">Flagged for release</div>' : "") + "</td></tr>").join("") ||
     '<tr><td colspan="7" class="small">Nothing here.</td></tr>';
@@ -610,7 +620,7 @@ function people(d) {
 }
 function ticketRows(d) {
   if (!d.tickets.length) return "";
-  return '<div class="hr"></div><h2>' + (d.reg.tier === "sponsored" ? "Claimed seats" : "Tickets") + "</h2>" + d.tickets.map((t) =>
+  return '<div class="hr"></div><h2>' + (d.reg.shares ? (d.reg.tier === "sponsored" ? "Claimed seats" : "Claimed places") : "Tickets") + "</h2>" + d.tickets.map((t) =>
     '<div style="margin:0 0 8px"><span class="mono">' + esc(t.ticket_ref) + "</span> " + esc(t.name) + ", " + esc(t.email) +
     ' <span class="small">' + (t.kind === "judge" ? "judge or mentor, " : "") + (t.cancelled_at ? "<b>cancelled</b>" : t.sent_at ? "sent " + when(t.sent_at) : "not sent") + (t.table && ROLE === "admin" ? ", " + esc(t.table) : "") + "</span>" +
     (t.sent_at && !t.cancelled_at && ROLE === "admin" ? ' <button class="link" data-resend="' + t.id + '" data-email="' + esc(t.email) + '">Resend</button> <button class="link" data-cancel="' + t.id + '" data-name="' + esc(t.name) + '">Cancel ticket</button>' : "") + "</div>").join("");
@@ -620,7 +630,7 @@ function renderDetail(d) {
   current = d;
   const r = d.reg;
   const rows = [["Reference", '<span class="mono">' + esc(r.ref) + "</span>"], ["Status", '<span class="st ' + r.status + '">' + STATUS[r.status] + "</span>" + (r.flagged ? ' <span class="flag">Flagged for release</span>' : "")],
-    ["Ticket", esc(r.tierName) + (r.tier === "corporate" ? ", team of " + r.size : r.tier === "sponsored" ? ", " + r.size + " seats" : "")], ["Amount", r.amount ? esc(r.amountText) : "None"],
+    ["Ticket", esc(r.tierName) + (r.tier === "corporate" ? ", team of " + r.size : r.tier === "sponsored" ? ", " + r.size + " seats" : r.size > 1 ? " x" + r.size + (r.shares ? ", link to share" : ", named below") : "")], ["Amount", r.amount ? esc(r.amountText) : "None"],
     [r.tier === "sponsored" ? "Sponsor" : r.tier === "corporate" ? "Organisation" : "Name", esc(r.name)]];
   if (r.contact_person) rows.push(["Contact person", esc(r.contact_person)]);
   rows.push(["Email", '<a href="mailto:' + esc(r.email) + '">' + esc(r.email) + "</a>"]);
@@ -660,9 +670,9 @@ function renderDetail(d) {
       '<div id="queryBox" hidden><textarea id="queryNote" placeholder="What is missing or what to check. This text goes into the email."></textarea>' +
       '<div class="actions"><button class="btn ghost" data-act="queryPreview">Preview email</button><button class="btn" data-act="query">Send query email</button></div><div id="queryFrame"></div></div>';
   } else if (r.status === "verified") {
-    const what = r.tier === "sponsored" ? "the claim link email" : d.tickets.length + (d.tickets.length === 1 ? " ticket" : " tickets") + (r.tier === "corporate" ? " and the receipt to the billing contact" : "");
+    const what = r.shares ? (r.tier === "sponsored" ? "the claim link email" : "the email with the link to share") : d.tickets.length + (d.tickets.length === 1 ? " ticket" : " tickets") + (r.tier === "corporate" ? " and the receipt to the billing contact" : r.size > 1 ? " and the receipt to the buyer" : "");
     actions = '<div class="note">Verified. Nothing has been sent yet. Check ' + what + ' below, then press Send.</div>' +
-      '<div class="actions"><button class="btn gold" data-act="send">' + (r.tier === "sponsored" ? "Send claim link" : "Send tickets") + '</button><button class="btn ghost" data-act="unverify">Undo verification</button></div><div id="previews"><p class="small">Loading previews…</p></div>';
+      '<div class="actions"><button class="btn gold" data-act="send">' + (r.shares ? (r.tier === "sponsored" ? "Send claim link" : "Send link to share") : "Send tickets") + '</button><button class="btn ghost" data-act="unverify">Undo verification</button></div><div id="previews"><p class="small">Loading previews…</p></div>';
   } else if (r.status === "released") {
     actions = '<div class="actions"><button class="btn ghost" data-act="reopen">Reopen</button></div>';
   }
