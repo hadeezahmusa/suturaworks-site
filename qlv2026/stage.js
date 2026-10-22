@@ -12,6 +12,9 @@ import { API } from "./config.js";
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const K = new URLSearchParams(location.search).get("k") || "";
+// stage.html?demo=1 plays the whole day with sample tables and fast clocks,
+// without a link or the server. Nothing it does reaches the live stage.
+const DEMO = new URLSearchParams(location.search).get("demo") === "1";
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let st = null, data = null, offset = 0, lastOk = 0, sceneKey = "", slide = 0, slideTimer = null, hopTimer = null;
@@ -23,7 +26,10 @@ audio.chime.preload = audio.gong.preload = "auto";
 const pad = (n) => String(n).padStart(2, "0");
 const mmss = (ms) => { const s = Math.ceil(Math.max(0, ms) / 1000); return pad(Math.floor(s / 60)) + ":" + pad(s % 60); };
 const clockAt = (ms) => new Date(ms + 3600000).toISOString().slice(11, 16).replace(/^0/, "");
-const now = () => Date.now() + offset;
+// In the demo, time runs faster during the timed rounds so a 50-minute
+// sprint plays in a minute; the clock maths stays exactly the same.
+const demoTime = { v0: 0, r0: 0, speed: 1 };
+const now = () => DEMO ? demoTime.v0 + (Date.now() - demoTime.r0) * demoTime.speed : Date.now() + offset;
 function remaining() {
   if (!st) return null;
   const c = st.clock;
@@ -258,7 +264,7 @@ function render() {
   clearTimeout(slideTimer);
   if (st.phase === "arrival" && arrivalSlides().length > 1) {
     const which = arrivalSlides()[slide % arrivalSlides().length];
-    slideTimer = setTimeout(() => { slide++; render(); }, which === "opening" ? 9000 : 15000);
+    slideTimer = setTimeout(() => { slide++; render(); }, DEMO ? (which === "opening" ? 7000 : 6000) : which === "opening" ? 9000 : 15000);
   }
   tick(true);
 }
@@ -309,8 +315,50 @@ async function poll() {
     if (Date.now() - lastOk > 3000) $("#recon").hidden = false;
   }
 }
-setInterval(poll, 1000);
-poll();
+if (DEMO) runDemo();
+else { setInterval(poll, 1000); poll(); }
+
+// ---------- demo mode ----------
+function runDemo() {
+  const names = ["Foundation", "Blueprint", "Scaffold", "Keystone", "Pillar", "Legacy"];
+  const times = ["13:30", "13:42", "13:54", "14:06", "14:18", "14:30"];
+  const phases = ["arrival", "sprint", "handover", "critique", "response", "lunch", "presentations", "results"];
+  data = {
+    phases: phases.map((id) => ({ id, label: id[0].toUpperCase() + id.slice(1) })),
+    schedule: [["8:30", "Arrival, tea and light snacks"], ["10:50", "The sprint opens"], ["11:40", "Plans handed over"], ["11:45", "Critique"], ["12:20", "Response"], ["12:35", "Lunch"], ["13:30", "Presentations"], ["14:50", "Feedback and recognitions"]].map(([t, what]) => ({ t, what })),
+    order: names.map((name, i) => ({ name, time: times[i] })),
+    chain: names.concat(names[0]),
+    partners: ["Sutura Works Limited", "Your partners appear here"],
+    onStage: null, upNext: null, lastScores: null, podium: null,
+  };
+  st = { phase: "arrival", clock: { endsAt: null, pausedMs: null, totalMs: 0 }, toggles: { partners: true, schedule: true, animation: true }, revealed: false, flash: 0, version: 0 };
+  // [phase, real seconds on screen, clock minutes or 0, extra]
+  const steps = [
+    ["arrival", 20, 0], ["sprint", 64, 50], ["handover", 14, 5], ["critique", 32, 35], ["response", 22, 15], ["lunch", 10, 0],
+    ["presentations", 16, 10, 0], ["presentations", 16, 10, 1], ["presentations", 16, 10, 2], ["results", 6, 0, "hidden"], ["results", 16, 0, "revealed"],
+  ];
+  let i = 0;
+  const go = () => {
+    const [phase, secs, minutes, extra] = steps[i % steps.length];
+    const total = minutes * 60000;
+    demoTime.v0 = Date.now(); demoTime.r0 = Date.now();
+    // Finish the round about two seconds before the step ends, so the gong and flash show.
+    demoTime.speed = total ? total / ((secs - 2) * 1000) : 1;
+    st.phase = phase; st.flash++; slide = 0;
+    st.clock = total ? { endsAt: demoTime.v0 + total, pausedMs: null, totalMs: total } : { endsAt: null, pausedMs: null, totalMs: 0 };
+    st.revealed = extra === "revealed";
+    if (phase === "presentations") {
+      data.onStage = names[extra]; data.upNext = names[extra + 1];
+      data.lastScores = extra ? { name: names[extra - 1], n: 4, of: 4 } : null;
+    }
+    if (phase === "results") data.podium = st.revealed ? [{ place: "First", name: "Keystone", avg: "21.5" }, { place: "Second", name: "Blueprint", avg: "20.0" }, { place: "Third", name: "Legacy", avg: "18.8" }] : null;
+    render();
+    i++;
+    setTimeout(go, secs * 1000);
+  };
+  document.getElementById("screen").insertAdjacentHTML("beforeend", '<div style="position:absolute;left:72px;top:118px;z-index:4;font-family:var(--mono);font-size:16px;letter-spacing:.12em;color:#0A1F4D;background:#EFC22D;padding:4px 12px;border-radius:6px">DEMO · SAMPLE TABLES · FAST CLOCK</div>');
+  go();
+}
 
 // ---------- sound, full screen, idle cursor ----------
 function showToast(text) {

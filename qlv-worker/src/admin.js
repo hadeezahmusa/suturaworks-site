@@ -683,7 +683,7 @@ async function loadPreviews(ref) {
   } catch (err) { msg(err.message); }
 }
 
-async function open(ref) {
+async function openReg(ref) {
   msg("");
   try { renderDetail(await call("reg?ref=" + encodeURIComponent(ref))); if (innerWidth < 900) $("#detail").scrollIntoView(); } catch (err) { msg(err.message); }
 }
@@ -879,7 +879,7 @@ async function loadAnswers() {
 
 document.addEventListener("click", (e) => {
   const f = e.target.closest("[data-f]"); if (f) { filter = f.dataset.f; loadList(); return; }
-  const tr = e.target.closest("tr[data-ref]"); if (tr) { open(tr.dataset.ref); return; }
+  const tr = e.target.closest("tr[data-ref]"); if (tr) { openReg(tr.dataset.ref); return; }
   const a = e.target.closest("[data-act]"); if (a) { act(a.dataset.act, a); return; }
   const r = e.target.closest("[data-resend]"); if (r) { resend(r); return; }
   const mb = e.target.closest("tr[data-mb]"); if (mb) { openMember(mb.dataset.mb); return; }
