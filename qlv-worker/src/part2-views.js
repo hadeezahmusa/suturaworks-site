@@ -77,7 +77,7 @@ export const P2_HTML = String.raw`
 <div id="stageView" hidden>
   <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;margin:0 0 12px">
     <div><h1>Stage</h1><p class="small" style="margin:4px 0 0">Run the projector from here. The display follows whatever you choose.</p></div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="stDisp"></span><button class="btn" data-st="open">Open the display</button></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="stDisp"></span><button class="btn ghost" data-st="demo">Watch the demo</button><button class="btn" data-st="open">Open the display</button></div>
   </div>
   <div class="phases" id="stPhases"></div>
   <div class="grid">
@@ -308,7 +308,7 @@ function drawClock() {
   const lab = { arrival: "Arrival and tea", sprint: "Planning round", handover: "Handover", critique: "Critique", response: "Response", lunch: "Lunch", presentations: "Presentations" + (d.queue.find((q) => q.state === "On stage") ? " · " + d.queue.find((q) => q.state === "On stage").name + " on stage" : ""), results: "Panel feedback and recognitions" }[st.phase];
   const cue = { sprint: "Chime at halfway and at five minutes, gong at zero", handover: "Plans moving round the chain", critique: "Gap, question, strength", response: "Each team answers its critique", presentations: "Amber at 2:00, gong at zero", arrival: "Schedule and partner thanks on the display", lunch: "Judges are reading", results: st.revealed ? "Top three on the display" : "Waiting for every score" }[st.phase];
   const timed = rem !== null;
-  $("#stClock").innerHTML = '<div><div class="l">' + esc(lab) + (paused ? " · paused" : "") + '</div><div class="t">' + (timed ? mmss(rem) : "··:··") + '</div><div class="c">' + esc(cue) + '</div></div>' +
+  $("#stClock").innerHTML = '<div><div class="l">' + esc(lab) + (paused ? " · paused" : "") + '</div><div class="t"' + (timed ? "" : ' style="font-size:28px;padding:14px 0"') + '>' + (timed ? mmss(rem) : "No clock running") + '</div><div class="c">' + esc(cue) + '</div></div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:8px">' + (timed ? '<button class="btn ghost" data-st="' + (paused ? "resume" : "pause") + '">' + (paused ? "Resume" : "Pause") + '</button><button class="btn ghost" data-st="addMinute">Add 1 minute</button>' : "") +
     (d.nextLabel ? '<button class="btn gold" data-st="next">' + esc(d.nextLabel) + '</button>' : "") + '</div>';
 }
@@ -402,6 +402,7 @@ document.addEventListener("click", async (e) => {
     if (el("[data-st]")) {
       const a = el("[data-st]").dataset.st;
       if (a === "open") { const w = window.open("", "_blank"); const r = await call("display-link"); w.location = r.url; return; }
+      if (a === "demo") { const r = await call("display-link"); window.open(r.url.replace(/\?k=.*$/, "?demo=1"), "_blank"); return; }
       if (a === "reveal" && !confirm("Show the top three on the display now? This cannot be taken back from the people in the room.")) return;
       await call("stage", { action: a }); if (a === "testSound") msg("Test sound sent. It plays on the display if sound is on there.", true); return loadStage();
     }
