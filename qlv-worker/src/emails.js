@@ -94,6 +94,7 @@ const CHIP = {
 };
 
 export function paidLine(ticket, reg) {
+  if (ticket.kind === "standard" && reg.size > 1) return "Paid as part of a group booking";
   if (ticket.kind === "standard" || ticket.kind === "member") return `Paid ${ngn(reg.amount)} by transfer`;
   if (ticket.kind === "corporate") return `Corporate pack, ${ngn(reg.amount)}`;
   if (ticket.kind === "judge") return "Free with the corporate pack";
@@ -144,7 +145,8 @@ function questionsBlock(url, adviser) {
 
 export function proofReceived(reg, statusUrl) {
   const what = reg.tier === "sponsored" ? "your claim link goes to this address"
-    : reg.tier === "corporate" ? "each person you named gets their own ticket by email"
+    : reg.tier === "corporate" || (reg.size > 1 && reg.attendees) ? "each person you named gets their own ticket by email"
+    : reg.size > 1 ? "your link to share with your group comes to this address"
     : "your ticket comes to this address";
   const body = h1("Proof received") +
     p(`Hello ${esc(first(reg.contact_person || reg.name))}, thank you. We have your proof of payment and are checking it against the JCI Aso account. As soon as it clears, usually within one working day, ${what}.`) +
@@ -170,6 +172,8 @@ export function ticketIssued(t, reg, links) {
         ? `Hello ${first(t.name)}, your seat is claimed and covered by a QLV 2026 partner. Your ticket is below. Keep the reference, it is how we find you at the desk.`
       : t.kind === "facilitator"
         ? `Hello ${first(t.name)}, thank you for facilitating QLV 2026. You are registered and your ticket is below. Keep the reference, it is how we find you at the desk.`
+      : t.kind === "standard" && reg.size > 1 && reg.email && t.email !== reg.email
+        ? `Hello ${first(t.name)}, ${reg.name} booked your place at QLV 2026 and the payment has come through. Your ticket is below. Keep the reference, it is how we find you at the desk.`
       : judge
         ? `Hello ${first(t.name)}, ${reg.organisation} has named you as its judge or mentor for QLV 2026. You are not placed in a team: you rove and score on day two. Your ticket is below.`
         : `Hello ${first(t.name)}, your payment has come through and your seat is held. Your ticket is below. Keep the reference, it is how we find you at the desk.`;
@@ -197,6 +201,42 @@ export function corporateReceipt(reg, tickets) {
     subject: `Transfer verified, ${word(tickets.length).toLowerCase()} QLV 2026 tickets sent (${reg.ref})`,
     html: shell({ preheader: `Tickets sent for ${reg.ref}.`, body, foot: `Paid ${ngn(reg.amount)} by transfer &middot; <span style="font-family:${MONO};">${esc(reg.ref)}</span>` }),
     text: `Transfer verified\n\nThe transfer for ${reg.organisation} has been checked. Tickets sent to:\n${tickets.map((t) => `- ${t.name}${t.kind === "judge" ? " (judge or mentor)" : ""}, ${t.email}`).join("\n")}\n\nReference: ${reg.ref}\nPaid: ${ngn(reg.amount)}\n`,
+  };
+}
+
+// To the person who booked Standard tickets for a group and named everyone.
+export function groupReceipt(reg, tickets) {
+  const list = tickets.map((t) => `${esc(t.name)}, ${esc(t.email)}`);
+  const body = h1("Transfer verified") +
+    p(`Hello ${esc(first(reg.name))}, thank you. Your transfer has been checked against the JCI Aso account and this email is your receipt. ${word(tickets.length)} tickets have gone out, one to each person:`) +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">${list.map((l) => `<tr><td style="padding:3px 0;font-family:${FONT};font-size:12px;color:${C.ink};">${l}</td></tr>`).join("")}</table>` +
+    rows([["Reference", `<span style="font-family:${MONO};">${esc(reg.ref)}</span>`], ["Tickets", `${reg.size} Standard at ${ngn(reg.amount / reg.size)}`], ["Paid", ngn(reg.amount)]]) +
+    p("Teams are mixed on purpose, so the people in your booking will each join a different team on the day. If a ticket has not arrived, ask them to check their spam folder first, then reply to this email.", "font-size:12px;margin:0;");
+  return {
+    subject: `Transfer verified, ${word(tickets.length).toLowerCase()} QLV 2026 tickets sent (${reg.ref})`,
+    html: shell({ preheader: `Tickets sent for ${reg.ref}.`, body, foot: `Paid ${ngn(reg.amount)} by transfer &middot; <span style="font-family:${MONO};">${esc(reg.ref)}</span>` }),
+    text: `Transfer verified\n\nHello ${first(reg.name)}, your transfer has been checked and this email is your receipt. Tickets sent to:\n${tickets.map((t) => `- ${t.name}, ${t.email}`).join("\n")}\n\nReference: ${reg.ref}\nPaid: ${ngn(reg.amount)}\n\nEach person will join a different team on the day.\n`,
+  };
+}
+
+// To the person who booked Standard tickets for a group and chose a link to share.
+export function groupLink(reg, claimUrl, manageUrl, closeDate = "30 October") {
+  const n = word(reg.size).toLowerCase();
+  const body = h1(`Transfer verified, ${n} places held`) +
+    p(`Hello ${esc(first(reg.name))}, thank you. Your transfer has been checked against the JCI Aso account and this email is your receipt. Now send the link below to the people you booked for. Each one fills in their own details and their ticket comes straight to them. If one of the places is yours, use the link yourself too.`) +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;background:${C.navy};border-radius:12px;"><tr><td style="padding:18px 20px;font-family:${FONT};">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.7px;text-transform:uppercase;color:${C.yel};">Your link to share</div>
+      <div style="font-size:12px;color:#CFE0F3;line-height:1.5;margin:4px 0 10px;">Anyone with this link can take one of your places, so send it to the people themselves rather than posting it in a group chat.</div>
+      <a href="${esc(claimUrl)}" style="font-family:${MONO};font-size:13px;color:#FFFFFF;word-break:break-all;">${esc(claimUrl)}</a>
+    </td></tr></table>` +
+    rows([["Reference", `<span style="font-family:${MONO};">${esc(reg.ref)}</span>`], ["Tickets", `${reg.size} Standard at ${ngn(reg.amount / reg.size)}`], ["Paid", ngn(reg.amount)]]) +
+    p("We email you whenever somebody claims a place. You can also see how many are claimed here:") +
+    button(manageUrl, "See your places", true) +
+    p(`The link works until registration closes on ${closeDate}, so please send it early. Teams are mixed on purpose, so the people in your booking will each join a different team on the day.`, "font-size:12px;margin:0;");
+  return {
+    subject: `Your QLV 2026 link to share, ${n} places (${reg.ref})`,
+    html: shell({ preheader: "Send this link to the people you booked for.", body, foot: `Paid ${ngn(reg.amount)} by transfer &middot; <span style="font-family:${MONO};">${esc(reg.ref)}</span>` }),
+    text: `Transfer verified, ${n} places held\n\nYour transfer has been checked and this email is your receipt. Send the link below to the people you booked for. Each one fills in their own details and their ticket comes straight to them.\n\nYour link to share: ${claimUrl}\nAnyone with this link can take one of your places, so send it to the people themselves rather than posting it in a group chat.\n\nSee your places: ${manageUrl}\nReference: ${reg.ref}\nPaid: ${ngn(reg.amount)}\n\nThe link works until registration closes on ${closeDate}.\n`,
   };
 }
 
@@ -236,16 +276,18 @@ export function sponsorLink(reg, claimUrl, manageUrl, closeDate = "30 October") 
 }
 
 export function seatClaimed(reg, t, taken, manageUrl, closeDate = "30 October") {
+  const group = reg.tier === "standard";
+  const [one, many] = group ? ["place", "places"] : ["seat", "seats"];
   const left = reg.size - taken;
-  const status = left ? `${word(taken)} of ${reg.size} seats are now claimed, so ${word(left).toLowerCase()} ${left === 1 ? "is" : "are"} still open.` : `All ${reg.size} seats are now claimed. Thank you for sponsoring them.`;
-  const body = h1("A seat has been claimed") +
-    p(`Hello ${esc(first(reg.contact_person))}, ${esc(t.name)} has just claimed one of your seats and their ticket, ${esc(t.ticket_ref)}, has gone to them.`) +
-    p(status) + button(manageUrl, "See your seats", true) +
-    (left ? p(`Unclaimed seats are released on ${closeDate}.`, "font-size:12px;margin:0;") : "");
+  const status = left ? `${word(taken)} of ${reg.size} ${many} are now claimed, so ${word(left).toLowerCase()} ${left === 1 ? "is" : "are"} still open.` : `All ${reg.size} ${many} are now claimed.${group ? "" : " Thank you for sponsoring them."}`;
+  const body = h1(`A ${one} has been claimed`) +
+    p(`Hello ${esc(first(reg.contact_person || reg.name))}, ${esc(t.name)} has just claimed one of your ${many} and their ticket, ${esc(t.ticket_ref)}, has gone to them.`) +
+    p(status) + button(manageUrl, `See your ${many}`, true) +
+    (left ? p(group ? `The link works until registration closes on ${closeDate}.` : `Unclaimed seats are released on ${closeDate}.`, "font-size:12px;margin:0;") : "");
   return {
-    subject: `${t.name} claimed a seat (${taken} of ${reg.size})`,
+    subject: `${t.name} claimed a ${one} (${taken} of ${reg.size})`,
     html: shell({ preheader: status, body, foot: `<span style="font-family:${MONO};">${esc(reg.ref)}</span>` }),
-    text: `A seat has been claimed\n\n${t.name} has claimed one of your seats and their ticket, ${t.ticket_ref}, has gone to them.\n${status}\n\nSee your seats: ${manageUrl}\n`,
+    text: `A ${one} has been claimed\n\n${t.name} has claimed one of your ${many} and their ticket, ${t.ticket_ref}, has gone to them.\n${status}\n\nSee your ${many}: ${manageUrl}\n`,
   };
 }
 

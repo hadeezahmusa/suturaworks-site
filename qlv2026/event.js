@@ -9,6 +9,9 @@ export const PRICES = {
   sponsoredSeat: 9500,
 };
 export const SPONSORED_MIN = 6;
+// Standard tickets can be bought for up to five people in one booking.
+// Six or more is a sponsored booking.
+export const GROUP_MAX = 5;
 export const SPONSORED_MAX = 200; // a sanity cap on the stepper, not a ceiling anyone should reach
 
 export const TIER_NAME = {
@@ -33,7 +36,7 @@ export const ADVISERS_CLOSE_AT = "2026-11-05T23:00:00Z";
 export const RELEASE_AFTER_DAYS = 3;
 
 export function amountFor(tier, size) {
-  if (tier === "standard") return PRICES.standard;
+  if (tier === "standard") return size >= 1 && size <= GROUP_MAX ? size * PRICES.standard : null;
   if (tier === "member") return PRICES.member;
   if (tier === "corporate") return PRICES.corporate[size] || null;
   if (tier === "sponsored") return size >= SPONSORED_MIN ? size * PRICES.sponsoredSeat : null;

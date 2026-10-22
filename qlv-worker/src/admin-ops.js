@@ -21,12 +21,14 @@ async function lastLock(env) {
 
 // ---------- Tables ----------
 
-// Seats paid for but not yet claimed: confirmed sponsors and partners.
+// Seats paid for but not yet claimed: confirmed sponsors, Standard groups
+// with a link to share, and partners. Groups count with sponsored seats.
 async function heldSeats(env) {
   const r = await env.DB.prepare(`SELECT
       (SELECT COALESCE(SUM(r.size), 0) - (SELECT COUNT(*) FROM tickets t JOIN registrations r2 ON r2.ref = t.reg_ref
-         WHERE r2.tier = 'sponsored' AND r2.status = 'confirmed' AND t.kind = 'sponsored' AND t.ticket_ref != 'pending' AND t.cancelled_at IS NULL)
-       FROM registrations r WHERE r.tier = 'sponsored' AND r.status = 'confirmed') AS sponsored,
+         WHERE r2.status = 'confirmed' AND r2.attendees IS NULL AND r2.size > 1 AND t.kind = r2.tier AND r2.tier IN ('sponsored', 'standard')
+           AND t.ticket_ref != 'pending' AND t.cancelled_at IS NULL)
+       FROM registrations r WHERE r.tier IN ('sponsored', 'standard') AND r.attendees IS NULL AND r.size > 1 AND r.status = 'confirmed') AS sponsored,
       (SELECT COUNT(*) FROM partner_seats s JOIN partners p ON p.id = s.partner_id
        WHERE p.status = 'confirmed' AND s.ticket_id IS NULL AND s.voided_at IS NULL) AS partner`).first();
   return { sponsored: Math.max(0, r.sponsored || 0), partner: r.partner || 0 };

@@ -5,7 +5,7 @@
 // records, KV for proof files, sign-in links and the dev outbox.
 
 import { QBANK, SITUATIONS, MAX_ANSWER } from "../../qlv2026/questions.js";
-import { CLOSES_AT, ADVISERS_CLOSE_AT, SPONSORED_MIN, SPONSORED_MAX, amountFor, closeLabel } from "../../qlv2026/event.js";
+import { CLOSES_AT, ADVISERS_CLOSE_AT, SPONSORED_MIN, SPONSORED_MAX, GROUP_MAX, amountFor, closeLabel } from "../../qlv2026/event.js";
 import { sniff, stripMetadata } from "./strip.js";
 import * as mail from "./emails.js";
 import { handleAdmin } from "./admin.js";
@@ -57,6 +57,13 @@ export async function nextRef(env, counter) {
   if (counter === "facilitator") return "QLV26-F" + String(n).padStart(2, "0");
   return "QLV26-" + String(n).padStart(3, "0");
 }
+
+// A Standard booking for more than one person. The buyer either names
+// everyone (attendees is set) or gets one link to share, like a sponsor.
+export const isGroup = (reg) => reg.tier === "standard" && reg.size > 1;
+export const sharesLink = (reg) => reg.tier === "sponsored" || (isGroup(reg) && !reg.attendees);
+// The kind of ticket a claim link makes.
+const claimKind = (reg) => (reg.tier === "standard" ? "standard" : "sponsored");
 
 export function links(env, reg) {
   const site = env.SITE_URL;
@@ -150,7 +157,22 @@ function buildRegistration(b) {
     r.phone = need(clean(b.phone, 30), "your phone number", "phone");
     r.organisation = clean(b.organisation);
     r.situation = SITS.has(b.situation) ? b.situation : "emp";
-    if (b.understand !== true) throw new HttpError(400, "Please tick the box to confirm you can attend both days.");
+    if (tier === "standard") {
+      r.size = b.seats === undefined ? 1 : Math.floor(Number(b.seats));
+      if (!(r.size >= 1 && r.size <= GROUP_MAX)) throw new HttpError(400, `One booking can hold up to ${GROUP_MAX} Standard tickets. For six or more, choose Sponsored seats.`);
+      if (r.size > 1 && b.group !== "links") {
+        const list = Array.isArray(b.attendees) ? b.attendees.filter(Boolean) : [];
+        if (list.length !== r.size) throw new HttpError(400, `Please fill in all ${r.size} people, or choose to get a link to share instead.`);
+        const people = list.map((a, i) => ({
+          name: need(clean(a.name, 120), `the name for person ${i + 1}`),
+          email: need(clean(a.email).toLowerCase(), `the email for person ${i + 1}`, "email"),
+          situation: SITS.has(a.situation) ? a.situation : "emp",
+        }));
+        if (new Set(people.map((p) => p.email)).size !== people.length) throw new HttpError(400, "Each person needs their own email address, because each ticket is sent to the person it is for.");
+        r.attendees = JSON.stringify(people);
+      }
+    }
+    if (b.understand !== true) throw new HttpError(400, r.size > 1 ? "Please tick the box to confirm everyone can attend both days." : "Please tick the box to confirm you can attend both days.");
   } else if (tier === "corporate") {
     r.size = Number(b.pack);
     if (r.size !== 3 && r.size !== 5) throw new HttpError(400, "Please choose a team of three or a team of five.");
@@ -280,7 +302,8 @@ async function status(url, env) {
     ref: reg.ref, tier: reg.tier, size: reg.size, amount: reg.amount, email: reg.email,
     status: reg.status, proof: !!reg.proof_at, situation: reg.situation,
     queryNote: reg.status === "queried" ? reg.query_note : null,
-    manage: reg.tier === "sponsored" && reg.status === "confirmed" ? reg.manage_token : null,
+    group: isGroup(reg) ? (reg.attendees ? "names" : "links") : null,
+    manage: sharesLink(reg) && reg.status === "confirmed" ? reg.manage_token : null,
   };
 }
 
@@ -321,10 +344,12 @@ async function adviser(req, env, ctx) {
   return { ref, key: t.token, mode: a.mode };
 }
 
-// ---------- sponsored claims ----------
+// ---------- sponsored and group claims ----------
+// A sponsor's link and a Standard group buyer's link work the same way. Both
+// close with registration, so reopening registration reopens them too.
 
 async function claimState(env, reg) {
-  const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE reg_ref = ? AND kind = 'sponsored'").bind(reg.ref).first();
+  const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE reg_ref = ? AND kind = ?").bind(reg.ref, claimKind(reg)).first();
   if (reg.status !== "confirmed") return { state: "pending", taken: n };
   if (isClosed(await closesAt(env))) return { state: "closed", taken: n };
   if (n >= reg.size) return { state: "full", taken: n };
@@ -332,14 +357,15 @@ async function claimState(env, reg) {
 }
 async function regByClaim(env, t) {
   const reg = t ? await env.DB.prepare("SELECT * FROM registrations WHERE claim_token = ?").bind(String(t)).first() : null;
-  if (!reg) throw new HttpError(404, "This claim link is not valid.");
+  if (!reg || !sharesLink(reg)) throw new HttpError(404, "This claim link is not valid.");
   return reg;
 }
 
 async function claimInfo(url, env) {
   const reg = await regByClaim(env, url.searchParams.get("t"));
   const s = await claimState(env, reg);
-  return { state: s.state, left: Math.max(0, reg.size - s.taken) };
+  const group = reg.tier === "standard";
+  return { state: s.state, left: Math.max(0, reg.size - s.taken), group, by: group ? reg.name : null, closes: closeLabel(await closesAt(env)) };
 }
 
 async function claim(req, env, ctx) {
@@ -355,24 +381,27 @@ async function claim(req, env, ctx) {
   };
   const s = await claimState(env, reg);
   if (s.state === "closed") throw new HttpError(403, `This claim link closed on ${closeLabel(await closesAt(env))}.`, "closed");
-  if (s.state === "pending") throw new HttpError(409, "Your sponsor's transfer is still being checked. Try again later today.", "pending");
+  if (s.state === "pending") throw new HttpError(409, reg.tier === "standard" ? "The payment for these tickets is still being checked. Try again later today." : "Your sponsor's transfer is still being checked. Try again later today.", "pending");
+  const kind = claimKind(reg);
 
   // The same person pressing the button twice gets their existing seat back.
-  const mine = await env.DB.prepare("SELECT * FROM tickets WHERE reg_ref = ? AND kind = 'sponsored' AND email = ?").bind(reg.ref, c.email).first();
+  const mine = await env.DB.prepare("SELECT * FROM tickets WHERE reg_ref = ? AND kind = ? AND email = ?").bind(reg.ref, kind, c.email).first();
   if (mine && mine.ticket_ref !== "pending") return { ref: mine.ticket_ref, key: mine.token, email: mine.email };
 
   await brake(env, req, "claim", 20);
-  const t = { token: token(24), reg_ref: reg.ref, kind: "sponsored", ...c };
+  const t = { token: token(24), reg_ref: reg.ref, kind, ...c };
   const stamp = now();
   // The seat cap is enforced in the insert itself, so two people claiming the
   // last seat at the same moment cannot both get it.
   const ins = await env.DB.prepare(`INSERT INTO tickets (token, reg_ref, ticket_ref, kind, name, email, phone, situation, organisation, created_at)
-      SELECT ?, ?, 'pending', 'sponsored', ?, ?, ?, ?, ?, ?
-      WHERE (SELECT COUNT(*) FROM tickets WHERE reg_ref = ? AND kind = 'sponsored') < ?`)
-    .bind(t.token, reg.ref, c.name, c.email, c.phone, c.situation, c.organisation || null, stamp, reg.ref, reg.size).run();
-  if (!ins.meta.changes) throw new HttpError(409, "All the seats on this link have been claimed.", "full");
-  t.ticket_ref = await nextRef(env, "sponsored");
-  const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE reg_ref = ? AND kind = 'sponsored'").bind(reg.ref).first();
+      SELECT ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?
+      WHERE (SELECT COUNT(*) FROM tickets WHERE reg_ref = ? AND kind = ?) < ?
+      RETURNING id`)
+    .bind(t.token, reg.ref, kind, c.name, c.email, c.phone, c.situation, c.organisation || null, stamp, reg.ref, kind, reg.size).first();
+  if (!ins) throw new HttpError(409, reg.tier === "standard" ? "All the places on this link have been claimed." : "All the seats on this link have been claimed.", "full");
+  // Counting by id gives each claimant a different number, even at the same moment.
+  const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE reg_ref = ? AND kind = ? AND id <= ?").bind(reg.ref, kind, ins.id).first();
+  t.ticket_ref = kind === "standard" ? `${reg.ref}-${n}` : await nextRef(env, "sponsored");
   await env.DB.prepare("UPDATE tickets SET ticket_ref = ?, seat_no = ?, sent_at = ? WHERE token = ?").bind(t.ticket_ref, n, stamp, t.token).run();
   await seatPending(env);
 
@@ -440,9 +469,10 @@ async function sponsorView(url, env) {
   const m = url.searchParams.get("m");
   const reg = m ? await env.DB.prepare("SELECT * FROM registrations WHERE manage_token = ?").bind(String(m)).first() : null;
   if (!reg) throw new HttpError(404, "This link is not valid.");
-  const { results } = await env.DB.prepare("SELECT ticket_ref FROM tickets WHERE reg_ref = ? AND kind = 'sponsored' AND ticket_ref != 'pending' ORDER BY id").bind(reg.ref).all();
+  if (!sharesLink(reg)) throw new HttpError(404, "This link is not valid.");
+  const { results } = await env.DB.prepare("SELECT ticket_ref FROM tickets WHERE reg_ref = ? AND kind = ? AND ticket_ref != 'pending' ORDER BY id").bind(reg.ref, claimKind(reg)).all();
   return {
-    ref: reg.ref, seats: reg.size, closed: isClosed(await closesAt(env)),
+    ref: reg.ref, seats: reg.size, closed: isClosed(await closesAt(env)), group: reg.tier === "standard", closes: closeLabel(await closesAt(env)),
     claimUrl: reg.status === "confirmed" ? links(env, reg).claim : null,
     claims: results.map((r) => ({ ref: r.ticket_ref })),
   };
@@ -452,7 +482,7 @@ async function sponsorView(url, env) {
 
 async function ticketByToken(env, t) {
   if (!t) return null;
-  return env.DB.prepare("SELECT t.*, r.amount, r.mode, r.organisation AS reg_org, r.tier FROM tickets t JOIN registrations r ON r.ref = t.reg_ref WHERE t.token = ?").bind(String(t)).first();
+  return env.DB.prepare("SELECT t.*, r.amount, r.size, r.mode, r.organisation AS reg_org, r.tier, r.name AS buyer FROM tickets t JOIN registrations r ON r.ref = t.reg_ref WHERE t.token = ?").bind(String(t)).first();
 }
 
 async function ticketView(url, env) {

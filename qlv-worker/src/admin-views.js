@@ -148,7 +148,7 @@ async function loadTables() {
     '<div class="tile"><span>Tables in use</span><b>' + d.totals.tables + '</b></div>' +
     '<div class="tile"><span>JCI Aso members seated</span><b>' + d.totals.members + '</b></div>' +
     '<div class="tile gold"><span>Next verified seat goes to</span><b>' + esc(d.totals.next) + '</b></div>' +
-    '<div class="tile"><span>Held for partners and sponsors, not yet claimed</span><b>' + (h.partner + h.sponsored) + '</b><span>' + h.partner + " partner · " + h.sponsored + " sponsored</span></div>";
+    '<div class="tile"><span>Held for partners, sponsors and group links, not yet claimed</span><b>' + (h.partner + h.sponsored) + '</b><span>' + h.partner + " partner · " + h.sponsored + " sponsored or group</span></div>";
   $("#tKey").innerHTML = ["J JCI Aso member", "S Standard", "C Corporate", "P Sponsored", "T Partner"].map((x) => "<span>" + dot(x[0]) + x.slice(2) + "</span>").join("") +
     '<span><i style="border:1.5px dashed var(--rule);color:var(--mute);font-weight:400">4</i>Empty seat</span>' +
     '<span><i style="border:3px solid #2F6F4E;background:#2C3E58"></i>Coloured ring: same organisation</span>' +
@@ -220,7 +220,7 @@ async function loadExport() {
   $("#eStrip").innerHTML = "<span><b>Snapshot:</b> " + (d.lock ? when(d.lock.created_at) + " by " + esc(d.lock.created_by) : "not locked yet") + "</span>" +
     "<span><b>People:</b> " + s.participants + " participants, " + s.facilitators + " facilitators, " + s.advisers + " advisers, " + s.judges + " judges</span>" +
     "<span><b>Late additions:</b> " + (s.late || "none yet") + "</span>" +
-    "<span><b>Left out, not yet claimed:</b> " + d.held.partner + " partner and " + d.held.sponsored + " sponsored seats</span>";
+    "<span><b>Left out, not yet claimed:</b> " + d.held.partner + " partner and " + d.held.sponsored + " sponsored or group seats</span>";
   let lateShown = false;
   $("#eRows").innerHTML = d.rows.map((r) => {
     let pre = "";

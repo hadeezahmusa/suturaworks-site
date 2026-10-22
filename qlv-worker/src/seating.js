@@ -15,7 +15,7 @@
 import { choose, tablesFrom, orgKey } from "./placement.js";
 import { getSettings, isFrozen } from "./settings.js";
 
-const DUE_SQL = `SELECT t.id, t.kind, t.organisation, r.organisation AS reg_org, p.name AS partner_name,
+const DUE_SQL = `SELECT t.id, t.kind, t.organisation, t.reg_ref, r.size AS reg_size, r.organisation AS reg_org, p.name AS partner_name,
     CASE WHEN t.kind IN ('sponsored', 'partner') THEN t.created_at ELSE r.verified_at END AS due_at
   FROM tickets t JOIN registrations r ON r.ref = t.reg_ref LEFT JOIN partners p ON p.id = t.partner_id
   WHERE t.table_index IS NULL AND t.cancelled_at IS NULL AND t.ticket_ref != 'pending'
@@ -27,8 +27,10 @@ const SEATED_SQL = "SELECT id, kind, table_index, table_seat, org_key FROM ticke
 
 // The organisation that keeps people apart. Members never are; corporate
 // seats use the booking, partner seats the partner, everyone else what they typed.
+// People on one Standard group booking are kept apart like one organisation.
 export function orgFor(t) {
   if (t.kind === "member") return null;
+  if (t.kind === "standard" && t.reg_size > 1) return `booking ${String(t.reg_ref).toLowerCase()}`;
   if (t.kind === "corporate") return orgKey(t.reg_org);
   if (t.kind === "partner") return orgKey(t.partner_name);
   return orgKey(t.organisation || (t.kind === "standard" ? t.reg_org : null));

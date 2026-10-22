@@ -146,6 +146,12 @@ second press for any batch left over. If you move to Resend Pro, raise `DAILY_SA
   a calendar invitation. There is no payment, so there is nothing for a person to check.
 - **Claimed sponsored seats** get their ticket straight away, and the sponsor gets a "seat claimed"
   email each time. The sponsor's money was verified by you before the claim link existed.
+- **Group Standard bookings** (2 to 5 tickets, added 22 October 2026) work the same way once you
+  have sent them. If the buyer named everyone, Payment verified makes one ticket each
+  (QLV26-012-1, -2 and so on) and Send emails each person plus a receipt to the buyer. If the
+  buyer chose a link, Send emails them a link to share; each claim issues a ticket straight away
+  and tells the buyer. The link closes and reopens with registration. Everyone on one booking is
+  kept apart at the tables like one organisation. Six or more is pointed to Sponsored seats.
 - Everything that depends on money (standard, member, corporate, the sponsor's link) waits for you.
 
 ## Tables, partners, staff and badges (admin only)
