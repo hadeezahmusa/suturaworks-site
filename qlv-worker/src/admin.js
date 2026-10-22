@@ -18,6 +18,9 @@ import { seatPending } from "./seating.js";
 import * as ops from "./admin-ops.js";
 import * as money from "./money.js";
 import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
+import { sendBatch, dailyRoom, DAILY_SAFE } from "./mailer.js";
+import { part2Routes, sheetsPage } from "./part2-admin.js";
+import { P2_HTML, P2_JS, P2_STYLE, ONE_VIEW_JS } from "./part2-views.js";
 import { MONEY_HTML, MONEY_JS } from "./money-views.js";
 
 // The treasurer's only page besides Registrations: Money, to read.
@@ -36,19 +39,24 @@ const enc = new TextEncoder();
 function emails(v) {
   return (v || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 }
-// Two roles. Admins (ADMIN_EMAILS) can do everything. Verifiers
+// Roles. Admins (ADMIN_EMAILS) can do everything. Verifiers
 // (VERIFIER_EMAILS, a secret so personal addresses stay out of the code) see
 // the registrations list and proofs, mark payments verified and undo their
-// own verification. Sending tickets and everything else stays with admins.
-function roleOf(env, email) {
+// own verification, and can read the Money tab. Desk volunteers see only
+// Check-in and stage operators only Stage; admin adds both on the Settings tab.
+async function roleOf(env, email) {
+  if (!email) return null;
   if (emails(env.ADMIN_EMAILS).includes(email)) return "admin";
   if (emails(env.VERIFIER_EMAILS).includes(email)) return "verifier";
-  return null;
+  const row = await env.DB.prepare("SELECT role FROM access WHERE email = ?").bind(email).first();
+  return row && ["desk", "stage"].includes(row.role) ? row.role : null;
 }
-function adminList(env) {
-  return [...emails(env.ADMIN_EMAILS), ...emails(env.VERIFIER_EMAILS)];
-}
-const VERIFIER_CAN = new Set(["GET list", "GET reg", "POST verify", "POST unverify", "GET money"]);
+// What each role besides admin may call. Anything not listed is admin only.
+const CAN = {
+  verifier: new Set(["GET list", "GET reg", "POST verify", "POST unverify", "GET money"]),
+  desk: new Set(["GET checkin", "POST checkin"]),
+  stage: new Set(["GET stage", "POST stage", "GET display-link"]),
+};
 function b64url(bytes) {
   return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -74,7 +82,7 @@ async function session(req, env) {
   if (!payload || !sig || !same(sig, await hmac(env, payload))) return null;
   let email, exp;
   try { [email, exp] = atob(payload.replace(/-/g, "+").replace(/_/g, "/")).split("|"); } catch { return null; }
-  if (Date.now() > Number(exp) || !adminList(env).includes(email)) return null;
+  if (Date.now() > Number(exp) || !(await roleOf(env, email))) return null;
   return email;
 }
 
@@ -283,7 +291,6 @@ async function setClosing(env, b) {
 // 24 hours past DAILY_SAFE and never sends more than REMINDER_BATCH at once:
 // ticket emails sent the same day still have room. The admin sees counts
 // only, never who has or has not answered.
-const DAILY_SAFE = 90;
 const REMINDER_BATCH = 70;
 
 // Participants with a sent ticket who have no answers yet and no reminder
@@ -298,44 +305,6 @@ const WAITING_SQL = `SELECT t.id, t.token, t.ticket_ref, t.reg_ref, t.name, t.em
     AND NOT (t.kind IN ('standard', 'member') AND EXISTS (SELECT 1 FROM answers a WHERE a.holder = 'r:' || t.reg_ref))
     AND NOT EXISTS (SELECT 1 FROM email_log l WHERE l.kind = 'answers_reminder' AND l.ok = 1 AND l.ref = t.reg_ref AND l.recipient = t.email)
   ORDER BY t.id`;
-
-// Sends a list of {ref, to, subject, html, text} as one Resend batch and logs
-// it with one insert, so a batch of any size stays inside Cloudflare's
-// per-request limits. All or nothing: if Resend refuses, nobody is logged as
-// sent and the same people are picked up next time.
-async function sendBatch(env, msgs, kind) {
-  let ok = false;
-  let detail = "";
-  if (env.RESEND_API_KEY) {
-    try {
-      const res = await fetch("https://api.resend.com/emails/batch", {
-        method: "POST",
-        headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-        body: JSON.stringify(msgs.map((m) => ({ from: env.MAIL_FROM, to: [m.to], reply_to: env.REPLY_TO, subject: m.subject, html: m.html, text: m.text }))),
-      });
-      ok = res.ok;
-      detail = (await res.text()).slice(0, 300);
-    } catch (err) {
-      detail = String(err).slice(0, 300);
-    }
-  } else {
-    for (const m of msgs) await env.KV.put(`outbox:${Date.now()}:${token(6)}`, JSON.stringify({ kind, ...m }), { expirationTtl: 86400 });
-    ok = true;
-    detail = "dev outbox";
-  }
-  await env.DB.prepare(`INSERT INTO email_log (ref, kind, recipient, ok, detail, created_at)
-      SELECT json_extract(value, '$.ref'), ?, json_extract(value, '$.to'), ?, ?, ? FROM json_each(?)`)
-    .bind(kind, ok ? 1 : 0, ok ? "batch" : detail, now(), JSON.stringify(msgs.map((m) => ({ ref: m.ref, to: m.to })))).run();
-  if (!ok) throw new HttpError(502, "Resend did not accept the batch, so nobody was emailed. Try again in a few minutes.");
-}
-
-// Emails sent in the last 24 hours, and how many a batch may add without
-// passing the free plan's safe daily figure.
-async function dailyRoom(env) {
-  const since = new Date(Date.now() - 86400000).toISOString();
-  const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM email_log WHERE ok = 1 AND created_at > ?").bind(since).first();
-  return { sent24h: n, room: Math.max(0, DAILY_SAFE - n) };
-}
 
 // ---------- member codes ----------
 // Each JCI Aso member with an email on file gets their own code once.
@@ -579,7 +548,7 @@ textarea,input[type=email],input[type=text]{width:100%;font:inherit;border:1px s
 
 function page(title, body, script = "") {
   return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${e(title)}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Poppins:wght@400;600;700&display=swap"><style>${STYLE}${VIEWS_STYLE}</style></head><body>${body}${script ? `<script>${script}</script>` : ""}</body></html>`;
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Poppins:wght@400;600;700&display=swap"><style>${STYLE}${VIEWS_STYLE}${P2_STYLE}</style></head><body>${body}${script ? `<script>${script}</script>` : ""}</body></html>`;
 }
 
 function loginPage(note) {
@@ -948,7 +917,7 @@ function appPage(email, role) {
     &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
   <div class="wrap">
     ${!admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="money">Money</button></div>` : ""}
-    ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="staff">Staff</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button></div>` : ""}
+    ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
     <div id="msg" class="msg" hidden role="status"></div>
     ${admin ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="closeDate" style="font-weight:600">Registration closes at the end of</label>
@@ -967,9 +936,23 @@ function appPage(email, role) {
           <input type="search" id="mbFind" placeholder="Search by name, code or email" aria-label="Search members" style="width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;padding:10px 12px;min-height:42px;margin:0 0 10px"></div>
         <table><thead><tr><th>Code</th><th>Name</th><th class="hide-s">Email</th><th>Status</th></tr></thead><tbody id="mbRows"></tbody></table></div>
       <div class="side" id="mbSide"><div class="card small">Pick a member to correct their details.</div></div></div></div>` : ""}
-    ${admin ? VIEWS_HTML : MONEY_HTML}
+    ${admin ? VIEWS_HTML + P2_HTML : MONEY_HTML}
     <div id="answersView" hidden><div class="card" id="remind" style="margin:0 0 14px"></div><div id="answers"></div></div>
-  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(email)};\n` + APP + (admin ? VIEWS_JS : MONEY_JS + READ_ONLY_VIEWS));
+  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(email)};\n` + APP + (admin ? P2_JS + VIEWS_JS : MONEY_JS + READ_ONLY_VIEWS));
+}
+
+// Desk volunteers and stage operators get one tab and nothing else: no
+// payments, no personal details beyond name, reference and table.
+function oneViewPage(email, role) {
+  const desk = role === "desk";
+  return page(desk ? "QLV 2026 check-in" : "QLV 2026 stage", `<div class="top"><b>QLV 2026 ${desk ? "check-in desk" : "stage"}</b><span class="who">Signed in as ${e(email)}
+    &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
+  <div class="wrap"><div id="msg" class="msg" hidden role="status"></div>${P2_HTML}</div>`,
+  `const ROLE = ${JSON.stringify(role)};
+` + ONE_VIEW_JS + P2_JS + `
+document.getElementById(${JSON.stringify(desk ? "checkinView" : "stageView")}).hidden = false;
+${desk ? "loadCheckin().catch((err) => msg(err.message)); setInterval(() => { if (!document.hidden && !document.activeElement.matches('#ciFind')) loadCheckin().catch(() => {}); }, 20000);"
+       : "loadStage().catch((err) => msg(err.message)); setInterval(() => { if (!document.hidden) loadStage().catch(() => {}); }, 3000);"}`);
 }
 
 // ---------- router ----------
@@ -988,7 +971,7 @@ export async function handleAdmin(req, env, ctx, url) {
       const rl = `rl:login:${ip}:${Math.floor(Date.now() / 3600000)}`;
       const n = Number(await env.KV.get(rl)) || 0;
       await env.KV.put(rl, String(n + 1), { expirationTtl: 3700 });
-      if (n < 8 && adminList(env).includes(email)) {
+      if (n < 8 && (await roleOf(env, email))) {
         const t = token(32);
         await env.KV.put(`login:${t}`, email, { expirationTtl: 900 });
         await sendMail(env, { to: email, ...mail.adminLogin(`${url.origin}/admin/auth?t=${t}`) }, null, "admin_login");
@@ -999,7 +982,7 @@ export async function handleAdmin(req, env, ctx, url) {
     if (path === "/admin/auth" && req.method === "POST") {
       const t = (await form(req)).get("t") || "";
       const email = t ? await env.KV.get(`login:${t}`) : null;
-      if (!email || !adminList(env).includes(email)) return html(loginPage("That link has expired or was already used. Ask for a new one."), 401);
+      if (!email || !(await roleOf(env, email))) return html(loginPage("That link has expired or was already used. Ask for a new one."), 401);
       await env.KV.delete(`login:${t}`);
       return new Response(null, { status: 303, headers: { location: "/admin", "set-cookie": await makeCookie(env, email), ...SECURITY } });
     }
@@ -1008,16 +991,20 @@ export async function handleAdmin(req, env, ctx, url) {
     }
 
     const who = await session(req, env);
-    const role = who ? roleOf(env, who) : null;
-    if (path === "/admin") return who ? html(appPage(who, role)) : html(loginPage());
+    const role = who ? await roleOf(env, who) : null;
+    if (path === "/admin") return who ? html(role === "desk" || role === "stage" ? oneViewPage(who, role) : appPage(who, role)) : html(loginPage());
     if (!who) return path.startsWith("/admin/api/") ? json({ error: "Signed out." }, 401) : new Response(null, { status: 303, headers: { location: "/admin" } });
 
     if (req.method === "POST") {
       const origin = req.headers.get("origin");
       if (req.headers.get("x-admin") !== "1" || (origin && origin !== url.origin)) return json({ error: "Refused." }, 403);
     }
-    if (path === "/admin/proof") return proof(env, url.searchParams.get("ref"));
+    const refuse = () => json({ error: "Not available to your account." }, 403);
+    // Payment proofs, receipts and exports are for admin and the treasurer only.
+    const books = role === "admin" || role === "verifier";
+    if (path === "/admin/proof") return books ? proof(env, url.searchParams.get("ref")) : refuse();
     if (path === "/admin/receipt") {
+      if (!books) return refuse();
       // The treasurer can open receipts; only admin can attach them.
       if (req.method === "POST") {
         if (role !== "admin") return json({ error: "Not available to your account." }, 403);
@@ -1027,12 +1014,13 @@ export async function handleAdmin(req, env, ctx, url) {
     }
     if (path.startsWith("/admin/export/")) {
       const name = path.slice("/admin/export/".length);
-      if (role !== "admin" && name !== "registrations.csv" && name !== "money.csv") return json({ error: "Not available to your account." }, 403);
+      if (role !== "admin" && !(role === "verifier" && (name === "registrations.csv" || name === "money.csv"))) return refuse();
       if (name === "badges.csv") return new Response(await ops.badgesCsv(env), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="qlv2026-badges.csv"', ...SECURITY } });
       return exportCsv(env, name);
     }
 
     const q = url.searchParams;
+    if (path === "/admin/print/sheets") return role === "admin" ? html(await sheetsPage(env, q.get("t") || "all")) : refuse();
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : null;
     const api = {
       "GET list": () => list(env, q.get("status") || "awaiting"),
@@ -1073,9 +1061,10 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST money-entry": () => money.saveEntry(env, body, who),
       "POST money-delete": () => money.deleteEntry(env, body, who),
       "POST cancel-ticket": async () => detail(env, (await ops.cancelTicket(env, body)).reg_ref),
+      ...part2Routes(env, q, body, who, [...emails(env.ADMIN_EMAILS), ...emails(env.VERIFIER_EMAILS)]),
     }[`${req.method} ${path.slice("/admin/api/".length)}`];
     if (!path.startsWith("/admin/api/") || !api) return json({ error: "Not found." }, 404);
-    if (role !== "admin" && !VERIFIER_CAN.has(`${req.method} ${path.slice("/admin/api/".length)}`)) return json({ error: "Not available to your account." }, 403);
+    if (role !== "admin" && !CAN[role]?.has(`${req.method} ${path.slice("/admin/api/".length)}`)) return refuse();
     return json(await api());
   } catch (err) {
     if (err instanceof HttpError) return json({ error: err.message }, err.status);

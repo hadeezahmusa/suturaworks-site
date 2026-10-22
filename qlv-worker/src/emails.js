@@ -331,3 +331,21 @@ export function adviserIcs(t) {
   ];
   return lines.join("\r\n") + "\r\n";
 }
+
+// Role pack covering note. The wording comes from the cover_email template;
+// the paragraph holding the brief link becomes the one yellow button. Nothing
+// from the brief itself, least of all a task, is ever in this email.
+export function briefCover({ subject, paragraphs, link, ref }) {
+  const body = paragraphs.map((para) => {
+    if (para.includes(link)) {
+      const label = para.replace(link, "").replace(/[:\s]+$/, "").trim();
+      return (label ? p(esc(label)) : "") + button(link, "Open your brief");
+    }
+    return p(esc(para).replace(/\n/g, "<br>"));
+  }).join("");
+  return {
+    subject,
+    html: shell({ preheader: "Your brief opens on the morning of the day.", body, foot: `QLV 2026 &middot; <span style="font-family:${MONO};">${esc(ref)}</span>` }),
+    text: paragraphs.join("\n\n") + "\n",
+  };
+}

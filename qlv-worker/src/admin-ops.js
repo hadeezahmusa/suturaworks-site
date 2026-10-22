@@ -53,7 +53,8 @@ export async function tablesView(env) {
     for (const r of here) if (r.org_key) perOrg[r.org_key] = (perOrg[r.org_key] || 0) + 1;
     for (const [k, n] of Object.entries(perOrg)) if (n > 1) flags.push({ kind: "clash", title: `Two from ${title(k)} share ${tableName(i)}`, text: "Every table with space already had someone from that organisation, so the rule allowed a pair." });
     const seats = [];
-    for (let k = 1; k <= TABLE_CAPACITY; k++) {
+    const most = Math.max(TABLE_CAPACITY, ...here.map((x) => x.table_seat));
+    for (let k = 1; k <= most; k++) {
       const r = here.find((x) => x.table_seat === k);
       seats.push(r ? { n: k, letter: LETTER[r.kind] || "?", tier: TIER[r.kind] || r.kind, ring: r.org_key ? (perOrg[r.org_key] > 1 ? CLASH_COLOUR : ring[r.org_key] || null) : null } : { n: k });
     }
