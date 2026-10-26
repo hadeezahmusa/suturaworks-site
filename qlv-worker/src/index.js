@@ -13,6 +13,7 @@ import { seatPending } from "./seating.js";
 import { briefFor } from "./briefings.js";
 import { scoringPage, submitScore } from "./scoring.js";
 import { displayPoll } from "./stage.js";
+import { getLogo } from "./logos.js";
 
 const MAX_PROOF = 5 * 1024 * 1024;
 const MAX_JSON = 30000;
@@ -555,6 +556,8 @@ export default {
     const url = new URL(req.url);
     if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) return handleAdmin(req, env, ctx, url);
 
+    // Sponsor logos for the projector: images, not JSON.
+    if (url.pathname === "/api/logo" && req.method === "GET") return getLogo(env, url);
     const cors = corsHeaders(env, req);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const route = ROUTES[`${req.method} ${url.pathname}`];

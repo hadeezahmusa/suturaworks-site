@@ -289,7 +289,7 @@ async function loadStage() {
   const st = d.state;
   $("#stQueue").innerHTML = d.queue.map((q) => '<div class="q"><span><span class="small" style="margin-right:10px">' + esc(q.time) + '</span><b>' + esc(q.name) + '</b></span><span class="' + (q.state === "On stage" ? "st awaiting" : q.state ? "st released" : "") + '">' + esc(q.state) + '</span></div>').join("");
   const t = st.toggles;
-  $("#stToggles").innerHTML = [["partners", "Thank the partners"], ["schedule", "Show the day’s schedule"], ["animation", "Play the opening animation"]].map(([k, l]) =>
+  $("#stToggles").innerHTML = [["partners", "Thank partners and sponsors"], ["schedule", "Show the day’s schedule"], ["animation", "Play the opening animation"]].map(([k, l]) =>
     '<label style="display:flex;align-items:center;gap:10px;min-height:44px;font-size:13px"><input type="checkbox" data-toggle="' + k + '"' + (t[k] ? " checked" : "") + ' style="width:20px;height:20px">' + l + '</label>').join("");
   $("#stReveal").innerHTML = st.revealed ? '<p class="ok2" style="display:inline-block">Results are showing on the display</p><div class="actions"><button class="btn ghost" data-st="hideResults">Hide results again</button></div>'
     : '<button class="btn gold" data-st="reveal" style="width:100%"' + (d.scored.all ? "" : " disabled") + '>Reveal results · ' + d.scored.complete + ' of ' + d.scored.teams + ' teams scored</button>';
