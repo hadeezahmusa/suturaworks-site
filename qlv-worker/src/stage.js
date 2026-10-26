@@ -131,13 +131,16 @@ export async function displayData(env, st) {
   const [s, tables] = await Promise.all([getSettings(env), order(env)]);
   const { presentationOrder, chainOf } = await import("./briefings.js");
   const pres = presentationOrder(tables, s);
-  const partners = (await env.DB.prepare("SELECT name FROM partners WHERE status = 'confirmed' ORDER BY confirmed_at").all()).results.map((p) => p.name);
+  const { screenSponsors } = await import("./logos.js");
+  const sponsors = await screenSponsors(env);
   const out = {
     phases: PHASES.map((p) => ({ id: p, label: PHASE_LABEL[p] })),
     schedule: s.schedule,
     order: pres.map((o) => ({ name: o.name, time: o.time, done: st.presented.includes(o.index), now: st.onStage === o.index })),
     chain: chainOf(tables).map((c) => tableName(c.from)).concat(tables.length ? [tableName(tables[0])] : []),
-    partners,
+    // Partners, named sponsors and members' businesses, biggest first.
+    sponsors,
+    partners: sponsors.map((x) => x.name),
     sprintCues: { half: Math.round(s.sprint_minutes / 2) },
     onStage: st.onStage === null || st.onStage === undefined ? null : tableName(st.onStage),
     upNext: null, lastScores: null, podium: null,

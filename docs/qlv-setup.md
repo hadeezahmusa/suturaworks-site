@@ -264,6 +264,14 @@ see is in the QLV look; admin stays as it is.
   a magnifier for the critique, a pen for the response, steam at lunch, spotlights for presentations,
   a podium and confetti for the results); all of it stops for screens set to reduce motion. If the
   connection drops the clock keeps running and a small "reconnecting" mark appears.
+- **On screen tab** (added 26 October 2026, migration `2026-10-26-screen-logos.sql`). Lists who is
+  thanked on the projector: confirmed partners, sponsored-seat sponsors who agreed to be named, and
+  JCI Aso members' businesses (listed free, added here). Upload a PNG or JPG logo (up to 1MB) for
+  each, or leave it and the name shows. Size follows support: lead partner or ₦200,000+ largest,
+  supporting or ₦100,000+ large, community and other sponsors medium, members' businesses small.
+  During arrival the logos drift gently on white tiles, split over as many 10-second slides as they
+  need; the lunch screen names partners and sponsors and counts the members' businesses. Logos are
+  public at `/api/logo` and kept in KV under `logo:<id>`.
 
 ## Closing date
 

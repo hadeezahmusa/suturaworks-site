@@ -90,9 +90,40 @@ function floaters(names) {
     '<span style="left:' + ((i * 137) % 1700) + "px;animation-duration:" + (22 + (i % 5) * 4) + "s;animation-delay:-" + (i * 3.1) + 's">' + esc(n) + "</span>").join("") + "</div>";
 }
 
+// Partners, named sponsors and members' businesses, biggest first. Older
+// data without logos falls back to plain names at the medium size.
+function sponsors() {
+  return data.sponsors || data.partners.map((name) => ({ name, size: 2, logo: null }));
+}
+// Tile sizes on the 1920 by 1080 stage, and how much of the wall each takes.
+const TILE = { 4: [430, 226], 3: [340, 178], 2: [262, 138], 1: [200, 106] };
+const WALL_W = 1770, WALL_H = 560, GAP = 30;
+// Splits the wall into slides so nothing is ever pushed off screen: lays the
+// tiles into rows the way the page wraps them, and starts a new slide when
+// the next row would not fit under the heading.
+function thanksPages() {
+  const pages = [];
+  let page = [], rowW = 0, rowH = 0, height = 0;
+  for (const x of sponsors()) {
+    const [w, h] = TILE[x.size] || TILE[2];
+    if (rowW && rowW + GAP + w > WALL_W) { height += rowH + GAP; rowW = 0; rowH = 0; }
+    if (page.length && height + Math.max(rowH, h) > WALL_H) { pages.push(page); page = []; rowW = 0; rowH = 0; height = 0; }
+    rowW += (rowW ? GAP : 0) + w; rowH = Math.max(rowH, h);
+    page.push(x);
+  }
+  if (page.length) pages.push(page);
+  return pages;
+}
+// Fetches every logo once, so a slide never waits on the network and a
+// wifi drop later in the day does not blank them.
+const preloaded = new Set();
+function preloadLogos() {
+  for (const x of sponsors()) if (x.logo && !preloaded.has(x.logo)) { preloaded.add(x.logo); new Image().src = API + x.logo; }
+}
+
 function arrivalSlides() {
   const s = ["welcome"];
-  if (st.toggles.partners && data.partners.length) s.push("thanks");
+  if (st.toggles.partners) thanksPages().forEach((_, i) => s.push("thanks:" + i));
   if (st.toggles.animation) s.push("opening");
   return s;
 }
@@ -100,16 +131,22 @@ function arrivalSlides() {
 function sceneArrival() {
   const slides = arrivalSlides();
   const which = slides[slide % slides.length];
-  if (which === "thanks") return thanksHTML("Thank you to our partners");
+  if (which.startsWith("thanks:")) return thanksHTML(thanksPages()[Number(which.slice(7))] || []);
   if (which === "opening") return openingHTML();
   const sched = st.toggles.schedule ? '<div class="sched"><b>Today</b>' + data.schedule.map((x, i) => '<div style="animation-delay:' + (0.3 + i * 0.12) + 's"><span>' + esc(x.t) + "</span><span>" + esc(x.what) + "</span></div>").join("") + "</div>" : "";
   return floaters(data.order.map((o) => o.name)) + '<div class="arrival"><div class="l"><span class="eyebrow">Welcome to QLV 2026</span><span class="big" style="font-size:' + (sched ? 96 : 120) + 'px">Find your table by the name on your badge.</span>' +
     '<span class="lede">Tea and light snacks are served. The sprint opens at ' + esc((data.schedule.find((x) => /sprint/i.test(x.what)) || { t: "10:50" }).t) + ".</span></div>" + sched + "</div>";
 }
 
-function thanksHTML(title) {
-  return '<div class="thanks"><span class="eyebrow">With thanks</span><span class="big" style="font-size:88px">' + esc(title) + '</span><div class="names">' +
-    data.partners.map((p, i) => '<span style="animation-delay:' + (0.4 + i * 0.25) + 's">' + esc(p) + "</span>").join("") + "</div></div>";
+// The logo wall: each logo on a white tile, sized by what was given, popping
+// in and then drifting gently in place. Names stand in for missing logos.
+function thanksHTML(list) {
+  return '<div class="thanks"><span class="eyebrow">With thanks</span><span class="big" style="font-size:76px">Our partners and sponsors</span><div class="wall">' +
+    list.map((x, i) => {
+      const [w, h] = TILE[x.size] || TILE[2];
+      const inner = x.logo ? '<img alt="" src="' + esc(API + x.logo) + '">' : "<b style=\"font-size:" + Math.round(h / 4.6) + 'px">' + esc(x.name) + "</b>";
+      return '<span class="tile s' + x.size + '" style="width:' + w + "px;height:" + h + "px;animation-delay:" + (0.3 + i * 0.12).toFixed(2) + "s," + (1 + i * 0.12).toFixed(2) + "s;animation-duration:.6s," + (5 + (i % 4) * 0.9).toFixed(1) + 's" title="' + esc(x.name) + '">' + inner + "</span>";
+    }).join("") + "</div></div>";
 }
 
 function openingHTML() {
@@ -204,7 +241,12 @@ function startHops() {
 
 function sceneLunch() {
   const after = data.schedule.filter((x) => /present|feedback|recogn|close|certific/i.test(x.what));
-  const thanks = st.toggles.partners && data.partners.length ? '<span class="eyebrow" style="margin-top:20px">With thanks to our partners</span><span class="lede" style="color:#F2F6FC">' + data.partners.map(esc).join(" · ") + "</span>" : "";
+  // Partners and sponsors by name; members' businesses as a count, so a long
+  // list never pushes the lunch screen off the projector.
+  const big = sponsors().filter((x) => x.size > 1).map((x) => esc(x.name));
+  const small = sponsors().filter((x) => x.size === 1).length;
+  const line = big.concat(small ? [small + " JCI Aso members' business" + (small === 1 ? "" : "es")] : []).join(" · ");
+  const thanks = st.toggles.partners && line ? '<span class="eyebrow" style="margin-top:20px">With thanks to our partners and sponsors</span><span class="lede" style="color:#F2F6FC">' + line + "</span>" : "";
   return '<div class="arrival"><div class="l"><span class="eyebrow">Lunch</span><span class="big" style="font-size:110px">Enjoy your lunch.</span><span class="lede">The judges are reading every plan, critique and response.</span>' + thanks + "</div>" +
     '<div style="display:flex;flex-direction:column;align-items:center;gap:30px">' +
     '<svg class="bowl" width="300" height="240" viewBox="0 0 300 240" aria-hidden="true"><g class="steam"><path d="M110 90 c -20 -30, 20 -40, 0 -70"/><path d="M150 90 c -20 -30, 20 -40, 0 -70"/><path d="M190 90 c -20 -30, 20 -40, 0 -70"/></g>' +
@@ -241,7 +283,7 @@ function sceneResults() {
 }
 
 function render() {
-  const key = [st.phase, st.flash, data && data.onStage, st.revealed, JSON.stringify(st.toggles), slide, data && data.lastScores && data.lastScores.n, data && data.partners.length].join("|");
+  const key = [st.phase, st.flash, data && data.onStage, st.revealed, JSON.stringify(st.toggles), slide, data && data.lastScores && data.lastScores.n, data && data.partners.join("/"), data && data.sponsors && data.sponsors.map((x) => x.logo).join("/")].join("|");
   if (key === sceneKey) return;
   sceneKey = key;
   clearInterval(hopTimer);
@@ -264,7 +306,7 @@ function render() {
   clearTimeout(slideTimer);
   if (st.phase === "arrival" && arrivalSlides().length > 1) {
     const which = arrivalSlides()[slide % arrivalSlides().length];
-    slideTimer = setTimeout(() => { slide++; render(); }, DEMO ? (which === "opening" ? 7000 : 6000) : which === "opening" ? 9000 : 15000);
+    slideTimer = setTimeout(() => { slide++; render(); }, DEMO ? (which === "opening" ? 7000 : 6000) : which === "opening" ? 9000 : which.startsWith("thanks:") ? 10000 : 15000);
   }
   tick(true);
 }
@@ -306,7 +348,7 @@ async function poll() {
     const testChanged = lastTest !== null && d.testSound !== lastTest;
     lastTest = d.testSound;
     st = { ...d, clock: d.clock };
-    if (d.data) data = d.data;
+    if (d.data) { data = d.data; preloadLogos(); }
     lastOk = Date.now();
     $("#recon").hidden = true;
     if (testChanged) { play("chime"); showToast(soundOn ? "Test sound" : "Sound is off: click the display"); }
@@ -328,7 +370,8 @@ function runDemo() {
     schedule: [["8:30", "Arrival, tea and light snacks"], ["10:50", "The sprint opens"], ["11:40", "Plans handed over"], ["11:45", "Critique"], ["12:20", "Response"], ["12:35", "Lunch"], ["13:30", "Presentations"], ["14:50", "Feedback and recognitions"]].map(([t, what]) => ({ t, what })),
     order: names.map((name, i) => ({ name, time: times[i] })),
     chain: names.concat(names[0]),
-    partners: ["Sutura Works Limited", "Your partners appear here"],
+    partners: ["Sutura Works Limited", "Your lead partner", "A supporting partner", "A sponsor", "A member's business", "Another member's business"],
+    sponsors: [["Sutura Works Limited", 4], ["Your lead partner", 4], ["A supporting partner", 3], ["A sponsor", 2], ["A member's business", 1], ["Another member's business", 1]].map(([name, size]) => ({ name, size, logo: null })),
     onStage: null, upNext: null, lastScores: null, podium: null,
   };
   st = { phase: "arrival", clock: { endsAt: null, pausedMs: null, totalMs: 0 }, toggles: { partners: true, schedule: true, animation: true }, revealed: false, flash: 0, version: 0 };

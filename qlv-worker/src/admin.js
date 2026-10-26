@@ -17,6 +17,7 @@ import { THEME, tableName } from "./config.js";
 import { seatPending } from "./seating.js";
 import * as ops from "./admin-ops.js";
 import * as money from "./money.js";
+import * as logos from "./logos.js";
 import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
 import { sendBatch, dailyRoom, DAILY_SAFE } from "./mailer.js";
 import { part2Routes, sheetsPage } from "./part2-admin.js";
@@ -927,7 +928,7 @@ function appPage(email, role) {
     &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
   <div class="wrap">
     ${!admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="money">Money</button></div>` : ""}
-    ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
+    ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
     <div id="msg" class="msg" hidden role="status"></div>
     ${admin ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="closeDate" style="font-weight:600">Registration closes at the end of</label>
@@ -1022,6 +1023,10 @@ export async function handleAdmin(req, env, ctx, url) {
       }
       return money.getReceipt(env, url.searchParams.get("id"));
     }
+    if (path === "/admin/logo" && req.method === "POST") {
+      if (role !== "admin") return refuse();
+      return json(await logos.putLogo(env, req, url.searchParams.get("key"), who));
+    }
     if (path.startsWith("/admin/export/")) {
       const name = path.slice("/admin/export/".length);
       if (role !== "admin" && !(role === "verifier" && (name === "registrations.csv" || name === "money.csv"))) return refuse();
@@ -1068,6 +1073,11 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET export": () => ops.exportRows(env),
       "POST badge-name": () => ops.setBadgeName(env, body),
       "GET money": () => money.moneyView(env),
+      "GET screen": () => logos.screenList(env),
+      "POST screen-member": () => logos.addMemberBusiness(env, body, who),
+      "POST screen-save": () => logos.saveScreenEntry(env, body, who),
+      "POST screen-member-remove": () => logos.removeMemberBusiness(env, body),
+      "POST screen-logo-remove": () => logos.removeLogo(env, body, who),
       "POST money-entry": () => money.saveEntry(env, body, who),
       "POST money-delete": () => money.deleteEntry(env, body, who),
       "POST cancel-ticket": async () => detail(env, (await ops.cancelTicket(env, body)).reg_ref),
