@@ -531,6 +531,7 @@ const STYLE = `
 body.board .wrap .btn,body.board .wrap button.link,body.board .wrap .actions,body.board .wrap .switch,body.board .wrap input[type=file],body.board .wrap form button,
 body.board .wrap [data-act],body.board .wrap a[href^="/admin/"],body.board #stageView button,body.board #checkinView button,body.board #scoringView button,
 body.board #tablesView button,body.board #exportView button,body.board #pNote,body.board #pDetail .note,body.board #partnersView form,body.board #staffView form,body.board #screenView form{display:none!important}
+body.board #stDemo{display:inline-flex!important}
 body.board .wrap input:disabled,body.board .wrap select:disabled,body.board .wrap textarea:disabled{opacity:1;color:var(--ink);background:#F4F7FB;cursor:default}
 :root{--navy:${THEME.primary};--blue:#1A5AA8;--teal:#1F7D87;--yel:${THEME.accent};--ink:#0E1B33;--body:#4A5B75;--mute:#5A6B85;--line:#E0E8F2;--rule:#C6D4E6;--panel:#F4F8FC;--bg:#F4F7FB}
 *{box-sizing:border-box}body{margin:0;font-family:Poppins,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
@@ -935,7 +936,7 @@ document.addEventListener("click", (e) => { const b = e.target.closest("#saveClo
 loadList().catch((err) => msg(err.message));
 `;
 
-function appPage(email, role) {
+function appPage(email, role, site) {
   const board = role === "board";
   // The board sees the admin's own screens, read only, minus the tabs that
   // hold the tasks, member codes, answers and sign-in settings.
@@ -969,7 +970,7 @@ function appPage(email, role) {
       <div class="side" id="mbSide"><div class="card small">Pick a member to correct their details.</div></div></div></div>` : ""}
     ${admin ? VIEWS_HTML + P2_HTML : MONEY_HTML}
     <div id="answersView" hidden><div class="card" id="remind" style="margin:0 0 14px"></div><div id="answers"></div></div>
-  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(board ? "" : email)};\n` + APP + (admin ? P2_JS + VIEWS_JS : MONEY_JS + READ_ONLY_VIEWS) + (board ? BOARD_LOCK : ""));
+  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(board ? "" : email)}; const SITE = ${JSON.stringify(site)};\n` + APP + (admin ? P2_JS + VIEWS_JS : MONEY_JS + READ_ONLY_VIEWS) + (board ? BOARD_LOCK : ""));
 }
 
 // The board view: every field is shown but cannot be edited, and the
@@ -984,12 +985,12 @@ boardLock();
 
 // Desk volunteers and stage operators get one tab and nothing else: no
 // payments, no personal details beyond name, reference and table.
-function oneViewPage(email, role) {
+function oneViewPage(email, role, site) {
   const desk = role === "desk";
   return page(desk ? "QLV 2026 check-in" : "QLV 2026 stage", `<div class="top"><b>QLV 2026 ${desk ? "check-in desk" : "stage"}</b><span class="who">Signed in as ${e(email)}
     &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
   <div class="wrap"><div id="msg" class="msg" hidden role="status"></div>${P2_HTML}</div>`,
-  `const ROLE = ${JSON.stringify(role)};
+  `const ROLE = ${JSON.stringify(role)}; const SITE = ${JSON.stringify(site)};
 ` + ONE_VIEW_JS + P2_JS + `
 document.getElementById(${JSON.stringify(desk ? "checkinView" : "stageView")}).hidden = false;
 ${desk ? "loadCheckin().catch((err) => msg(err.message)); setInterval(() => { if (!document.hidden && !document.activeElement.matches('#ciFind')) loadCheckin().catch(() => {}); }, 20000);"
@@ -1038,7 +1039,7 @@ export async function handleAdmin(req, env, ctx, url) {
 
     const who = await session(req, env);
     const role = who ? await roleOf(env, who) : null;
-    if (path === "/admin") return who ? html(role === "desk" || role === "stage" ? oneViewPage(who, role) : appPage(who, role)) : html(loginPage());
+    if (path === "/admin") return who ? html(role === "desk" || role === "stage" ? oneViewPage(who, role, env.SITE_URL) : appPage(who, role, env.SITE_URL)) : html(loginPage());
     if (!who) return path.startsWith("/admin/api/") ? json({ error: "Signed out." }, 401) : new Response(null, { status: 303, headers: { location: "/admin" } });
 
     if (req.method === "POST") {
