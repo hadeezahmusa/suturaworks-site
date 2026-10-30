@@ -18,6 +18,7 @@ import { seatPending } from "./seating.js";
 import * as ops from "./admin-ops.js";
 import * as money from "./money.js";
 import * as logos from "./logos.js";
+import { BOARD_CAN, boardSessionOk, boardView, boardAction, boardLogin, redact } from "./board.js";
 import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
 import { sendBatch, dailyRoom, DAILY_SAFE } from "./mailer.js";
 import { part2Routes, sheetsPage } from "./part2-admin.js";
@@ -45,8 +46,10 @@ function emails(v) {
 // the registrations list and proofs, mark payments verified and undo their
 // own verification, and can read the Money tab. Desk volunteers see only
 // Check-in and stage operators only Stage; admin adds both on the Settings tab.
+// The board signs in with a shared passcode, not an email, and only reads.
 async function roleOf(env, email) {
   if (!email) return null;
+  if (email.startsWith("board:")) return (await boardSessionOk(env, email)) ? "board" : null;
   if (emails(env.ADMIN_EMAILS).includes(email)) return "admin";
   if (emails(env.VERIFIER_EMAILS).includes(email)) return "verifier";
   const row = await env.DB.prepare("SELECT role FROM access WHERE email = ?").bind(email).first();
@@ -57,6 +60,7 @@ const CAN = {
   verifier: new Set(["GET list", "GET reg", "POST verify", "POST unverify", "GET money"]),
   desk: new Set(["GET checkin", "POST checkin"]),
   stage: new Set(["GET stage", "POST stage", "GET display-link"]),
+  board: BOARD_CAN,
 };
 function b64url(bytes) {
   return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -524,6 +528,10 @@ async function proof(env, ref) {
 // ---------- pages ----------
 
 const STYLE = `
+body.board .wrap .btn,body.board .wrap button.link,body.board .wrap .actions,body.board .wrap .switch,body.board .wrap input[type=file],body.board .wrap form button,
+body.board .wrap [data-act],body.board .wrap a[href^="/admin/"],body.board #stageView button,body.board #checkinView button,body.board #scoringView button,
+body.board #tablesView button,body.board #exportView button,body.board #pNote,body.board #pDetail .note,body.board #partnersView form,body.board #staffView form,body.board #screenView form{display:none!important}
+body.board .wrap input:disabled,body.board .wrap select:disabled,body.board .wrap textarea:disabled{opacity:1;color:var(--ink);background:#F4F7FB;cursor:default}
 :root{--navy:${THEME.primary};--blue:#1A5AA8;--teal:#1F7D87;--yel:${THEME.accent};--ink:#0E1B33;--body:#4A5B75;--mute:#5A6B85;--line:#E0E8F2;--rule:#C6D4E6;--panel:#F4F8FC;--bg:#F4F7FB}
 *{box-sizing:border-box}body{margin:0;font-family:Poppins,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
 a{color:#14478F}h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 10px}
@@ -562,11 +570,14 @@ function page(title, body, script = "") {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Poppins:wght@400;600;700&display=swap"><style>${STYLE}${VIEWS_STYLE}${P2_STYLE}</style></head><body>${body}${script ? `<script>${script}</script>` : ""}</body></html>`;
 }
 
-function loginPage(note) {
+function loginPage(note, boardNote) {
   return page("Sign in | QLV 2026 admin", `<div class="top"><b>QLV 2026 admin</b></div><div class="wrap" style="max-width:460px">
   <div class="card"><h1>Sign in</h1><p class="small" style="margin:6px 0 14px">Enter your admin email. We send a one-time sign-in link to it.</p>
   ${note ? `<div class="msg ok">${e(note)}</div>` : ""}
-  <form method="post" action="/admin/login"><input type="email" name="email" required autocomplete="email" placeholder="you@example.com"><div class="actions"><button class="btn">Email me a link</button></div></form></div></div>`);
+  <form method="post" action="/admin/login"><input type="email" name="email" required autocomplete="email" placeholder="you@example.com"><div class="actions"><button class="btn">Email me a link</button></div></form></div>
+  <div class="card"><h2>Board view</h2><p class="small" style="margin:6px 0 14px">For JCI Aso board members. Type the passcode you were given to look round the admin. It is read only.</p>
+  ${boardNote ? `<div class="msg err">${e(boardNote)}</div>` : ""}
+  <form method="post" action="/admin/board"><input type="text" name="passcode" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="word-word-word-word"><div class="actions"><button class="btn ghost">Open the board view</button></div></form></div></div>`);
 }
 function continuePage(t) {
   return page("Continue | QLV 2026 admin", `<div class="top"><b>QLV 2026 admin</b></div><div class="wrap" style="max-width:460px">
@@ -581,7 +592,7 @@ const naira = (n) => "₦" + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 const when = (s) => s ? new Date(s).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" }) : "";
 const TIER = { standard: "Standard", member: "Member", corporate: "Corporate", sponsored: "Sponsored", adviser: "Adviser" };
 const STATUS = { awaiting: "Awaiting", verified: "Verified, not sent", confirmed: "Confirmed", queried: "Queried", released: "Released" };
-let filter = "awaiting", current = null, tab = "regs";
+let filter = ROLE === "board" ? "all" : "awaiting", current = null, tab = "regs";
 
 async function call(path, body) {
   const opts = body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json", "x-admin": "1" }, body: JSON.stringify(body) };
@@ -604,7 +615,7 @@ async function loadList() {
     $("#closeState").textContent = d.closed ? "Registration is closed." : "Registration is open.";
     $("#closeState").style.color = d.closed ? "#8A2A20" : "#19646D";
   }
-  $("#flagNote").hidden = ROLE === "verifier";
+  $("#flagNote").hidden = ROLE === "verifier" || ROLE === "board";
   $("#flagNote").textContent = "Flagged means still awaiting " + d.releaseAfterDays + " days after registering. Nothing is released until you press Release.";
   $("#rows").innerHTML = d.rows.map((r) => '<tr data-ref="' + esc(r.ref) + '" class="' + (current && current.reg.ref === r.ref ? "sel" : "") + '">' +
     '<td class="mono">' + esc(r.ref) + "</td><td>" + esc(r.contact_person ? r.name + " (" + r.contact_person + ")" : r.name) + '<div class="small">' + esc(r.email) + "</div></td>" +
@@ -634,8 +645,9 @@ function renderDetail(d) {
     ["Ticket", esc(r.tierName) + (r.tier === "corporate" ? ", team of " + r.size : r.tier === "sponsored" ? ", " + r.size + " seats" : r.size > 1 ? " x" + r.size + (r.shares ? ", link to share" : ", named below") : "")], ["Amount", r.amount ? esc(r.amountText) : "None"],
     [r.tier === "sponsored" ? "Sponsor" : r.tier === "corporate" ? "Organisation" : "Name", esc(r.name)]];
   if (r.contact_person) rows.push(["Contact person", esc(r.contact_person)]);
-  rows.push(["Email", '<a href="mailto:' + esc(r.email) + '">' + esc(r.email) + "</a>"]);
-  if (r.phone) rows.push(["Phone", '<a href="tel:' + esc(r.phone) + '">' + esc(r.phone) + "</a>"]);
+  if (ROLE === "board") rows.push(["Email and phone", '<span class="small">Hidden in the board view</span>']);
+  else rows.push(["Email", '<a href="mailto:' + esc(r.email) + '">' + esc(r.email) + "</a>"]);
+  if (r.phone && ROLE !== "board") rows.push(["Phone", '<a href="tel:' + esc(r.phone) + '">' + esc(r.phone) + "</a>"]);
   if (r.organisation && r.tier !== "corporate") rows.push(["Organisation", esc(r.organisation)]);
   if (r.tier === "member") rows.push(["Member code", '<span class="mono">' + esc(r.member_no || "") + "</span> (checked against the member list)"]);
   if (r.tier === "sponsored") rows.push(["Name publicly", r.named_publicly ? "Yes" : "No, anonymous"]);
@@ -646,7 +658,9 @@ function renderDetail(d) {
   if (d.claimUrl) rows.push(["Claim link", '<span class="small" style="word-break:break-all">' + esc(d.claimUrl) + "</span>"]);
 
   let proof = "";
-  if (r.tier !== "adviser") {
+  if (r.tier !== "adviser" && ROLE === "board") {
+    proof = '<div class="hr"></div><h2>Proof of payment</h2><p class="small">' + (r.proof_at ? "Uploaded. Proofs are seen only by the verification team." : "Nothing uploaded yet.") + "</p>";
+  } else if (r.tier !== "adviser") {
     proof = '<div class="hr"></div><h2>Proof of payment</h2>' + (!r.proof_at ? '<p class="small">Nothing uploaded yet.</p>'
       : r.proof_type === "application/pdf" ? '<p><a target="_blank" rel="noopener" href="/admin/proof?ref=' + encodeURIComponent(r.ref) + '">Open the PDF</a></p>'
       : '<div class="proof"><a target="_blank" rel="noopener" href="/admin/proof?ref=' + encodeURIComponent(r.ref) + '"><img alt="Proof of payment for ' + esc(r.ref) + '" src="/admin/proof?ref=' + encodeURIComponent(r.ref) + '"></a></div>');
@@ -922,15 +936,21 @@ loadList().catch((err) => msg(err.message));
 `;
 
 function appPage(email, role) {
-  const admin = role === "admin";
-  return page("QLV 2026 admin", `<div class="top"><b>QLV 2026 ${admin ? "admin" : "payment verification"}</b><span class="who">Signed in as ${e(email)}
-    &middot; <a href="/admin/export/registrations.csv">Registrations CSV</a>${admin ? ` &middot; <a href="/admin/export/tickets.csv">Tickets CSV</a> &middot; <a href="/admin/export/answers.csv">Answers CSV</a>` : ""}
+  const board = role === "board";
+  // The board sees the admin's own screens, read only, minus the tabs that
+  // hold the tasks, member codes, answers and sign-in settings.
+  const admin = role === "admin" || board;
+  const boardTabs = `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button></div>
+    <div class="note" style="margin:0 0 14px">Board view, read only. Emails, phone numbers, proofs of payment and private links are hidden. Nothing here can be changed.</div>`;
+  return page("QLV 2026 admin", `<div class="top"><b>QLV 2026 ${board ? "board view" : admin ? "admin" : "payment verification"}</b><span class="who">${board ? "Read only" : `Signed in as ${e(email)}`}
+    ${board ? "" : `&middot; <a href="/admin/export/registrations.csv">Registrations CSV</a>`}${role === "admin" ? ` &middot; <a href="/admin/export/tickets.csv">Tickets CSV</a> &middot; <a href="/admin/export/answers.csv">Answers CSV</a>` : ""}
     &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
   <div class="wrap">
     ${!admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="money">Money</button></div>` : ""}
-    ${admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
+    ${board ? boardTabs : ""}
+    ${role === "admin" ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
     <div id="msg" class="msg" hidden role="status"></div>
-    ${admin ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+    ${role === "admin" ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="closeDate" style="font-weight:600">Registration closes at the end of</label>
       <input type="date" id="closeDate" min="2026-10-01" max="2026-11-06" style="width:auto;min-height:40px;padding:6px 10px">
       <button class="btn ghost" id="saveClose">Save date</button>
@@ -939,8 +959,8 @@ function appPage(email, role) {
     </div>` : ""}
     <div id="regsView"><div id="chips" class="chips"></div><p class="small" id="flagNote" style="margin:-4px 0 12px"></p>
       <div class="grid"><div class="list card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Ref</th><th>Who</th><th>Ticket</th><th>Amount</th><th class="hide-s">Proof</th><th class="hide-s">Registered</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
-      <div class="side" id="detail"><div class="card small">Pick a registration to see its details and proof.</div></div></div></div>
-    ${admin ? `<div id="codesView" hidden><div class="card" id="codesBox"></div>
+      <div class="side" id="detail"><div class="card small">Pick a registration to see its details${board ? "" : " and proof"}.</div></div></div></div>
+    ${role === "admin" ? `<div id="codesView" hidden><div class="card" id="codesBox"></div>
       <div class="grid" style="margin-top:14px"><div class="list card" style="padding:0;overflow-x:auto">
         <div style="padding:14px 16px 0"><h2>Correct a member's name, code or email</h2>
           <p class="small" style="margin:0 0 10px">Pick a member to fix how their name is spelled or ordered. Their code follows the corrected initials and keeps its three numbers. The old code keeps working too, because the old list was shared on WhatsApp.</p>
@@ -949,8 +969,18 @@ function appPage(email, role) {
       <div class="side" id="mbSide"><div class="card small">Pick a member to correct their details.</div></div></div></div>` : ""}
     ${admin ? VIEWS_HTML + P2_HTML : MONEY_HTML}
     <div id="answersView" hidden><div class="card" id="remind" style="margin:0 0 14px"></div><div id="answers"></div></div>
-  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(email)};\n` + APP + (admin ? P2_JS + VIEWS_JS : MONEY_JS + READ_ONLY_VIEWS));
+  </div>`, `const ROLE = ${JSON.stringify(role)}; const ME = ${JSON.stringify(board ? "" : email)};\n` + APP + (admin ? P2_JS + VIEWS_JS : MONEY_JS + READ_ONLY_VIEWS) + (board ? BOARD_LOCK : ""));
 }
+
+// The board view: every field is shown but cannot be edited, and the
+// buttons that change things are hidden. The server refuses changes anyway;
+// this keeps the page from offering them.
+const BOARD_LOCK = String.raw`
+document.body.classList.add("board");
+const boardLock = () => document.querySelectorAll(".wrap input:not([type=search]), .wrap select, .wrap textarea").forEach((el) => { if (!el.disabled) el.disabled = true; });
+new MutationObserver(boardLock).observe(document.querySelector(".wrap"), { childList: true, subtree: true });
+boardLock();
+`;
 
 // Desk volunteers and stage operators get one tab and nothing else: no
 // payments, no personal details beyond name, reference and table.
@@ -988,6 +1018,11 @@ export async function handleAdmin(req, env, ctx, url) {
         await sendMail(env, { to: email, ...mail.adminLogin(`${url.origin}/admin/auth?t=${t}`) }, null, "admin_login");
       }
       return html(loginPage("If that address is on the admin list, a sign-in link is on its way. It expires in 15 minutes."));
+    }
+    if (path === "/admin/board" && req.method === "POST") {
+      const r = await boardLogin(env, req, (await form(req)).get("passcode"));
+      if (r.error) return html(loginPage("", r.error), 401);
+      return new Response(null, { status: 303, headers: { location: "/admin", "set-cookie": await makeCookie(env, r.id), ...SECURITY } });
     }
     if (path === "/admin/auth" && req.method === "GET") return html(continuePage(url.searchParams.get("t") || ""));
     if (path === "/admin/auth" && req.method === "POST") {
@@ -1074,6 +1109,8 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST badge-name": () => ops.setBadgeName(env, body),
       "GET money": () => money.moneyView(env),
       "GET screen": () => logos.screenList(env),
+      "GET board-access": () => boardView(env),
+      "POST board-access": () => boardAction(env, body, who),
       "POST screen-member": () => logos.addMemberBusiness(env, body, who),
       "POST screen-save": () => logos.saveScreenEntry(env, body, who),
       "POST screen-member-remove": () => logos.removeMemberBusiness(env, body),
@@ -1085,7 +1122,7 @@ export async function handleAdmin(req, env, ctx, url) {
     }[`${req.method} ${path.slice("/admin/api/".length)}`];
     if (!path.startsWith("/admin/api/") || !api) return json({ error: "Not found." }, 404);
     if (role !== "admin" && !CAN[role]?.has(`${req.method} ${path.slice("/admin/api/".length)}`)) return refuse();
-    return json(await api());
+    return json(role === "board" ? redact(await api()) : await api());
   } catch (err) {
     if (err instanceof HttpError) return json({ error: err.message }, err.status);
     console.error(err);

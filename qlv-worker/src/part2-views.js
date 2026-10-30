@@ -106,6 +106,7 @@ export const P2_HTML = String.raw`
         <div id="setAccess"></div>
         <form id="accForm" class="form2" style="margin-top:10px"><label>Email<input type="email" name="email" required placeholder="volunteer@example.com"></label>
           <label>Can see<select name="role"><option value="desk">Check-in desk</option><option value="stage">Stage</option></select></label><button class="btn" style="width:100%">Add sign-in</button></form></div>
+      <div class="card" style="margin-top:14px"><h2>Board view</h2><p class="small" style="margin:0 0 10px">A read-only look round the admin for the board, opened with one passcode. They see registrations, tables, partners, sponsors, staff, scoring, the stage, check-in, badges and money. Emails, phone numbers, proofs of payment, private links, the tasks, member codes and the three answers stay hidden.</p><div id="setBoard"></div></div>
     </div>
   </div>
 </div>`;
@@ -315,7 +316,17 @@ function drawClock() {
 
 // ---------- Settings ----------
 let setData = null;
+async function loadBoard() {
+  const b = await call("board-access");
+  $("#setBoard").innerHTML = (b.on
+    ? '<div class="okbox" style="margin:0 0 10px">On. Passcode: <b class="mono" style="font-size:15px;user-select:all">' + esc(b.code) + '</b></div>' +
+      '<p class="small" style="margin:0 0 10px">Board members open the admin page, go to Board view and type this. They stay signed in for up to 7 days.</p>' +
+      '<div class="actions"><button class="btn ghost" data-board="new">New passcode</button><button class="btn warn" data-board="off">Turn off</button></div>'
+    : '<p class="small" style="margin:0 0 10px">Off. Nobody can open the board view.</p><div class="actions"><button class="btn" data-board="on">Turn on and make a passcode</button></div>') +
+    (b.visits.length ? '<div class="small" style="margin-top:10px"><b>Recent board sign-ins</b>' + b.visits.map((v) => "<div>" + esc(when(v.at)) + ", " + esc(v.device) + "</div>").join("") + "</div>" : "");
+}
 async function loadSettings() {
+  loadBoard().catch((err) => msg(err.message));
   const d = setData = await call("settings");
   const s = d.settings;
   const f = (name, label, value, type, extra) => '<label>' + label + '<input name="' + name + '" type="' + (type || "text") + '" value="' + esc(value) + '"' + (extra || "") + '></label>';
@@ -409,6 +420,12 @@ document.addEventListener("click", async (e) => {
     if (el("[data-announce]")) {
       if (!confirm("Mark the teams as announced? From now on nobody already seated can be moved. This cannot be undone.")) return;
       await call("teams-announced", {}); msg("Teams are frozen.", true); return loadSettings();
+    }
+    if (el("[data-board]")) {
+      const a = el("[data-board]").dataset.board;
+      if (a === "new" && !confirm("Make a new passcode? Everyone using the old one is signed out and needs the new one.")) return;
+      if (a === "off" && !confirm("Turn the board view off? Everyone using it is signed out.")) return;
+      await call("board-access", { action: a }); msg(a === "off" ? "Board view turned off." : "Board passcode ready. Copy it from the Board view card.", true); return loadBoard();
     }
     if (el("[data-accrm]")) { await call("access", { email: el("[data-accrm]").dataset.accrm, remove: true }); return loadSettings(); }
   } catch (err) { msg(err.message); }
