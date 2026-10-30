@@ -77,7 +77,7 @@ export const P2_HTML = String.raw`
 <div id="stageView" hidden>
   <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;margin:0 0 12px">
     <div><h1>Stage</h1><p class="small" style="margin:4px 0 0">Run the projector from here. The display follows whatever you choose.</p></div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="stDisp"></span><button class="btn ghost" data-st="demo">Watch the demo</button><button class="btn" data-st="open">Open the display</button></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="stDisp"></span><a class="btn ghost" id="stDemo" target="_blank" rel="noopener" style="text-decoration:none">Watch the demo</a><button class="btn" data-st="open">Open the display</button></div>
   </div>
   <div class="phases" id="stPhases"></div>
   <div class="grid">
@@ -112,6 +112,9 @@ export const P2_HTML = String.raw`
 </div>`;
 
 export const P2_JS = String.raw`
+// The projector demo: sample tables and a fast clock, no live data, so
+// everyone who can see the Stage tab may open it (the board included).
+if ($("#stDemo")) $("#stDemo").href = SITE + "stage.html?demo=1";
 let rbOpt = "spread", rbData = null, bfData = null, bfRole = "mentor", bfConfirm = null, tplList = [], tplKey = null, stData = null, stTimer = null, stOffset = 0;
 const pad = (n) => String(n).padStart(2, "0");
 const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return pad(Math.floor(s / 60)) + ":" + pad(s % 60); };
@@ -413,7 +416,6 @@ document.addEventListener("click", async (e) => {
     if (el("[data-st]")) {
       const a = el("[data-st]").dataset.st;
       if (a === "open") { const w = window.open("", "_blank"); const r = await call("display-link"); w.location = r.url; return; }
-      if (a === "demo") { const r = await call("display-link"); window.open(r.url.replace(/\?k=.*$/, "?demo=1"), "_blank"); return; }
       if (a === "reveal" && !confirm("Show the top three on the display now? This cannot be taken back from the people in the room.")) return;
       await call("stage", { action: a }); if (a === "testSound") msg("Test sound sent. It plays on the display if sound is on there.", true); return loadStage();
     }
