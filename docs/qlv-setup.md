@@ -273,6 +273,18 @@ see is in the QLV look; admin stays as it is.
   need; the lunch screen names partners and sponsors and counts the members' businesses. Logos are
   public at `/api/logo` and kept in KV under `logo:<id>`.
 
+## Board view (read only, added 30 October 2026)
+
+Settings, Board view card: turn it on and a four-word passcode appears. Board members open the admin
+page and type it under Board view. They stay signed in for up to 7 days. They see Registrations,
+Tables, Partners, On screen, Staff, Scoring, Stage, Check-in, Badge export and Money, with every
+field greyed out and no buttons that change anything. The server refuses every change from a board
+session and strips emails, phone numbers, member codes and private links (claim, scoring, brief and
+display links) from what it sends (`qlv-worker/src/board.js`). Proofs, receipts, CSV exports, the
+tasks, member codes, the three answers and Settings are never available to them. New passcode signs
+everyone using the old one out; Turn off signs them all out. The card lists recent board sign-ins
+with the time and a rough device. Wrong guesses are limited to ten an hour per connection.
+
 ## Closing date
 
 - Registration, claims and new answers close at the end of **30 October 2026** (Abuja time) unless
