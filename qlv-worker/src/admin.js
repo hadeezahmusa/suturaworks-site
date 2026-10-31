@@ -18,6 +18,7 @@ import { seatPending } from "./seating.js";
 import * as ops from "./admin-ops.js";
 import * as money from "./money.js";
 import * as logos from "./logos.js";
+import * as lobby from "./lobby.js";
 import { BOARD_CAN, boardSessionOk, boardView, boardAction, boardLogin, redact } from "./board.js";
 import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
 import { sendBatch, dailyRoom, DAILY_SAFE } from "./mailer.js";
@@ -208,7 +209,9 @@ async function outgoing(env, r) {
   const t = await tickets(env, r.ref);
   for (const tk of t) {
     if (tk.sent_at) continue;
-    out.push({ kind: "ticket_issued", ticketId: tk.id, to: tk.email, ...mail.ticketIssued(tk, r, ticketLinks(env, tk)) });
+    // Previews show the lobby link without counting the person as told.
+    const lobbyLink = await lobby.lobbyLinkForTicket(env, tk, false);
+    out.push({ kind: "ticket_issued", ticketId: tk.id, lobby: !!lobbyLink, to: tk.email, ...mail.ticketIssued(tk, r, { ...ticketLinks(env, tk), lobby: lobbyLink }) });
   }
   if (r.tier === "corporate" && !r.sent_at) out.push({ kind: "corporate_receipt", to: r.email, ...mail.corporateReceipt(r, t) });
   if (r.tier === "standard" && r.size > 1 && !r.sent_at) out.push({ kind: "group_receipt", to: r.email, ...mail.groupReceipt(r, t) });
@@ -226,6 +229,7 @@ async function send(env, ref) {
   if (r.status !== "verified") throw new HttpError(409, "Press Payment verified first.");
   const failed = [];
   for (const m of await outgoing(env, r)) {
+    if (m.lobby) await lobby.markLobbyTold(env, m.ticketId);
     const ok = await sendMail(env, { to: m.to, subject: m.subject, html: m.html, text: m.text }, r.ref, m.kind);
     if (!ok) { failed.push(m.to); continue; }
     if (m.ticketId) await env.DB.prepare("UPDATE tickets SET sent_at = ? WHERE id = ?").bind(now(), m.ticketId).run();
@@ -279,7 +283,7 @@ async function resendTicket(env, b) {
   const email = String(b.email || t.email).trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, "That email address does not look complete.");
   const tk = { ...t, email };
-  const msg = mail.ticketIssued(tk, r, ticketLinks(env, tk));
+  const msg = mail.ticketIssued(tk, r, { ...ticketLinks(env, tk), lobby: await lobby.lobbyLinkForTicket(env, tk) });
   if (t.kind === "adviser") msg.attachments = [{ filename: "qlv-2026.ics", content: btoa(mail.adviserIcs(tk)), content_type: "text/calendar" }];
   const ok = await sendMail(env, { to: email, ...msg }, r.ref, "ticket_resent");
   if (!ok) throw new HttpError(502, "The email did not send. Try again in a minute.");
@@ -949,7 +953,7 @@ function appPage(email, role, site) {
   <div class="wrap">
     ${!admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="money">Money</button></div>` : ""}
     ${board ? boardTabs : ""}
-    ${role === "admin" ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
+    ${role === "admin" ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="lobby">Team rooms</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
     <div id="msg" class="msg" hidden role="status"></div>
     ${role === "admin" ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="closeDate" style="font-weight:600">Registration closes at the end of</label>
@@ -1111,6 +1115,14 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET money": () => money.moneyView(env),
       "GET screen": () => logos.screenList(env),
       "GET board-access": () => boardView(env),
+      "GET lobby": () => lobby.lobbyAdmin(env),
+      "POST lobby-open": () => lobby.openLobby(env, who),
+      "POST lobby-rooms": () => lobby.openRooms(env, who),
+      "POST lobby-settings": () => lobby.lobbySettings(env, body, who),
+      "POST lobby-post": () => lobby.savePost(env, body, who),
+      "POST lobby-post-action": () => lobby.postAction(env, body, who),
+      "POST lobby-hide": () => lobby.hideMessage(env, body, who),
+      "POST lobby-person": () => lobby.personAction(env, body, who),
       "POST board-access": () => boardAction(env, body, who),
       "POST screen-member": () => logos.addMemberBusiness(env, body, who),
       "POST screen-save": () => logos.saveScreenEntry(env, body, who),
