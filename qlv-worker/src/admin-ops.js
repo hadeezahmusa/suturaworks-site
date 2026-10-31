@@ -291,3 +291,47 @@ export async function cancelTicket(env, b) {
   await freeSeat(env, t.id);
   return { reg_ref: t.reg_ref };
 }
+
+// ---------- giving a cancelled seat to someone else ----------
+// A corporate pack or a named group booking paid for a seat; if the person
+// named on it cannot come (or was entered by mistake), admin cancels their
+// ticket and later gives the same seat to the replacement. The new ticket
+// keeps the booking's reference and seat number, takes a table and is
+// emailed straight away (with the lobby link, once the lobby is open).
+const REPLACEABLE = ["corporate", "standard"];
+
+export async function replaceableIds(env, regRef) {
+  const { results } = await env.DB.prepare(`SELECT c.id FROM tickets c WHERE c.reg_ref = ? AND c.cancelled_at IS NOT NULL AND c.kind IN ('corporate', 'standard')
+    AND NOT EXISTS (SELECT 1 FROM tickets l WHERE l.reg_ref = c.reg_ref AND l.kind = c.kind AND l.seat_no = c.seat_no AND l.cancelled_at IS NULL)`).bind(regRef).all();
+  return results.map((r) => r.id);
+}
+
+export async function replaceTicket(env, b) {
+  const old = await env.DB.prepare("SELECT * FROM tickets WHERE id = ?").bind(Number(b.id)).first();
+  if (!old) throw new HttpError(404, "No such ticket.");
+  if (!old.cancelled_at) throw new HttpError(409, "Cancel this ticket first, then give the seat to someone else.");
+  if (!REPLACEABLE.includes(old.kind)) throw new HttpError(409, "Only corporate seats and named group seats can be given to someone else here.");
+  if (!(await replaceableIds(env, old.reg_ref)).includes(old.id)) throw new HttpError(409, "This seat has already been given to someone else.");
+  const name = clean(b.name, 120), email = clean(b.email, 160).toLowerCase();
+  if (!name) throw new HttpError(400, "Type the new person's full name.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, "That email address does not look complete.");
+  const clash = await env.DB.prepare("SELECT 1 FROM tickets WHERE reg_ref = ? AND lower(email) = ? AND cancelled_at IS NULL").bind(old.reg_ref, email).first();
+  if (clash) throw new HttpError(409, "Someone on this booking already uses that email. Each person needs their own.");
+  const r = await env.DB.prepare("SELECT * FROM registrations WHERE ref = ?").bind(old.reg_ref).first();
+  const stamp = now();
+  const row = await env.DB.prepare(`INSERT INTO tickets (token, reg_ref, ticket_ref, kind, seat_no, name, email, situation, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`).bind(token(24), old.reg_ref, old.ticket_ref, old.kind, old.seat_no, name, email, old.situation || "emp", stamp).first();
+  const t = await env.DB.prepare("SELECT * FROM tickets WHERE id = ?").bind(row.id).first();
+  // The booking's list of names follows the change, for the records.
+  if (r.attendees) {
+    const list = JSON.parse(r.attendees);
+    const i = list.findIndex((a) => !a.judge && String(a.email).toLowerCase() === String(old.email).toLowerCase());
+    if (i >= 0) { list[i] = { ...list[i], name, email }; await env.DB.prepare("UPDATE registrations SET attendees = ?, updated_at = ? WHERE ref = ?").bind(JSON.stringify(list), stamp, r.ref).run(); }
+  }
+  const { lobbyLinkForTicket } = await import("./lobby.js");
+  const lobby = await lobbyLinkForTicket(env, t);
+  const ok = await sendMail(env, { to: email, ...mail.ticketIssued(t, r, { ...ticketLinks(env, t), lobby }) }, r.ref, "ticket_issued");
+  await env.DB.prepare("UPDATE tickets SET sent_at = ? WHERE id = ?").bind(now(), t.id).run();
+  await seatPending(env);
+  return { reg_ref: r.ref, sent: ok, name };
+}
