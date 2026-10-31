@@ -23,6 +23,7 @@ button, input, textarea { font: inherit; }
 .count { font-size: 13px; color: #CFE0F3; margin-top: 4px; }
 .count b { font-family: var(--mono); color: #fff; font-weight: 600; }
 .tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.tabs[hidden] { display: none; }
 .tabs button { font-family: var(--text); font-size: 14px; font-weight: 700; white-space: nowrap; padding: 8px 14px; min-height: 40px; border-radius: 999px; border: 0; cursor: pointer; background: rgba(255, 255, 255, .14); color: #fff; position: relative; }
 .tabs button[aria-selected="true"] { background: var(--yel); color: var(--navy); }
 .tabs button .dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 9px; background: #F06A4F; }
@@ -95,3 +96,8 @@ textarea { resize: vertical; min-height: 64px; }
 .room-hero p { margin: 0; color: var(--body); font-size: 14px; }
 .sat { background: var(--panel); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-top: 12px; }
 @media (min-width: 720px) { .people { grid-template-columns: 1fr 1fr; } .room-hero .nm { font-size: 56px; } }
+/* demo mode bar */
+.demobar { background: var(--yel); color: var(--navy); font-size: 13px; font-weight: 700; padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.demobar .seg { display: flex; gap: 4px; }
+.demobar button { font-family: var(--text); font-size: 12px; font-weight: 700; border: 1.5px solid var(--navy); background: transparent; color: var(--navy); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+.demobar button[aria-pressed="true"] { background: var(--navy); color: #fff; }
