@@ -151,7 +151,7 @@ async function detail(env, ref) {
   const { secret, ...safe } = r;
   return {
     reg: { ...safe, attendees: r.attendees ? JSON.parse(r.attendees) : null, shares: sharesLink(r), flagged: flagged(r), tierName: TIER_NAME[r.tier], amountText: ngn(r.amount) },
-    tickets: t.map(({ token: _t, ...rest }) => ({ ...rest, table: rest.table_index === null || rest.table_index === undefined ? null : `${tableName(rest.table_index)}, seat ${rest.table_seat}` })),
+    tickets: (await (async () => { const free = new Set(await ops.replaceableIds(env, r.ref)); return t.map((x) => ({ ...x, replaceable: free.has(x.id) })); })()).map(({ token: _t, ...rest }) => ({ ...rest, table: rest.table_index === null || rest.table_index === undefined ? null : `${tableName(rest.table_index)}, seat ${rest.table_seat}` })),
     log,
     claimUrl: r.status === "confirmed" ? links(env, r).claim : null,
   };
@@ -640,7 +640,8 @@ function ticketRows(d) {
   return '<div class="hr"></div><h2>' + (d.reg.shares ? (d.reg.tier === "sponsored" ? "Claimed seats" : "Claimed places") : "Tickets") + "</h2>" + d.tickets.map((t) =>
     '<div style="margin:0 0 8px"><span class="mono">' + esc(t.ticket_ref) + "</span> " + esc(t.name) + ", " + esc(t.email) +
     ' <span class="small">' + (t.kind === "judge" ? "judge or mentor, " : "") + (t.cancelled_at ? "<b>cancelled</b>" : t.sent_at ? "sent " + when(t.sent_at) : "not sent") + (t.table && ROLE === "admin" ? ", " + esc(t.table) : "") + "</span>" +
-    (t.sent_at && !t.cancelled_at && ROLE === "admin" ? ' <button class="link" data-resend="' + t.id + '" data-email="' + esc(t.email) + '">Resend</button> <button class="link" data-cancel="' + t.id + '" data-name="' + esc(t.name) + '">Cancel ticket</button>' : "") + "</div>").join("");
+    (t.sent_at && !t.cancelled_at && ROLE === "admin" ? ' <button class="link" data-resend="' + t.id + '" data-email="' + esc(t.email) + '">Resend</button> <button class="link" data-cancel="' + t.id + '" data-name="' + esc(t.name) + '">Cancel ticket</button>' : "") +
+    (t.replaceable && ROLE === "admin" ? ' <button class="link" data-replace="' + t.id + '" data-name="' + esc(t.name) + '">Give this seat to someone else</button>' : "") + "</div>").join("");
 }
 
 function renderDetail(d) {
@@ -747,6 +748,19 @@ async function resend(btn) {
   const email = prompt("Send this ticket to which email? Change it if it was mistyped.", btn.dataset.email);
   if (!email) return;
   try { renderDetail(await call("resend-ticket", { id: Number(btn.dataset.resend), email })); msg("Ticket sent to " + email + ".", true); } catch (err) { msg(err.message); }
+}
+
+// A cancelled corporate or group seat goes to a new person: new ticket, same seat.
+async function replaceSeat(btn) {
+  const name = prompt("Who gets " + btn.dataset.name + "'s seat? Their full name, as it should read on the ticket.");
+  if (!name || !name.trim()) return;
+  const email = prompt("Their email. The ticket goes straight there.");
+  if (!email || !email.trim()) return;
+  if (!confirm("Give this seat to " + name.trim() + " (" + email.trim() + ") and email them their ticket now?")) return;
+  try {
+    const d = await call("replace-ticket", { id: Number(btn.dataset.replace), name, email });
+    renderDetail(d); msg(d.sent === false ? "Seat given to " + name.trim() + ", but the email did not send. Use Resend on their ticket." : "Seat given to " + name.trim() + ". Their ticket has been emailed.", d.sent !== false);
+  } catch (err) { msg(err.message); }
 }
 
 async function loadCodes() {
@@ -912,6 +926,7 @@ document.addEventListener("click", (e) => {
   const tr = e.target.closest("tr[data-ref]"); if (tr) { openReg(tr.dataset.ref); return; }
   const a = e.target.closest("[data-act]"); if (a) { act(a.dataset.act, a); return; }
   const r = e.target.closest("[data-resend]"); if (r) { resend(r); return; }
+  const rp = e.target.closest("[data-replace]"); if (rp) { replaceSeat(rp); return; }
   const mb = e.target.closest("tr[data-mb]"); if (mb) { openMember(mb.dataset.mb); return; }
   if (e.target.closest("#mbPreview")) { mbPreview().catch((err) => msg(err.message)); return; }
   const cd = e.target.closest("[data-codes]"); if (cd) { codes(cd.dataset.codes, cd).catch((err) => msg(err.message)); return; }
@@ -1131,6 +1146,7 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST money-entry": () => money.saveEntry(env, body, who),
       "POST money-delete": () => money.deleteEntry(env, body, who),
       "POST cancel-ticket": async () => detail(env, (await ops.cancelTicket(env, body)).reg_ref),
+      "POST replace-ticket": async () => { const x = await ops.replaceTicket(env, body); return { ...(await detail(env, x.reg_ref)), sent: x.sent }; },
       ...part2Routes(env, q, body, who, [...emails(env.ADMIN_EMAILS), ...emails(env.VERIFIER_EMAILS)]),
     }[`${req.method} ${path.slice("/admin/api/".length)}`];
     if (!path.startsWith("/admin/api/") || !api) return json({ error: "Not found." }, 404);
