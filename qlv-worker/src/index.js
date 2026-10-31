@@ -14,6 +14,7 @@ import { briefFor } from "./briefings.js";
 import { scoringPage, submitScore } from "./scoring.js";
 import { displayPoll } from "./stage.js";
 import { getLogo } from "./logos.js";
+import * as lobby from "./lobby.js";
 
 const MAX_PROOF = 5 * 1024 * 1024;
 const MAX_JSON = 30000;
@@ -403,13 +404,15 @@ async function claim(req, env, ctx) {
   // Counting by id gives each claimant a different number, even at the same moment.
   const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE reg_ref = ? AND kind = ? AND id <= ?").bind(reg.ref, kind, ins.id).first();
   t.ticket_ref = kind === "standard" ? `${reg.ref}-${n}` : await nextRef(env, "sponsored");
+  // Once the lobby is open, the ticket email carries the lobby link.
+  const lobbyLink = await lobby.lobbyLinkForTicket(env, { id: ins.id, kind });
   await env.DB.prepare("UPDATE tickets SET ticket_ref = ?, seat_no = ?, sent_at = ? WHERE token = ?").bind(t.ticket_ref, n, stamp, t.token).run();
   await seatPending(env);
 
   // The sponsor's money was verified by a person before this link went out,
   // so a claimed seat's ticket goes straight to the claimant.
   ctx.waitUntil((async () => {
-    await sendMail(env, { to: c.email, ...mail.ticketIssued(t, reg, ticketLinks(env, t)) }, t.ticket_ref, "ticket_issued");
+    await sendMail(env, { to: c.email, ...mail.ticketIssued(t, reg, { ...ticketLinks(env, t), lobby: lobbyLink }) }, t.ticket_ref, "ticket_issued");
     await sendMail(env, { to: reg.email, ...mail.seatClaimed(reg, t, n, links(env, reg).manage, closeLabel(await closesAt(env))) }, reg.ref, "seat_claimed");
   })());
   return { ref: t.ticket_ref, key: t.token, email: c.email };
@@ -460,9 +463,10 @@ async function partnerSeatClaim(req, env, ctx) {
     throw new HttpError(409, "This seat has already been claimed.", "full");
   }
   t.ticket_ref = await nextRef(env, "partner");
+  const lobbyLink = await lobby.lobbyLinkForTicket(env, { id: row.id, kind: "partner" });
   await env.DB.prepare("UPDATE tickets SET ticket_ref = ?, sent_at = ? WHERE id = ?").bind(t.ticket_ref, stamp, row.id).run();
   await seatPending(env);
-  ctx.waitUntil(sendMail(env, { to: c.email, ...mail.ticketIssued(t, {}, ticketLinks(env, t)) }, t.ticket_ref, "ticket_issued"));
+  ctx.waitUntil(sendMail(env, { to: c.email, ...mail.ticketIssued(t, {}, { ...ticketLinks(env, t), lobby: lobbyLink }) }, t.ticket_ref, "ticket_issued"));
   return { ref: t.ticket_ref, key: t.token, email: c.email };
 }
 
@@ -549,15 +553,27 @@ const ROUTES = {
   "GET /api/score": (req, env, ctx, url) => scoringPage(env, url),
   "POST /api/score": async (req, env) => submitScore(env, await readJson(req)),
   "GET /api/stage": (req, env, ctx, url) => displayPoll(env, url),
+  // The lobby and team rooms, behind each person's own link.
+  "GET /api/my": (req, env, ctx, url) => lobby.myView(env, url),
+  "GET /api/my-wall": (req, env, ctx, url) => lobby.myWall(env, url),
+  "POST /api/my-intro": async (req, env) => lobby.saveIntro(env, await readJson(req)),
+  "POST /api/my-post": async (req, env, ctx) => lobby.postMessage(env, await readJson(req), ctx),
+  "POST /api/my-push": async (req, env) => lobby.savePush(env, await readJson(req)),
+  "POST /api/my-signin": async (req, env) => lobby.signIn(env, req, await readJson(req)),
 };
 
 export default {
   async fetch(req, env, ctx) {
+    if (env.TEST_CLOCK_SHIFT) lobby.setClockShift(env.TEST_CLOCK_SHIFT);
     const url = new URL(req.url);
     if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) return handleAdmin(req, env, ctx, url);
 
     // Sponsor logos for the projector: images, not JSON.
     if (url.pathname === "/api/logo" && req.method === "GET") return getLogo(env, url);
+    // The home screen app's manifest, made for each person.
+    if (url.pathname === "/api/manifest" && req.method === "GET") {
+      try { return await lobby.manifest(env, url); } catch { return new Response("Not found.", { status: 404, headers: { "access-control-allow-origin": "*" } }); }
+    }
     const cors = corsHeaders(env, req);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const route = ROUTES[`${req.method} ${url.pathname}`];
@@ -569,5 +585,10 @@ export default {
       console.error(err);
       return json({ error: "Something went wrong on our side. Please try again in a minute." }, 500, cors);
     }
+  },
+  // Every minute: scheduled lobby posts, waiting emails and notifications.
+  async scheduled(event, env, ctx) {
+    if (env.TEST_CLOCK_SHIFT) lobby.setClockShift(env.TEST_CLOCK_SHIFT);
+    ctx.waitUntil(lobby.tick(env));
   },
 };

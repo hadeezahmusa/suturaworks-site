@@ -273,6 +273,39 @@ see is in the QLV look; admin stays as it is.
   need; the lunch screen names partners and sponsors and counts the members' businesses. Logos are
   public at `/api/logo` and kept in KV under `logo:<id>`.
 
+## Lobby and team rooms (added 31 October 2026)
+
+From `QLV-2026-Team-Rooms-Build-Spec.md`, with one change: the lobby opens when admin presses
+**Open the lobby** on the Team rooms tab, not at a fixed time. Migration `2026-10-31-lobby.sql`;
+code in `qlv-worker/src/lobby.js`, `webpush.js`, `lobby-views.js` and `qlv2026/my/`.
+
+- **Who is in.** Participants (standard, member, corporate, sponsored, partner), mentors and
+  advisers who are not judging, the Lead Sprint Marshal and floor facilitators. Judges never are; a
+  person marked both mentor and judge counts as a judge.
+- **One personal link** each: `https://suturaworks.com/qlv2026/my/?t=<40 random characters>`.
+  The lobby before team rooms open, then the person's own room with an Everyone tab. Mentors see
+  their two tables, the Lead Sprint Marshal every room, floor facilitators the lobby only. Backup
+  sign-in at `/qlv2026/my/` needs the ticket reference and the registration email; five failed
+  tries pause it for 15 minutes.
+- **Opening.** Open the lobby emails everyone already holding a ticket ("You're in"). From then
+  on the link travels inside each new ticket email. Anyone not covered (mentors, a role changed
+  later) is emailed by the minute tick. All of it stays within the 90 emails a day.
+- **Open team rooms** works only after Settings, Teams have been announced. It emails "Meet your
+  QLV 2026 team" to everyone on a table and sends the announcement notification.
+- **Scheduled posts** are seeded from the spec. They go out on their own each minute
+  (`[triggers] crons` in `wrangler.toml`). Posts with `{meet_link}` or `{explainer_link}` wait,
+  with a warning, until the link is saved on the tab. Posts already due when the lobby opens
+  appear without a notification.
+- **Notifications** are standard Web Push, encrypted on the server (VAPID keys made on first use,
+  settings key `vapid`). Team messages notify the rest of that team at most once every 15 minutes
+  each, grouped after that; nothing goes out from 10:00pm to 7:00am except the team announcement;
+  lobby wall messages never notify. A run sends at most 35, the rest follow on the next minute.
+  iPhones only allow notifications once QLV is on the home screen.
+- **Never shown** in the lobby or rooms: emails, phone numbers, registration counts, tasks or briefs.
+- **Testing locally** uses `--test-scheduled` and two test-only variables: `PUSH_TEST_HOST` (a
+  stand-in push service) and `TEST_CLOCK_SHIFT` (milliseconds, to test either side of the quiet
+  hours). Neither is set in production.
+
 ## Board view (read only, added 30 October 2026)
 
 Settings, Board view card: turn it on and a four-word passcode appears. Board members open the admin

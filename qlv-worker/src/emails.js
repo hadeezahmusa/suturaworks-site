@@ -16,7 +16,7 @@ function first(name) {
   return String(name || "").trim().split(/\s+/)[0] || "there";
 }
 
-function shell({ preheader, body, foot }) {
+function shell({ preheader, body, foot, bare = false }) {
   return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>QLV 2026</title></head>
 <body style="margin:0;padding:0;background:#E3EBF4;">
 <span style="display:none;max-height:0;overflow:hidden;opacity:0;color:#E3EBF4;">${esc(preheader)}</span>
@@ -33,14 +33,14 @@ function shell({ preheader, body, foot }) {
   </tr></table>
 </td></tr>
 <tr><td style="padding:24px 28px 22px;font-family:${FONT};">${body}</td></tr>
-<tr><td style="background:${C.panel};border-top:1px solid ${C.line};padding:12px 28px;font-family:${FONT};font-size:10px;color:${C.body};">
+${bare ? "" : `<tr><td style="background:${C.panel};border-top:1px solid ${C.line};padding:12px 28px;font-family:${FONT};font-size:10px;color:${C.body};">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
     <td style="font-family:${FONT};font-size:10px;color:${C.body};">${foot}</td>
     <td align="right" style="font-family:${FONT};font-size:10px;font-weight:500;color:${C.body};">JCI Aso &middot; Abuja</td>
   </tr></table>
-</td></tr>
+</td></tr>`}
 </table>
-<p style="font-family:${FONT};font-size:10px;color:#5A6B85;margin:14px 0 0;">Registration for QLV 2026 is hosted by Sutura Works Limited for JCI Aso.</p>
+${bare ? "" : `<p style="font-family:${FONT};font-size:10px;color:#5A6B85;margin:14px 0 0;">Registration for QLV 2026 is hosted by Sutura Works Limited for JCI Aso.</p>`}
 </td></tr></table></body></html>`;
 }
 
@@ -181,12 +181,16 @@ export function ticketIssued(t, reg, links) {
   const after = adviser
     ? p("Your brief, your tables and the tasks arrive by email. The link opens at 7:00am on Saturday 7 November. Participants do not see the tasks until the sprint opens, so please keep them to yourself. If something changes and you can no longer make it, reply as early as you can, because the roving routes are built around who is coming.", "font-size:12px;")
     : p("Day one is virtual and the joining link comes the day before. Your team is announced on day one, and its task is handed out as the sprint opens on day two, so there is nothing to prepare.", "font-size:12px;");
+  const lobby = links.lobby ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;background:${C.navy};border-radius:10px;"><tr><td style="padding:16px 18px;font-family:${FONT};">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.7px;text-transform:uppercase;color:${C.yel};">The QLV lobby is open</div>
+      <div style="font-size:12px;color:#CFE0F3;line-height:1.55;margin:4px 0 10px;">Meet the people you'll be building with and get updates from us until Friday. On Friday 6 November at 4:45pm, this same link becomes your team room.</div>
+      <a href="${esc(links.lobby)}" style="font-size:12px;font-weight:600;color:#FFFFFF;">Open the QLV lobby &rarr;</a></td></tr></table>` : "";
   const body = h1(heading) + p(esc(intro)) + ticketCard(t) +
-    button(links.ticket, "Open your ticket") + after + questionsBlock(links.answer, adviser);
+    button(links.ticket, "Open your ticket") + lobby + after + questionsBlock(links.answer, adviser);
   return {
     subject: adviser ? `You are confirmed for QLV 2026, ${t.ticket_ref}` : `Your QLV 2026 ticket, ${t.ticket_ref}`,
     html: shell({ preheader: `${heading}. Reference ${t.ticket_ref}.`, body, foot: `${esc(paidLine(t, reg))} &middot; <span style="font-family:${MONO};">${esc(t.ticket_ref)}</span>` }),
-    text: `${heading}\n\n${intro}\n\nAdmit: ${t.name}\nReference: ${t.ticket_ref}\n${dayLines(t).map(([k, v]) => `${k}: ${v}`).join("\n")}${["adviser", "judge", "facilitator"].includes(t.kind) ? "" : "\nTeam: announced on day one"}\n\nOpen your ticket: ${links.ticket}\n${adviser ? "Send a problem" : "Answer the three questions"}: ${links.answer}\n`,
+    text: `${heading}\n\n${intro}\n\n${links.lobby ? `The QLV lobby is open: ${links.lobby}\n\n` : ""}Admit: ${t.name}\nReference: ${t.ticket_ref}\n${dayLines(t).map(([k, v]) => `${k}: ${v}`).join("\n")}${["adviser", "judge", "facilitator"].includes(t.kind) ? "" : "\nTeam: announced on day one"}\n\nOpen your ticket: ${links.ticket}\n${adviser ? "Send a problem" : "Answer the three questions"}: ${links.answer}\n`,
   };
 }
 
@@ -201,6 +205,34 @@ export function corporateReceipt(reg, tickets) {
     subject: `Transfer verified, ${word(tickets.length).toLowerCase()} QLV 2026 tickets sent (${reg.ref})`,
     html: shell({ preheader: `Tickets sent for ${reg.ref}.`, body, foot: `Paid ${ngn(reg.amount)} by transfer &middot; <span style="font-family:${MONO};">${esc(reg.ref)}</span>` }),
     text: `Transfer verified\n\nThe transfer for ${reg.organisation} has been checked. Tickets sent to:\n${tickets.map((t) => `- ${t.name}${t.kind === "judge" ? " (judge or mentor)" : ""}, ${t.email}`).join("\n")}\n\nReference: ${reg.ref}\nPaid: ${ngn(reg.amount)}\n`,
+  };
+}
+
+// ---------- lobby and team rooms ----------
+
+export function lobbyWelcome(firstName, url) {
+  const body = p(`Hi ${esc(firstName)},`) +
+    p("The QLV 2026 lobby is open. Meet the people you'll be building with, and get updates from us until Friday.") +
+    button(url, "Open the QLV lobby", true) +
+    p("Two quick things when you get there: write your intro, and add QLV to your home screen so it's one tap away.") +
+    p("On Friday 6 November at 4:45pm, this same link becomes your team room.") +
+    p("See you soon,<br>The QLV 2026 team, JCI Aso", "margin:0;");
+  return {
+    subject: "You're in. Welcome to the QLV 2026 lobby",
+    html: shell({ preheader: "Meet the people you'll be building with.", body, bare: true }),
+    text: `Hi ${firstName},\n\nThe QLV 2026 lobby is open. Meet the people you'll be building with, and get updates from us until Friday.\n\nOpen the QLV lobby: ${url}\n\nTwo quick things when you get there: write your intro, and add QLV to your home screen so it's one tap away.\n\nOn Friday 6 November at 4:45pm, this same link becomes your team room.\n\nSee you soon,\nThe QLV 2026 team, JCI Aso\n`,
+  };
+}
+
+export function teamAnnounced(firstName, tableName, url) {
+  const body = p(`Hi ${esc(firstName)},`) +
+    p(`You're on team <b>${esc(tableName)}</b>. Your team room is open now, on the same link as the lobby.`) +
+    button(url, "Meet your team", true) +
+    p("See you on Saturday,<br>The QLV 2026 team, JCI Aso", "margin:0;");
+  return {
+    subject: "Meet your QLV 2026 team",
+    html: shell({ preheader: `You're on team ${tableName}.`, body, bare: true }),
+    text: `Hi ${firstName},\n\nYou're on team ${tableName}. Your team room is open now, on the same link as the lobby.\n\nMeet your team: ${url}\n\nSee you on Saturday,\nThe QLV 2026 team, JCI Aso\n`,
   };
 }
 
