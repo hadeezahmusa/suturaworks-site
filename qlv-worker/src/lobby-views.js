@@ -57,7 +57,7 @@ async function loadLobby(d) {
     "<div><b>Lobby</b> " + (st.shut ? '<span class="pill off">Closed</span>' : st.open ? '<span class="pill on">Open</span> since ' + esc(when(st.opened_at)) : '<span class="pill off">Not open yet</span>') + "</div>" +
     '<div style="margin-top:6px"><b>Team rooms</b> ' + rooms + "</div>" +
     '<div class="small" style="margin-top:6px">Closes ' + esc(when(st.close_at)) + (x.welcomeWaiting && st.open ? ". " + x.welcomeWaiting + " lobby email" + (x.welcomeWaiting === 1 ? "" : "s") + " still to go out; they follow automatically as the daily email allowance frees up." : "") + "</div></div>" +
-    '<div class="actions" style="margin:0">' +
+    '<div class="actions" style="margin:0"><a class="btn ghost" style="text-decoration:none" target="_blank" rel="noopener" href="' + esc(SITE) + 'my/?demo=1">See the demo</a>' +
     (!st.open ? '<button class="btn gold" data-lb="open">Open the lobby</button>' : "") +
     (st.open && !st.rooms_open && !st.shut ? '<button class="btn' + (st.frozen ? " gold" : " ghost") + '" data-lb="rooms"' + (st.frozen ? "" : " disabled title=\"Available once teams are announced\"") + ">Open team rooms</button>" : "") +
     (st.open && !st.shut ? '<button class="btn warn" data-lb="close">Close lobby and rooms</button>' : "") +

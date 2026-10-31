@@ -4,6 +4,7 @@
 // The wall refreshes every 10 seconds, only while the page is on screen.
 
 import { API } from "../config.js";
+import { demoApi, setDemoRooms } from "./demo.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -11,6 +12,8 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const linkify = (s) => esc(s).replace(/https:\/\/[^\s<]+[^\s<.,;:!?)]/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
 const params = new URLSearchParams(location.search);
 const T = params.get("t") || "";
+// my/?demo=1: sample people and posts, answered in the browser. Nothing is saved or sent.
+const DEMO = params.get("demo") === "1";
 const STANDALONE = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const PUSH_OK = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -23,6 +26,7 @@ let D = null, space = "lobby", installEvent = null, sending = false;
 const lastId = {};
 
 async function api(path, body) {
+  if (DEMO) return demoApi(path, body);
   let res;
   try {
     res = await fetch(API + path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: T, ...body }) } : {});
@@ -97,7 +101,7 @@ function installCard() {
       ${PUSH_OK || IOS ? "<p>Add QLV to your home screen to get notifications.</p>" : ""}
       <button class="btn ghost" style="color:#CFE0F3;padding-left:0" data-act="install-later">Not now</button></div>`;
   }
-  if (!installEvent) return "";
+  if (!installEvent && !DEMO) return "";
   return `<div class="card prompt" id="installCard"><h2>Keep QLV one tap away</h2><p>Your team room will be right there on Friday.</p>
     <div class="row"><button class="btn gold" data-act="install">Add QLV to your home screen</button><button class="btn ghost" style="color:#CFE0F3" data-act="install-later">Not now</button></div></div>`;
 }
@@ -171,7 +175,7 @@ function show(next) {
   for (const w of document.querySelectorAll(".wall")) w.scrollTop = w.scrollHeight;
   const list = room ? room.messages : D.lobby;
   lastId[space] = list.length ? list.at(-1).id : lastId[space] || 0;
-  if (location.hash !== "#" + space && !location.hash.startsWith("#post-")) history.replaceState(null, "", "?t=" + encodeURIComponent(T) + (params.get("app") ? "&app=1" : "") + "#" + space);
+  if (location.hash !== "#" + space && !location.hash.startsWith("#post-")) history.replaceState(null, "", (DEMO ? "?demo=1" : "?t=" + encodeURIComponent(T) + (params.get("app") ? "&app=1" : "")) + "#" + space);
 }
 
 function bindCompose() {
@@ -263,6 +267,10 @@ document.addEventListener("click", async (e) => {
   if (tab) { show(tab.dataset.space); refresh(); window.scrollTo(0, 0); return; }
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (!act) return;
+  if (DEMO && (act === "install" || act === "notify")) {
+    alert(act === "install" ? "On a real phone, the phone's own \"Add to home screen\" box appears here." : "On a real phone, the phone asks permission here, and only after this tap.");
+    return;
+  }
   if (act === "install" && installEvent) {
     installEvent.prompt();
     const { outcome } = await installEvent.userChoice;
@@ -308,7 +316,23 @@ async function load(keepSpace) {
   if (PUSH_OK && Notification.permission === "granted") subscribe().catch(() => {});
 }
 
-if (!T) {
+if (DEMO) {
+  // A bar across the top to switch between before and after the announcement.
+  document.body.insertAdjacentHTML("afterbegin", `<div class="demobar"><span>Demo · sample people · nothing is saved or sent</span>
+    <span class="seg"><button data-demo="lobby" aria-pressed="true">Lobby, before Friday</button><button data-demo="rooms" aria-pressed="false">Team rooms open</button></span></div>`);
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-demo]");
+    if (!b) return;
+    setDemoRooms(b.dataset.demo === "rooms");
+    document.querySelectorAll("[data-demo]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    history.replaceState(null, "", "?demo=1");
+    load();
+    window.scrollTo(0, 0);
+  });
+  load();
+  setInterval(countdown, 30000);
+  setInterval(refresh, 3000);
+} else if (!T) {
   signInPage();
 } else {
   // The home screen app gets a manifest made for this person, so its icon opens this link.
