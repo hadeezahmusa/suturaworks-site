@@ -13,7 +13,9 @@
 // are, so judging stays impartial; someone marked both mentor and judge
 // counts as a judge. Participants see their own table's room only, mentors
 // their two tables, the Lead Sprint Marshal every room, floor facilitators
-// the lobby only. Nothing here ever shows an email, a phone number, a count
+// the lobby only. The QLV team (organisers added on the Team rooms tab, no
+// ticket) see the lobby and every room, under the negative of their
+// lobby_team id. Nothing here ever shows an email, a phone number, a count
 // of registrations, or anything from the briefs and tasks.
 
 import { HttpError, now, token, sendMail } from "./index.js";
@@ -72,7 +74,7 @@ export const isShut = (st, at = Date.now()) => st.closed || at >= Date.parse(st.
 // Everyone with a lobby place, worked out fresh each time so a cancelled
 // ticket or a changed role takes effect at once.
 export async function lobbyPeople(env) {
-  const [parts, staff, tables] = await Promise.all([
+  const [parts, staff, tables, team] = await Promise.all([
     env.DB.prepare(`SELECT t.id, t.kind, t.name, t.email, t.ticket_ref, t.table_index, t.late_after_freeze, t.sent_at,
         CASE
           WHEN t.kind = 'partner' THEN p.name
@@ -85,6 +87,7 @@ export async function lobbyPeople(env) {
         AND t.cancelled_at IS NULL AND t.ticket_ref != 'pending'
       ORDER BY t.sent_at, t.id`).all(),
     staffPeople(env), tablesNow(env),
+    env.DB.prepare("SELECT id, name, email FROM lobby_team WHERE removed_at IS NULL ORDER BY id").all(),
   ]);
   const plan = assignPlan(staff, tables);
   const out = parts.results.map((t) => ({
@@ -103,10 +106,13 @@ export async function lobbyPeople(env) {
       out.push({ ...base, role: "mentor", rooms });
     }
   }
+  for (const m of team.results) {
+    out.push({ id: -m.id, kind: "team", name: m.name, email: m.email, ref: "", org: "", role: "team", table: null, late: false, rooms: tables });
+  }
   return out;
 }
 
-const ROLE_LABEL = { participant: "", mentor: "Mentor", marshal: "Lead Sprint Marshal", facilitator: "QLV team" };
+const ROLE_LABEL = { participant: "", mentor: "Mentor", marshal: "Lead Sprint Marshal", facilitator: "QLV team", team: "QLV team" };
 
 // The person behind a link, if the link is live and they still have a place.
 async function personFor(env, tok) {
@@ -172,7 +178,8 @@ function canSee(person, st, space) {
 }
 
 async function messages(env, space, after = 0, ticketId = null) {
-  const { results } = await env.DB.prepare(`SELECT m.id, m.ticket_id, m.sender_role, m.body, m.created_at, t.name FROM lobby_messages m LEFT JOIN tickets t ON t.id = m.ticket_id
+  const { results } = await env.DB.prepare(`SELECT m.id, m.ticket_id, m.sender_role, m.body, m.created_at, COALESCE(t.name, lt.name) AS name FROM lobby_messages m
+    LEFT JOIN tickets t ON t.id = m.ticket_id LEFT JOIN lobby_team lt ON lt.id = -m.ticket_id
     WHERE m.space = ? AND m.hidden = 0 AND m.id > ? ORDER BY m.id DESC LIMIT 80`).bind(space, Number(after) || 0).all();
   return results.reverse().map((m) => ({
     id: m.id, who: first(m.name) || "QLV team", role: ROLE_LABEL[m.sender_role] || "", mine: ticketId !== null && m.ticket_id === ticketId, body: m.body, at: m.created_at,
@@ -257,6 +264,13 @@ export async function myView(env, url) {
 // working out everyone's place (D1's free plan counts rows read).
 async function quickAccess(env, tok, space, st) {
   const t = String(tok || "");
+  // The QLV team: no ticket, every room.
+  const own = t.length >= 32 ? await env.DB.prepare("SELECT a.ticket_id, a.revoked_at, lt.removed_at FROM lobby_access a JOIN lobby_team lt ON lt.id = -a.ticket_id WHERE a.token = ? AND a.ticket_id < 0").bind(t).first() : null;
+  if (own) {
+    if (own.revoked_at || own.removed_at) throw new HttpError(404, "This link is no longer active.", "bad_link");
+    if (space !== "lobby" && !st.rooms_open) throw new HttpError(403, "This room is not open to you.");
+    return own.ticket_id;
+  }
   const row = t.length >= 32 ? await env.DB.prepare(`SELECT a.ticket_id, a.revoked_at, t.kind, t.table_index, t.late_after_freeze, t.cancelled_at,
       sr.mentor, sr.judge, sr.facilitator_type, sr.tables
     FROM lobby_access a JOIN tickets t ON t.id = a.ticket_id LEFT JOIN staff_roles sr ON sr.ticket_id = t.id WHERE a.token = ?`).bind(t).first() : null;
@@ -393,7 +407,9 @@ async function teamNotify(env, sender, table) {
   const st = await lobbyState(env);
   const people = await lobbyPeople(env);
   const space = `t:${table}`, name = tableName(table);
-  const team = people.filter((p) => p.id !== sender.id && p.role !== "marshal" && p.rooms.includes(table));
+  // The Lead Sprint Marshal and the QLV team see every room, so team messages
+  // would flood them; they get scheduled posts only.
+  const team = people.filter((p) => p.id !== sender.id && p.role !== "marshal" && p.role !== "team" && p.rooms.includes(table));
   const subs = await subsOf(env, team.map((p) => p.id));
   const withSubs = new Set(subs.map((s) => s.ticket_id));
   const sendNow = [];
@@ -578,7 +594,7 @@ export async function lobbyAdmin(env) {
   const posts = (await env.DB.prepare("SELECT * FROM lobby_posts ORDER BY send_at, id").all()).results;
   const opened = await env.DB.prepare("SELECT last_opened_at FROM lobby_access WHERE revoked_at IS NULL AND last_opened_at IS NOT NULL").all();
   const tables = await tablesNow(env);
-  const msgs = (await env.DB.prepare("SELECT m.*, t.name FROM lobby_messages m LEFT JOIN tickets t ON t.id = m.ticket_id ORDER BY m.id DESC LIMIT 120").all()).results;
+  const msgs = (await env.DB.prepare("SELECT m.*, COALESCE(t.name, lt.name) AS name FROM lobby_messages m LEFT JOIN tickets t ON t.id = m.ticket_id LEFT JOIN lobby_team lt ON lt.id = -m.ticket_id ORDER BY m.id DESC LIMIT 120").all()).results;
   return {
     state: { ...st, shut: isShut(st), frozen: isFrozen(s), teamsAnnouncedAt: s.teams_announced_at },
     welcomeWaiting: people.filter((p) => !access[p.id]?.notified_at && p.email).length,
@@ -587,7 +603,7 @@ export async function lobbyAdmin(env) {
       const a = access[p.id];
       return {
         ticketId: p.id, name: p.name, ref: p.ref, role: p.role, roleLabel: ROLE_LABEL[p.role] || "Participant",
-        table: p.role === "participant" && p.table !== null && p.table !== undefined ? tableName(p.table) : p.role === "mentor" ? p.rooms.map(tableName).join(" and ") : p.role === "marshal" ? "All rooms" : "",
+        table: p.role === "participant" && p.table !== null && p.table !== undefined ? tableName(p.table) : p.role === "mentor" ? p.rooms.map(tableName).join(" and ") : p.role === "marshal" || p.role === "team" ? "All rooms" : "",
         late: p.late, link: a ? lobbyUrl(env, a.token) : null, told: a?.notified_at || null, toldBy: a?.notified_by || null,
         lastOpened: a?.last_opened_at || null, installed: !!a?.installed, push: subs[p.id] ? "on" : a?.push_state === "denied" ? "denied" : "off",
         intro: intros.has(p.id), posted: posted[p.id] || 0, noEmail: !p.email,
@@ -688,5 +704,34 @@ export async function personAction(env, b, who) {
     if (!ok) throw new HttpError(502, "The email did not send. Try again in a minute.");
     await env.DB.prepare("UPDATE lobby_access SET notified_at = ?, notified_by = 'welcome' WHERE id = ?").bind(now(), a.id).run();
   }
+  return lobbyAdmin(env);
+}
+
+// ---------- the QLV team ----------
+
+export async function addTeamMember(env, b, who) {
+  const name = clean(b.name, 120), email = clean(b.email, 160).toLowerCase();
+  if (!name) throw new HttpError(400, "Type their full name.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, "That email address does not look complete.");
+  if (await env.DB.prepare("SELECT 1 FROM lobby_team WHERE lower(email) = ? AND removed_at IS NULL").bind(email).first()) throw new HttpError(409, "They are already on the QLV team list.");
+  const row = await env.DB.prepare("INSERT INTO lobby_team (name, email, created_at, created_by) VALUES (?, ?, ?, ?) RETURNING id").bind(name, email, now(), who || null).first();
+  const st = await lobbyState(env);
+  let sent = false;
+  // Once the lobby is open their link goes straight away; before that, with everyone else's.
+  if (st.open && !isShut(st)) {
+    const a = await accessFor(env, -row.id);
+    sent = await sendMail(env, { to: email, ...mail.lobbyWelcome(first(name), lobbyUrl(env, a.token)) }, null, "lobby_welcome");
+    if (sent) await env.DB.prepare("UPDATE lobby_access SET notified_at = ?, notified_by = 'welcome' WHERE id = ?").bind(now(), a.id).run();
+  }
+  return { ...(await lobbyAdmin(env)), sent, open: st.open };
+}
+
+export async function removeTeamMember(env, b) {
+  const id = Math.abs(Number(b.id));
+  await env.DB.batch([
+    env.DB.prepare("UPDATE lobby_team SET removed_at = ? WHERE id = ? AND removed_at IS NULL").bind(now(), id),
+    env.DB.prepare("UPDATE lobby_access SET revoked_at = ? WHERE ticket_id = ? AND revoked_at IS NULL").bind(now(), -id),
+    env.DB.prepare("DELETE FROM push_subs WHERE ticket_id = ?").bind(-id),
+  ]);
   return lobbyAdmin(env);
 }

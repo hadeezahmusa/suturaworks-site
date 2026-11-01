@@ -1138,6 +1138,8 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST lobby-post-action": () => lobby.postAction(env, body, who),
       "POST lobby-hide": () => lobby.hideMessage(env, body, who),
       "POST lobby-person": () => lobby.personAction(env, body, who),
+      "POST lobby-team": () => lobby.addTeamMember(env, body, who),
+      "POST lobby-team-remove": () => lobby.removeTeamMember(env, body),
       "POST board-access": () => boardAction(env, body, who),
       "POST screen-member": () => logos.addMemberBusiness(env, body, who),
       "POST screen-save": () => logos.saveScreenEntry(env, body, who),
