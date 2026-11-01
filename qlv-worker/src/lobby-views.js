@@ -38,6 +38,12 @@ export const LOBBY_HTML = String.raw`
         <label class="fl">Explainer video link<input type="url" name="explainer_link" placeholder="https://…"></label>
         <label class="fl">Lobby and rooms close (Abuja time)<input type="datetime-local" name="close_at" min="2026-11-01T00:00" max="2026-11-30T23:59"></label>
         <button class="btn" style="width:100%">Save</button></form>
+      <form class="card lp-form" id="lbTeam" style="margin:0 0 14px"><h2>QLV team</h2>
+        <p class="small" style="margin:-4px 0 10px">Organisers who should see the lobby and every team room as participants do. They get their own link, can post, show as "QLV team", and have no ticket, badge or table.</p>
+        <div id="lbTeamList"></div>
+        <label class="fl">Full name<input type="text" name="name" maxlength="120" required></label>
+        <label class="fl">Email<input type="email" name="email" maxlength="160" required></label>
+        <button class="btn" style="width:100%">Add to the QLV team</button></form>
       <div class="card" style="margin:0 0 14px"><h2>By table</h2><div id="lbTables"></div></div>
       <div class="card" id="lbLate" hidden><h2>Added after the freeze, no room</h2><div id="lbLateList"></div></div>
     </div>
@@ -46,7 +52,7 @@ export const LOBBY_HTML = String.raw`
 
 export const LOBBY_JS = String.raw`
 let lbData = null;
-const LB_ROLE = { participant: "Participant", mentor: "Mentor", marshal: "Lead Sprint Marshal", facilitator: "Facilitator" };
+const LB_ROLE = { participant: "Participant", mentor: "Mentor", marshal: "Lead Sprint Marshal", facilitator: "Facilitator", team: "QLV team" };
 const lbBody = (s) => { const [t, ...r] = String(s).split("\n"); return "<b>" + esc(t) + "</b>" + (r.length ? "\n" + esc(r.join("\n")) : ""); };
 async function loadLobby(d) {
   const x = lbData = d || await call("lobby");
@@ -77,6 +83,9 @@ async function loadLobby(d) {
     (p.noEmail ? '<div class="flag">No email, share link by hand</div>' : "") + "</td></tr>").join("") || '<tr><td colspan="7" class="small">Nobody has a ticket yet.</td></tr>';
   $("#lbTables").innerHTML = x.tables.length ? '<table><thead><tr><th>Table</th><th>People</th><th>Opened room</th><th>Intro</th><th>Posted</th></tr></thead><tbody>' +
     x.tables.map((t) => "<tr><td><b>" + esc(t.name) + "</b></td><td>" + t.members + "</td><td>" + (st.rooms_open ? t.opened : "–") + "</td><td>" + t.intros + "</td><td>" + t.posted + "</td></tr>").join("") + "</tbody></table>" : '<p class="small">No tables yet.</p>';
+  const team = x.people.filter((p) => p.role === "team");
+  $("#lbTeamList").innerHTML = team.length ? team.map((p) => '<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)"><span><b>' + esc(p.name) + '</b><span class="tiny"> · ' +
+    (p.told ? "link sent" : st.open ? "email waiting" : "link goes when the lobby opens") + '</span></span><button type="button" class="link" data-lbteamrm="' + p.ticketId + '" data-name="' + esc(p.name) + '">Remove</button></div>').join("") + '<div style="height:10px"></div>' : "";
   $("#lbLate").hidden = !x.late.length;
   $("#lbLateList").innerHTML = x.late.map((p) => "<div>" + esc(p.name) + ' <span class="tiny mono">' + esc(p.ref) + "</span></div>").join("");
   $("#lbMsgs").innerHTML = x.messages.map((m) => '<div class="lmsg' + (m.hidden ? " hid" : "") + '"><b>' + esc(m.who) + "</b>" + (m.role ? " (" + esc(m.role) + ")" : "") + ' <span class="tiny">in ' + esc(m.space) + ", " + esc(when(m.at)) + "</span>" +
@@ -94,6 +103,15 @@ $("#lbPostForm").addEventListener("submit", async (e) => {
   const f = e.currentTarget;
   try { await loadLobby(await call("lobby-post", { id: f.postId.value ? Number(f.postId.value) : undefined, sendAt: f.sendAt.value, audience: f.audience.value, body: f.body.value })); lbResetForm(); msg("Post saved.", true); }
   catch (err) { msg(err.message); }
+});
+$("#lbTeam").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.currentTarget;
+  try {
+    const r = await call("lobby-team", { name: f.name.value, email: f.email.value });
+    await loadLobby(r); f.reset();
+    msg(r.open ? (r.sent ? "Added. Their lobby link has been emailed." : "Added, but the email did not send. Use Resend email in People.") : "Added. Their link goes out with everyone else's when you open the lobby.", r.sent || !r.open);
+  } catch (err) { msg(err.message); }
 });
 $("#lbLinks").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -123,6 +141,11 @@ $("#lobbyView").addEventListener("click", async (e) => {
       const b = el("[data-lbp]"), a = b.dataset.lbp;
       if (a === "send" && !confirm("Send this post now? It appears in the lobby and goes out as a notification.")) return;
       await loadLobby(await call("lobby-post-action", { id: Number(b.dataset.id), action: a })); msg(a === "send" ? "Sent." : a === "cancel" ? "Cancelled." : "Restored.", true); return;
+    }
+    if (el("[data-lbteamrm]")) {
+      const b = el("[data-lbteamrm]");
+      if (!confirm("Remove " + b.dataset.name + " from the QLV team? Their link stops working.")) return;
+      await loadLobby(await call("lobby-team-remove", { id: Number(b.dataset.lbteamrm) })); msg("Removed.", true); return;
     }
     if (el("[data-lbhide]")) { const b = el("[data-lbhide]"); await loadLobby(await call("lobby-hide", { id: Number(b.dataset.lbhide), hidden: b.dataset.hidden === "1" })); return; }
     if (el("[data-lbcopy]")) { await navigator.clipboard.writeText(el("[data-lbcopy]").dataset.lbcopy); msg("Link copied. It is personal to them, so send it only to that person.", true); return; }
