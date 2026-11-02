@@ -117,6 +117,18 @@ export async function stageAction(env, b) {
   return stageView(env);
 }
 
+// After a rehearsal: back to Arrival with nobody presented and results
+// hidden. The display settings stay as they are. Refused once any score has
+// been submitted, so it can never clear the real day.
+export async function resetStage(env) {
+  const scored = await env.DB.prepare("SELECT count(*) AS n FROM scores").first();
+  if (scored?.n) throw new HttpError(409, "Judges have already submitted scores, so the stage can't be reset. Speak to the chair.");
+  const st = await readStage(env);
+  const fresh = { ...structuredClone(BLANK), toggles: st.toggles, version: st.version, flash: (st.flash || 0) + 1 };
+  await writeStage(env, fresh);
+  return stageView(env);
+}
+
 // The next step the primary button takes, in words.
 function nextLabel(st, tables) {
   if (st.phase === "presentations") {
