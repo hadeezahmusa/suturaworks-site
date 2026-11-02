@@ -10,7 +10,7 @@
 
 export const TEMPLATE_KEYS = [
   ["cover_email", "Covering email (all roles)"],
-  ["facilitator_run_sheet", "Facilitator run sheet"],
+  ["facilitator_run_sheet", "Lead Sprint Marshal run sheet"],
   ["mentor_brief", "Mentor/Advisor brief"],
   ["mentor_route", "Mentor/Advisor route card"],
   ["judge_brief", "Judge brief"],
@@ -35,17 +35,18 @@ If anything changes on your side, call or message {{chair_name}} on {{chair_phon
 See you on Saturday,
 The QLV 2026 team, JCI Aso`,
 
-  facilitator_run_sheet: `**QLV 2026 run sheet · {{full_name}} · {{facilitator_type}}**
+  facilitator_run_sheet: `**QLV 2026 run sheet · {{full_name}} · Lead Sprint Marshal**
 Tables you look after: {{tables_covered}}
 
 **Your job in one line.** You run the process: the clock, the handovers and the room. You never help with the content and you never score.
 
-**Friday 6 November, virtual** *(Lead Sprint Marshal only. Suggested times, confirm with the chair.)*
+**Friday 6 November, virtual** *(Suggested times, confirm with the chair.)*
 
 | Time | What happens | Your cue |
 |---|---|---|
 | 3:45pm | Open the call, test sound and screen share | |
 | 4:00pm | Welcome and why QLV 2026 | "Building systems that outlive you starts with how we work tomorrow." |
+| [confirm] | Keynote from Friday's facilitator | Introduce them and keep to time. |
 | 4:10pm | How the sprint works | Walk through plan, hand over, critique, respond, present, using the "How the sprint works" guide in the lobby. Say clearly that nobody sees the task until Saturday. |
 | 4:25pm | Teams announced | Read out each table and its members. Post the list in the chat. |
 | 4:40pm | Teams meet: in breakout rooms if the call allows them, otherwise in each team's group chat | Ten minutes to say hello. No tasks, no homework. |
@@ -56,18 +57,18 @@ Tables you look after: {{tables_covered}}
 | Time | What happens | Your cue |
 |---|---|---|
 | 8:30 to 10:50 | Arrivals, tea and light snacks | Badge desk open. Send people to their table by the name on their badge. |
-| [confirm] | Opening protocol and partner remarks, 3 minutes each | The Lead Sprint Marshal introduces each speaker and keeps time. |
+| [confirm] | Opening protocol, keynote from Saturday's facilitator and partner remarks, 3 minutes each | Introduce each speaker and keep time. |
 | 10:45 | Everyone seated | "Five minutes. Find your table." |
-| 10:50 | **Sprint opens.** Task cards handed out to every table at the same moment | Lead Sprint Marshal: "Your task is on the table. You have fifty minutes. Your plan has to work without you in the room." Start the clock on the screen. |
+| 10:50 | **Sprint opens.** Task cards handed out to every table at the same moment | "Your task is on the table. You have fifty minutes. Your plan has to work without you in the room." Start the clock on the screen. |
 | 11:15 | Halfway call | "Twenty-five minutes left. If you haven't named who owns each step, start now." |
 | 11:35 | Five-minute call | "Five minutes. Finish your sentences, not your ideas." |
-| 11:40 | **Plans locked and handed over** | Pens down. Floor facilitators carry each plan to the next table: {{handover_chain}} |
+| 11:40 | **Plans locked and handed over** | Pens down. You and the ushers carry each plan to the next table: {{handover_chain}} |
 | 11:45 | **Critique opens**, 35 minutes | "You're reviewing another team's plan. Find the gaps. Use the critique sheet: gap, question, strength." |
-| 12:20 | **Critiques returned.** Response opens, 15 minutes | Floor facilitators return each critique to the team that wrote the plan. "You have fifteen minutes to answer your critique on the response sheet." |
-| 12:35 | **Lunch.** Collect every plan, critique and response | Floor facilitators bundle each table's three sheets and hand them to the judges' table. |
+| 12:20 | **Critiques returned.** Response opens, 15 minutes | You and the ushers return each critique to the team that wrote the plan. "You have fifteen minutes to answer your critique on the response sheet." |
+| 12:35 | **Lunch.** Collect every plan, critique and response | You and the ushers bundle each table's three sheets and hand them to the judges' table. |
 | 13:30 | **Presentations**, 3 to 5 minutes per team from their A2 board, 2 minutes changeover | Order: {{presentation_order}}. The timer runs 5 minutes, turns amber at 1 minute and red at zero. At zero, thank them and stop them. |
 | 14:50 | **Panel feedback and recognitions** | Hand over to the judges' spokesperson. |
-| [confirm] | Close and certificates | Lead Sprint Marshal: thanks to partners, mentors/advisors, judges and the committee. |
+| [confirm] | Close and certificates | Thank partners, both facilitators, mentors/advisors, judges and the committee. |
 | 16:00 | End | |
 
 **When things go wrong**
@@ -75,7 +76,7 @@ Tables you look after: {{tables_covered}}
 - **Someone arrives after 10:50.** Seat them at their own table. Don't stop the clock.
 - **A team finishes early.** Ask them to read their plan as if they were a stranger who has to run it tomorrow, then fix what's unclear.
 - **A team asks you for an idea.** "That's a great question for your mentor." Then point to the mentor on the floor.
-- **The screen or power fails.** The Lead Sprint Marshal calls the times out loud. The sprint runs on paper anyway.`,
+- **The screen or power fails.** Call the times out loud. The sprint runs on paper anyway.`,
 
   mentor_brief: `**QLV 2026 · Mentor/Advisor brief · {{full_name}}**
 Reference {{reference}}

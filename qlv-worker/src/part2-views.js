@@ -54,7 +54,7 @@ export const P2_HTML = String.raw`
     <div class="side" style="flex:1 1 340px">
       <div class="card" style="margin:0 0 14px"><h2>The six tasks</h2><p class="small" style="margin:0 0 6px">Only admin can see these before the briefs open at 7:00am on Saturday. They are never put in an email. Which table has which task, and the print packs, are on the Tables page.</p><div id="bfTasks"></div></div>
       <div class="card" id="taskEdit" hidden style="margin:0 0 14px"></div>
-      <div class="card"><h2>Who does what</h2><p class="small" style="margin:0 0 10px">Mentor routes and facilitator tables are on the Staff tab.</p><button class="btn ghost" data-goto="staff">Open Staff</button></div>
+      <div class="card"><h2>Who does what</h2><p class="small" style="margin:0 0 10px">Mentor routes and judges are on the Staff tab. The Lead Sprint Marshal is marked on the Team rooms tab.</p><button class="btn ghost" data-goto="staff">Open Staff</button></div>
     </div>
   </div>
 </div>
@@ -171,7 +171,7 @@ function drawCheckin() {
 }
 
 // ---------- Briefings ----------
-const ROLE_ORDER = ["facilitator", "mentor", "judge"];
+const ROLE_ORDER = ["marshal", "mentor", "judge"];
 async function loadBriefings() {
   const [p, t, tp] = await Promise.all([call("packs"), call("sprint"), call("templates")]);
   bfData = { packs: p, tasks: t };
@@ -271,10 +271,10 @@ async function loadRoles() {
     d.people.map((p) => {
       const fac = p.kind === "facilitator";
       return '<tr style="cursor:default"><td><b>' + esc(p.name) + '</b><div class="small mono">' + esc(p.ref) + '</div></td>' +
-        (fac ? '<td colspan="2"><select data-ftype="' + p.id + '">' + opts(p.facilitatorType, [{ v: "lead", l: "Lead Sprint Marshal" }, { v: "floor", l: "Floor facilitator" }]) + '</select></td>'
+        (fac ? '<td colspan="4"><span class="small">Facilitator, gives the keynote. Ticket only: no lobby, brief, tables or scoring.</span></td></tr>'
           : '<td><input type="checkbox" data-rolechk="mentor" data-id="' + p.id + '"' + (p.mentor ? " checked" : "") + ' style="width:20px;height:20px"></td><td><input type="checkbox" data-rolechk="judge" data-id="' + p.id + '"' + (p.judge ? " checked" : "") + ' style="width:20px;height:20px"></td>') +
-        '<td>' + (p.mentor && !fac ? '<select data-pair="' + p.id + '"><option value="">Choose a pair</option>' + opts(JSON.stringify(p.tables), d.pairs.map((pr) => ({ v: JSON.stringify(pr.tables), l: pr.label }))) + '</select>' : '<span class="small">' + esc(p.tableNames.join(", ") || (fac ? "" : "Judges only")) + '</span>') + '</td>' +
-        '<td>' + (p.mentor && !fac && p.tables.length ? '<select data-start="' + p.id + '">' + opts(p.startTable, p.tables.map((t, i) => ({ v: t, l: p.tableNames[i] }))) + '</select>' : "") + '</td></tr>';
+        (fac ? "" : '<td>' + (p.mentor ? '<select data-pair="' + p.id + '"><option value="">Choose a pair</option>' + opts(JSON.stringify(p.tables), d.pairs.map((pr) => ({ v: JSON.stringify(pr.tables), l: pr.label }))) + '</select>' : '<span class="small">' + esc(p.tableNames.join(", ") || "Judges only") + '</span>') + '</td>' +
+        '<td>' + (p.mentor && p.tables.length ? '<select data-start="' + p.id + '">' + opts(p.startTable, p.tables.map((t, i) => ({ v: t, l: p.tableNames[i] }))) + '</select>' : "") + '</td></tr>');
     }).join("") + '</tbody></table>';
 }
 
@@ -345,7 +345,7 @@ async function loadSettings() {
   $("#setForm").innerHTML = '<h2>Teams and briefs</h2>' +
     '<div class="two">' + f("min_table_size", "Smallest table allowed", s.min_table_size, "number", ' min="2" max="8"') + f("teams_announced_at", "Teams announced at", abuja(s.teams_announced_at), "datetime-local") + '</div>' +
     '<div class="two">' + f("brief_unlock_at", "Briefs open at", abuja(s.brief_unlock_at), "datetime-local") + f("event_day", "Judges’ links work on", s.event_day, "date") + '</div>' +
-    '<h2 style="margin-top:8px">Arrival times</h2><div class="three">' + f("arr_facilitator", "Facilitators", s.arrival_time.facilitator) + f("arr_mentor", "Mentors/Advisors", s.arrival_time.mentor) + f("arr_judge", "Judges", s.arrival_time.judge) + '</div>' +
+    '<h2 style="margin-top:8px">Arrival times</h2><div class="three">' + f("arr_marshal", "Lead Sprint Marshal", s.arrival_time.marshal || s.arrival_time.facilitator) + f("arr_mentor", "Mentors/Advisors", s.arrival_time.mentor) + f("arr_judge", "Judges", s.arrival_time.judge) + '</div>' +
     '<h2 style="margin-top:8px">People</h2><div class="two"><label>Judges’ spokesperson<select name="spokesperson"><option value="">Not chosen yet</option>' + d.judges.map((j) => '<option value="' + j.id + '"' + (j.id === s.spokesperson ? " selected" : "") + '>' + esc(j.name) + '</option>').join("") + '</select></label>' +
     f("chair_name", "Chairperson’s name", s.chair_name) + '</div>' + f("chair_phone", "Chairperson’s phone, used in the briefs", s.chair_phone) +
     '<h2 style="margin-top:8px">The clock</h2><div class="three">' + f("sprint_start", "Sprint opens", s.sprint_start) + f("sprint_minutes", "Sprint minutes", s.sprint_minutes, "number") + f("critique_minutes", "Critique minutes", s.critique_minutes, "number") + '</div>' +
@@ -447,7 +447,6 @@ document.addEventListener("change", async (e) => {
     if (t.id === "tplPick") { tplKey = t.value; return drawTemplates(); }
     if (t.matches("[data-toggle]")) { await call("stage", { action: "toggles", toggles: { [t.dataset.toggle]: t.checked } }); return; }
     if (t.matches("[data-rolechk]")) { await call("role", { id: Number(t.dataset.id), [t.dataset.rolechk]: t.checked }); return loadRoles(); }
-    if (t.matches("[data-ftype]")) { await call("role", { id: Number(t.dataset.ftype), facilitatorType: t.value }); return loadRoles(); }
     if (t.matches("[data-pair]")) { await call("role", { id: Number(t.dataset.pair), tables: t.value ? JSON.parse(t.value) : [] }); return loadRoles(); }
     if (t.matches("[data-start]")) { await call("role", { id: Number(t.dataset.start), startTable: Number(t.value) }); return loadRoles(); }
   } catch (err) { msg(err.message); }
@@ -474,7 +473,7 @@ document.addEventListener("submit", async (e) => {
       const schedule = v("schedule").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const m = l.match(/^(\d{1,2}:\d{2})\s+(.+)$/); return m ? { t: m[1], what: m[2] } : { t: "", what: l }; });
       await call("settings", { settings: {
         min_table_size: v("min_table_size"), teams_announced_at: v("teams_announced_at"), brief_unlock_at: v("brief_unlock_at"), event_day: v("event_day"),
-        arrival_time: { facilitator: v("arr_facilitator"), mentor: v("arr_mentor"), judge: v("arr_judge") },
+        arrival_time: { marshal: v("arr_marshal"), mentor: v("arr_mentor"), judge: v("arr_judge") },
         spokesperson: v("spokesperson") || null, chair_name: v("chair_name"), chair_phone: v("chair_phone"),
         sprint_start: v("sprint_start"), sprint_minutes: v("sprint_minutes"), critique_minutes: v("critique_minutes"), response_minutes: v("response_minutes"),
         presentations_start: v("presentations_start"), presentation_minutes: v("presentation_minutes"), changeover_minutes: v("changeover_minutes"),

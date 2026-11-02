@@ -10,7 +10,7 @@ export const DEFAULTS = {
   teams_frozen: false,                          // set by "Teams have been announced"
   brief_unlock_at: "2026-11-07T06:00:00Z",      // 7:00am on Saturday 7 November
   event_day: "2026-11-07",                      // judges' links work on this day only
-  arrival_time: { facilitator: "8:00am", mentor: "10:15am", judge: "10:15am" },
+  arrival_time: { marshal: "8:00am", mentor: "10:15am", judge: "10:15am" },
   spokesperson: null,                           // a judge's ticket id
   chair_name: "Hadeezah Balarabe Musa",
   chair_phone: "+234 703 390 1986",
@@ -95,7 +95,7 @@ function check(key, v) {
   }
   if (key === "arrival_time") {
     const out = {};
-    for (const role of ["facilitator", "mentor", "judge"]) {
+    for (const role of ["marshal", "mentor", "judge"]) {
       const t = String(v?.[role] || "").replace(/\s+/g, "").toLowerCase();
       if (!ARRIVAL.test(t)) throw new HttpError(400, "Write arrival times like 8:00am or 10:15am.");
       out[role] = t;
