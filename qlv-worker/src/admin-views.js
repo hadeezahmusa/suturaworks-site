@@ -86,7 +86,7 @@ export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + String.raw`
 </div>
 
 <div id="staffView" hidden>
-  <p class="small" style="margin:0 0 12px">Facilitators, advisers and judges. Nobody here sits at a table. Their badge shows their role instead.</p>
+  <p class="small" style="margin:0 0 12px">Facilitators, advisers and judges. Nobody here sits at a table. Their badge shows their role instead. The facilitators are the keynote speakers, one for each day: they get a ticket only.</p>
   <div class="grid">
     <form class="card" id="sForm" style="flex:1 1 340px"><h2>Register a facilitator</h2>
       <label class="fl">Full name<input type="text" name="name" placeholder="As on their ID" required></label>

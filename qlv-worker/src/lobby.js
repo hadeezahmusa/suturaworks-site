@@ -9,13 +9,13 @@
 // changed later) is emailed by the minute tick in tick().
 //
 // Who is in: participants (standard, member, corporate, sponsored, partner),
-// mentors and advisers who are not judging, and facilitators. Judges never
+// mentors and advisers who are not judging, and the QLV team. Judges never
 // are, so judging stays impartial; someone marked both mentor and judge
-// counts as a judge. Participants see their own table's room only, mentors
-// their two tables, the Lead Sprint Marshal every room, floor facilitators
-// the lobby only. The QLV team (organisers added on the Team rooms tab, no
-// ticket) see the lobby and every room, under the negative of their
-// lobby_team id. Nothing here ever shows an email, a phone number, a count
+// counts as a judge. Facilitators (the keynote speakers) are not in the lobby
+// at all. Participants see their own table's room only, mentors their two
+// tables. The QLV team (organisers added on the Team rooms tab, no ticket)
+// see the lobby and every room, under the negative of their lobby_team id;
+// the one marked as marshal shows as "Lead Sprint Marshal". Nothing here ever shows an email, a phone number, a count
 // of registrations, or anything from the briefs and tasks.
 
 import { HttpError, now, token, sendMail } from "./index.js";
@@ -91,7 +91,7 @@ export async function lobbyPeople(env) {
         AND t.cancelled_at IS NULL AND t.ticket_ref != 'pending'
       ORDER BY t.sent_at, t.id`).all(),
     staffPeople(env), tablesNow(env),
-    env.DB.prepare("SELECT id, name, email FROM lobby_team WHERE removed_at IS NULL ORDER BY id").all(),
+    env.DB.prepare("SELECT id, name, email, marshal FROM lobby_team WHERE removed_at IS NULL ORDER BY id").all(),
   ]);
   const plan = assignPlan(staff, tables);
   const out = parts.results.map((t) => ({
@@ -100,23 +100,20 @@ export async function lobbyPeople(env) {
     rooms: t.table_index !== null && t.table_index !== undefined && !t.late_after_freeze ? [t.table_index] : [],
   }));
   for (const s of staff) {
-    if (s.judge) continue;
+    if (s.judge || s.kind === "facilitator") continue;
     const base = { id: s.id, kind: s.kind, name: s.name, email: s.email, ref: s.ref, org: "", table: null, late: false };
-    if (s.kind === "facilitator") {
-      if (s.facilitatorType === "lead") out.push({ ...base, role: "marshal", rooms: tables });
-      else out.push({ ...base, role: "facilitator", rooms: [] });
-    } else if (s.mentor) {
+    if (s.mentor) {
       const rooms = s.tables?.length ? s.tables : plan[s.id]?.tables || [];
       out.push({ ...base, role: "mentor", rooms });
     }
   }
   for (const m of team.results) {
-    out.push({ id: -m.id, kind: "team", name: m.name, email: m.email, ref: "", org: "", role: "team", table: null, late: false, rooms: tables });
+    out.push({ id: -m.id, kind: "team", name: m.name, email: m.email, ref: "", org: "", role: m.marshal ? "marshal" : "team", table: null, late: false, rooms: tables });
   }
   return out;
 }
 
-const ROLE_LABEL = { participant: "", mentor: "Mentor", marshal: "Lead Sprint Marshal", facilitator: "QLV team", team: "QLV team" };
+const ROLE_LABEL = { participant: "", mentor: "Mentor", marshal: "Lead Sprint Marshal", team: "QLV team" };
 
 // The person behind a link, if the link is live and they still have a place.
 async function personFor(env, tok) {
@@ -285,14 +282,13 @@ async function quickAccess(env, tok, space, st) {
     return own.ticket_id;
   }
   const row = t.length >= 32 ? await env.DB.prepare(`SELECT a.ticket_id, a.revoked_at, t.kind, t.table_index, t.late_after_freeze, t.cancelled_at,
-      sr.mentor, sr.judge, sr.facilitator_type, sr.tables
+      sr.mentor, sr.judge, sr.tables
     FROM lobby_access a JOIN tickets t ON t.id = a.ticket_id LEFT JOIN staff_roles sr ON sr.ticket_id = t.id WHERE a.token = ?`).bind(t).first() : null;
-  if (!row || row.revoked_at || row.cancelled_at || row.judge) throw new HttpError(404, "This link is no longer active.", "bad_link");
+  if (!row || row.revoked_at || row.cancelled_at || row.judge || row.kind === "facilitator") throw new HttpError(404, "This link is no longer active.", "bad_link");
   if (space === "lobby") return row.ticket_id;
   const n = Number((/^t:(\d+)$/.exec(space) || [])[1]);
   if (!st.rooms_open || !Number.isInteger(n)) throw new HttpError(403, "This room is not open to you.");
   const ok = PARTICIPANT.includes(row.kind) ? row.table_index === n && !row.late_after_freeze
-    : row.kind === "facilitator" ? row.facilitator_type === "lead"
     : !!row.mentor && JSON.parse(row.tables || "[]").includes(n);
   // A mentor whose tables were never saved falls back to the full check.
   if (!ok && row.mentor && !JSON.parse(row.tables || "[]").length) {
@@ -738,6 +734,19 @@ export async function addTeamMember(env, b, who) {
     if (sent) await env.DB.prepare("UPDATE lobby_access SET notified_at = ?, notified_by = 'welcome' WHERE id = ?").bind(now(), a.id).run();
   }
   return { ...(await lobbyAdmin(env)), sent, open: st.open };
+}
+
+// One Lead Sprint Marshal at a time, chosen from the QLV team. Marking
+// someone new moves the mark; the run sheet in Briefings goes to them.
+export async function setMarshal(env, b) {
+  const id = Math.abs(Number(b.id));
+  if (b.on && !(await env.DB.prepare("SELECT 1 FROM lobby_team WHERE id = ? AND removed_at IS NULL").bind(id).first())) throw new HttpError(404, "They are not on the QLV team list.");
+  await env.DB.batch([
+    env.DB.prepare("UPDATE lobby_team SET marshal = 0 WHERE marshal = 1" + (b.on ? "" : " AND id = ?")).bind(...(b.on ? [] : [id])),
+    ...(b.on ? [env.DB.prepare("UPDATE lobby_team SET marshal = 1 WHERE id = ?").bind(id)] : []),
+    env.DB.prepare("UPDATE packs SET stale = 1 WHERE role = 'marshal'"),
+  ]);
+  return lobbyAdmin(env);
 }
 
 export async function removeTeamMember(env, b) {

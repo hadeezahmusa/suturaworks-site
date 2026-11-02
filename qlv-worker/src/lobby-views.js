@@ -40,7 +40,7 @@ export const LOBBY_HTML = String.raw`
         <label class="fl">Lobby and rooms close (Abuja time)<input type="datetime-local" name="close_at" min="2026-11-01T00:00" max="2026-11-30T23:59"></label>
         <button class="btn" style="width:100%">Save</button></form>
       <form class="card lp-form" id="lbTeam" style="margin:0 0 14px"><h2>QLV team</h2>
-        <p class="small" style="margin:-4px 0 10px">Organisers who should see the lobby and every team room as participants do. They get their own link, can post, show as "QLV team", and have no ticket, badge or table.</p>
+        <p class="small" style="margin:-4px 0 10px">Organisers who should see the lobby and every team room as participants do. They get their own link, can post, show as "QLV team", and have no ticket, badge or table. Mark one of them as the Lead Sprint Marshal: they show as that in the chat and the run sheet in Briefings goes to them.</p>
         <div id="lbTeamList"></div>
         <label class="fl">Full name<input type="text" name="name" maxlength="120" required></label>
         <label class="fl">Email<input type="email" name="email" maxlength="160" required></label>
@@ -53,7 +53,7 @@ export const LOBBY_HTML = String.raw`
 
 export const LOBBY_JS = String.raw`
 let lbData = null;
-const LB_ROLE = { participant: "Participant", mentor: "Mentor", marshal: "Lead Sprint Marshal", facilitator: "Facilitator", team: "QLV team" };
+const LB_ROLE = { participant: "Participant", mentor: "Mentor", marshal: "Lead Sprint Marshal", team: "QLV team" };
 const lbBody = (s) => { const [t, ...r] = String(s).split("\n"); return "<b>" + esc(t) + "</b>" + (r.length ? "\n" + esc(r.join("\n")) : ""); };
 async function loadLobby(d) {
   const x = lbData = d || await call("lobby");
@@ -85,9 +85,14 @@ async function loadLobby(d) {
     (p.noEmail ? '<div class="flag">No email, share link by hand</div>' : "") + "</td></tr>").join("") || '<tr><td colspan="7" class="small">Nobody has a ticket yet.</td></tr>';
   $("#lbTables").innerHTML = x.tables.length ? '<table><thead><tr><th>Table</th><th>People</th><th>Opened room</th><th>Intro</th><th>Posted</th></tr></thead><tbody>' +
     x.tables.map((t) => "<tr><td><b>" + esc(t.name) + "</b></td><td>" + t.members + "</td><td>" + (st.rooms_open ? t.opened : "–") + "</td><td>" + t.intros + "</td><td>" + t.posted + "</td></tr>").join("") + "</tbody></table>" : '<p class="small">No tables yet.</p>';
-  const team = x.people.filter((p) => p.role === "team");
-  $("#lbTeamList").innerHTML = team.length ? team.map((p) => '<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)"><span><b>' + esc(p.name) + '</b><span class="tiny"> · ' +
-    (p.told ? "link sent" : st.open ? "email waiting" : "link goes when the lobby opens") + '</span></span><button type="button" class="link" data-lbteamrm="' + p.ticketId + '" data-name="' + esc(p.name) + '">Remove</button></div>').join("") + '<div style="height:10px"></div>' : "";
+  const team = x.people.filter((p) => p.role === "team" || p.role === "marshal");
+  const hasMarshal = team.some((p) => p.role === "marshal");
+  $("#lbTeamList").innerHTML = team.length ? team.map((p) => '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)"><span><b>' + esc(p.name) + "</b>" +
+    (p.role === "marshal" ? ' <span class="pill ok">Lead Sprint Marshal</span>' : "") + '<span class="tiny"> · ' +
+    (p.told ? "link sent" : st.open ? "email waiting" : "link goes when the lobby opens") + '</span></span><span style="display:flex;gap:12px;flex:none">' +
+    (p.role === "marshal" ? '<button type="button" class="link" data-lbmarshal="' + p.ticketId + '" data-on="0" data-name="' + esc(p.name) + '">Unmark</button>'
+      : '<button type="button" class="link" data-lbmarshal="' + p.ticketId + '" data-on="1" data-name="' + esc(p.name) + '">' + (hasMarshal ? "Make marshal instead" : "Make Lead Sprint Marshal") + "</button>") +
+    '<button type="button" class="link" data-lbteamrm="' + p.ticketId + '" data-name="' + esc(p.name) + '">Remove</button></span></div>').join("") + '<div style="height:10px"></div>' : "";
   $("#lbLate").hidden = !x.late.length;
   $("#lbLateList").innerHTML = x.late.map((p) => "<div>" + esc(p.name) + ' <span class="tiny mono">' + esc(p.ref) + "</span></div>").join("");
   $("#lbMsgs").innerHTML = x.messages.map((m) => '<div class="lmsg' + (m.hidden ? " hid" : "") + '"><b>' + esc(m.who) + "</b>" + (m.role ? " (" + esc(m.role) + ")" : "") + ' <span class="tiny">in ' + esc(m.space) + ", " + esc(when(m.at)) + "</span>" +
@@ -143,6 +148,11 @@ $("#lobbyView").addEventListener("click", async (e) => {
       const b = el("[data-lbp]"), a = b.dataset.lbp;
       if (a === "send" && !confirm("Send this post now? It appears in the lobby and goes out as a notification.")) return;
       await loadLobby(await call("lobby-post-action", { id: Number(b.dataset.id), action: a })); msg(a === "send" ? "Sent." : a === "cancel" ? "Cancelled." : "Restored.", true); return;
+    }
+    if (el("[data-lbmarshal]")) {
+      const b = el("[data-lbmarshal]"), on = b.dataset.on === "1";
+      if (!confirm(on ? "Make " + b.dataset.name + " the Lead Sprint Marshal? They show as that in the chat and get the marshal run sheet in Briefings." : "Unmark " + b.dataset.name + " as the Lead Sprint Marshal?")) return;
+      await loadLobby(await call("lobby-marshal", { id: Number(b.dataset.lbmarshal), on })); msg(on ? b.dataset.name + " is the Lead Sprint Marshal. Generate the marshal pack in Briefings when you are ready." : "Unmarked.", true); return;
     }
     if (el("[data-lbteamrm]")) {
       const b = el("[data-lbteamrm]");

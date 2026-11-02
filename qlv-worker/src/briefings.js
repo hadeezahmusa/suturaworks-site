@@ -1,6 +1,8 @@
 // Tasks, staff roles, mentor routes, role packs, brief links and the printed
 // table sheets (part 2, feature 3). Admin screens use the Sutura Works look;
-// everything a facilitator, mentor or judge receives is in the QLV look.
+// everything the Lead Sprint Marshal, a mentor or a judge receives is in the
+// QLV look. Facilitators are the keynote speakers, one for each day: they get
+// their ticket and nothing else from here.
 //
 // The access rule: a brief link shows a holding page until brief_unlock_at.
 // Tasks are only ever shown through those links and to signed-in admin, never
@@ -14,7 +16,7 @@ import { sendBatch, dailyRoom } from "./mailer.js";
 import { tasksInUse, assignments } from "./sprintpack.js";
 import * as mail from "./emails.js";
 
-const ROLES = { facilitator: "Facilitator", mentor: "Mentor/Advisor", judge: "Judge" };
+const ROLES = { marshal: "Lead Sprint Marshal", mentor: "Mentor/Advisor", judge: "Judge" };
 const clean = (v, max = 2000) => String(v ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, max);
 const list = (names) => names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 
@@ -38,38 +40,47 @@ export function presentationOrder(tables, s) {
 
 // ---------- staff and their roles ----------
 
-// Facilitators, advisers (sign-up page) and corporate judges or mentors, with
-// what they do on the day. Without a saved row, roles follow how they signed up.
+// Facilitators (keynote speakers), advisers (sign-up page) and corporate judges
+// or mentors, with what they do on the day. Without a saved row, roles follow
+// how they signed up. Facilitators never mentor or judge.
 export async function staffPeople(env) {
   const { results } = await env.DB.prepare(`SELECT t.id, t.kind, t.name, t.email, t.ticket_ref, t.created_at, r.mode,
       sr.mentor, sr.judge, sr.facilitator_type, sr.tables, sr.start_table, sr.ticket_id AS saved
     FROM tickets t JOIN registrations r ON r.ref = t.reg_ref LEFT JOIN staff_roles sr ON sr.ticket_id = t.id
     WHERE t.kind IN ('facilitator', 'adviser', 'judge') AND t.cancelled_at IS NULL AND r.status = 'confirmed'
     ORDER BY t.created_at, t.id`).all();
-  let leadSeen = false;
   return results.map((p) => {
     const mode = p.kind === "judge" ? "both" : p.mode || "both";
     const out = {
       id: p.id, kind: p.kind, name: p.name, email: p.email, ref: p.ticket_ref,
-      mentor: p.saved ? !!p.mentor : p.kind !== "facilitator" && mode !== "judge",
-      judge: p.saved ? !!p.judge : p.kind !== "facilitator" && mode !== "adviser",
-      facilitatorType: p.kind === "facilitator" ? (p.facilitator_type || null) : null,
-      tables: p.tables ? JSON.parse(p.tables) : [],
-      startTable: p.start_table,
+      mentor: p.kind !== "facilitator" && (p.saved ? !!p.mentor : mode !== "judge"),
+      judge: p.kind !== "facilitator" && (p.saved ? !!p.judge : mode !== "adviser"),
+      tables: p.kind !== "facilitator" && p.tables ? JSON.parse(p.tables) : [],
+      startTable: p.kind !== "facilitator" ? p.start_table : null,
     };
-    if (p.kind === "facilitator") {
-      if (!out.facilitatorType) out.facilitatorType = leadSeen ? "floor" : "lead";
-      if (out.facilitatorType === "lead") leadSeen = true;
-    }
     return out;
   });
+}
+
+// The Lead Sprint Marshal: someone on the QLV team list (Team rooms tab)
+// marked as the marshal. No ticket, so the id is the negative of their
+// lobby_team id, the same as in the lobby. They cover every table.
+export async function marshalPeople(env, tables) {
+  const { results } = await env.DB.prepare("SELECT id, name, email FROM lobby_team WHERE marshal = 1 AND removed_at IS NULL ORDER BY id").all();
+  return results.map((m) => ({ id: -m.id, kind: "marshal", name: m.name, email: m.email, ref: "", mentor: false, judge: false, tables: tables || [], startTable: null }));
+}
+
+// Everyone who gets a brief: the staff plus the marshal.
+async function briefPeople(env) {
+  const tables = await tablesNow(env);
+  return [...(await staffPeople(env)), ...(await marshalPeople(env, tables))];
 }
 
 function saveRow(env, p) {
   return env.DB.prepare(`INSERT INTO staff_roles (ticket_id, mentor, judge, facilitator_type, tables, start_table, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (ticket_id) DO UPDATE SET mentor = excluded.mentor, judge = excluded.judge, facilitator_type = excluded.facilitator_type,
       tables = excluded.tables, start_table = excluded.start_table, updated_at = excluded.updated_at`)
-    .bind(p.id, p.mentor ? 1 : 0, p.judge ? 1 : 0, p.facilitatorType, JSON.stringify(p.tables || []), p.startTable ?? null, now());
+    .bind(p.id, p.mentor ? 1 : 0, p.judge ? 1 : 0, null, JSON.stringify(p.tables || []), p.startTable ?? null, now());
 }
 
 // The pairs: first and second, third and fourth... An odd last table joins the final pair.
@@ -81,8 +92,7 @@ export function pairsOf(tables) {
 }
 
 // Mentors in sign-up order go round the pairs: one per pair, then a second
-// for each pair, who starts on the other table. Floor facilitators share the
-// tables in order; the lead covers every table.
+// for each pair, who starts on the other table.
 export function assignPlan(people, tables) {
   const pairs = pairsOf(tables);
   const mentors = people.filter((p) => p.mentor);
@@ -92,12 +102,6 @@ export function assignPlan(people, tables) {
     const nth = Math.floor(k / pairs.length);
     plan[m.id] = { tables: pair, startTable: pair[nth % pair.length] };
   });
-  const floors = people.filter((p) => p.kind === "facilitator" && p.facilitatorType === "floor");
-  for (const p of people.filter((x) => x.kind === "facilitator")) {
-    if (p.facilitatorType === "lead" || !floors.length) { plan[p.id] = { tables, startTable: null }; continue; }
-    const i = floors.indexOf(p), per = Math.ceil(tables.length / floors.length);
-    plan[p.id] = { tables: tables.slice(i * per, i * per + per), startTable: null };
-  }
   return plan;
 }
 
@@ -145,14 +149,14 @@ export async function saveStaffRole(env, b) {
   const next = { ...p };
   if ("mentor" in b) next.mentor = !!b.mentor;
   if ("judge" in b) next.judge = !!b.judge;
-  if ("facilitatorType" in b && p.kind === "facilitator") next.facilitatorType = b.facilitatorType === "lead" ? "lead" : "floor";
   if ("tables" in b) {
     const t = (Array.isArray(b.tables) ? b.tables : []).map(Number).filter((x) => tables.includes(x));
     next.tables = [...new Set(t)];
     if (!next.tables.includes(next.startTable)) next.startTable = next.tables[0] ?? null;
   }
   if ("startTable" in b) next.startTable = next.tables.includes(Number(b.startTable)) ? Number(b.startTable) : next.tables[0] ?? null;
-  if (!next.mentor && p.kind !== "facilitator") { next.tables = []; next.startTable = null; }
+  if (p.kind === "facilitator") throw new HttpError(409, "Facilitators give the keynote. They don't mentor or judge.");
+  if (!next.mentor) { next.tables = []; next.startTable = null; }
   await env.DB.batch([saveRow(env, next), env.DB.prepare("UPDATE packs SET stale = 1 WHERE ticket_id = ?").bind(p.id)]);
   return staffView(env);
 }
@@ -247,7 +251,7 @@ async function sha(text) {
 
 // Everything the templates can ask for, for one person in one role.
 async function context(env) {
-  const [s, tables, people, tpl, tasks, a] = await Promise.all([getSettings(env), tablesNow(env), staffPeople(env), templateMap(env), tasksInUse(env), assignments(env)]);
+  const [s, tables, people, tpl, tasks, a] = await Promise.all([getSettings(env), tablesNow(env), briefPeople(env), templateMap(env), tasksInUse(env), assignments(env)]);
   const crit = parseCriteria(tpl.criteria);
   const spokes = people.find((p) => p.id === s.spokesperson && p.judge);
   return { s, tables, people, tpl, tasks, tasksComplete: a.complete, crit, spokes };
@@ -258,7 +262,7 @@ async function fieldsFor(env, ctx, p, role) {
   const first = p.name.split(/\s+/)[0];
   const f = {
     first_name: first, full_name: p.name, role: ROLES[role], reference: p.ref,
-    arrival_time: s.arrival_time[role], unlock_time: abujaLabel(s.brief_unlock_at),
+    arrival_time: role === "marshal" ? (s.arrival_time.marshal || s.arrival_time.facilitator) : s.arrival_time[role], unlock_time: abujaLabel(s.brief_unlock_at),
     table_count: tables.length,
     handover_chain: chainOf(tables).map((c) => `${tableName(c.from)} to ${tableName(c.to)}`).join(", "),
     presentation_order: presentationOrder(tables, s).map((o) => `${o.name} ${o.time}`).join(", "),
@@ -268,9 +272,9 @@ async function fieldsFor(env, ctx, p, role) {
     criteria_block: ctx.crit.map((c) => `**${c.name}**\n- 1: ${c.anchors[1]}\n- 3: ${c.anchors[3]}\n- 5: ${c.anchors[5]}`).join("\n\n"),
     spokesperson_name: ctx.spokes?.name,
   };
-  if (role === "facilitator") {
-    f.facilitator_type = p.facilitatorType === "lead" ? "Lead Sprint Marshal" : "Floor facilitator";
-    f.tables_covered = list(p.tables.map(tableName)) || null;
+  if (role === "marshal") {
+    f.reference = "";
+    f.tables_covered = list(tables.map(tableName));
   }
   if (role === "mentor") {
     const names = p.tables.map(tableName);
@@ -289,13 +293,13 @@ async function fieldsFor(env, ctx, p, role) {
 }
 
 const DOCS = {
-  facilitator: [["facilitator_run_sheet", "Run sheet"]],
+  marshal: [["facilitator_run_sheet", "Run sheet"]],
   mentor: [["mentor_brief", "Brief"], ["mentor_route", "Route card"]],
   judge: [["judge_brief", "Brief"]],
 };
 
 function inRole(p, role) {
-  return role === "facilitator" ? p.kind === "facilitator" : role === "mentor" ? p.mentor && p.kind !== "facilitator" : p.judge && p.kind !== "facilitator";
+  return role === "marshal" ? p.kind === "marshal" : role === "mentor" ? p.mentor && p.kind !== "facilitator" : p.judge && p.kind !== "facilitator";
 }
 
 async function buildPack(env, ctx, p, role) {
@@ -308,16 +312,18 @@ async function buildPack(env, ctx, p, role) {
   });
   const cover = fill(ctx.tpl.cover_email, f);
   cover.missing.forEach((m) => missing.add(m));
+  // The marshal has no ticket, so no reference and no badge sentence.
+  if (role === "marshal") cover.text = cover.text.replace(/ ?Your reference is \.?/g, "").replace(/ and collect your badge at the desk/g, "");
   if (!ctx.tasksComplete) missing.add("tasks");
   return { name: p.name, ref: p.ref, role, docs, cover: cover.text, link: f.brief_link, missing: [...missing] };
 }
 
 export async function generatePacks(env, b) {
   const role = ROLES[b.role] ? b.role : null;
-  if (!role) throw new HttpError(400, "Choose facilitators, mentors/advisors or judges.");
+  if (!role) throw new HttpError(400, "Choose the Lead Sprint Marshal, mentors/advisors or judges.");
   const ctx = await context(env);
   const people = ctx.people.filter((p) => inRole(p, role));
-  if (!people.length) throw new HttpError(409, `There is nobody in the ${ROLES[role]} role yet.`);
+  if (!people.length) throw new HttpError(409, role === "marshal" ? "Nobody is marked as the Lead Sprint Marshal yet. Mark them on the Team rooms tab." : `There is nobody in the ${ROLES[role]} role yet.`);
   const stamp = now();
   const stmts = [];
   for (const p of people) {
@@ -342,7 +348,7 @@ function packState(row) {
 
 export async function packsView(env) {
   const [people, rows, s, tokens] = await Promise.all([
-    staffPeople(env),
+    briefPeople(env),
     env.DB.prepare("SELECT ticket_id, role, content, content_hash, generated_at, sent_at, sent_hash, stale FROM packs").all().then((r) => r.results),
     getSettings(env),
     env.DB.prepare("SELECT ticket_id, kind, token, opened_at FROM access_tokens WHERE revoked_at IS NULL AND ticket_id IS NOT NULL").all().then((r) => r.results),
@@ -357,7 +363,7 @@ export async function packsView(env) {
     for (const p of ps) { const r = by(p.id, role); if (r) JSON.parse(r.content).missing.forEach((m) => missing.add(m)); }
     return {
       role, label: ROLES[role], count: ps.length,
-      contents: { facilitator: "Run sheet for both days", mentor: "Brief, their tables, timed route, the tasks", judge: "Brief, personal scoring link, criteria, the tasks" }[role],
+      contents: { marshal: "Run sheet for both days", mentor: "Brief, their tables, timed route, the tasks", judge: "Brief, personal scoring link, criteria, the tasks" }[role],
       notGenerated: n("none"), stale: n("stale"), ready: n("ready"), sent: n("sent"), changed: n("changed"),
       missing: [...missing],
       people: ps.map((p) => {
@@ -381,7 +387,7 @@ export async function sendPacks(env, b) {
   if (!role) throw new HttpError(400, "Choose a role.");
   const { results } = await env.DB.prepare("SELECT ticket_id, content, content_hash, sent_at, sent_hash, stale FROM packs WHERE role = ?").bind(role).all();
   if (results.some((r) => r.stale)) throw new HttpError(409, "Something changed since these packs were made. Press Generate packs again first.");
-  const people = await staffPeople(env);
+  const people = await briefPeople(env);
   let pick = results;
   if (b.only === "changed") pick = results.filter((r) => r.sent_at && r.sent_hash !== r.content_hash);
   else if (b.only === "unsent") pick = results.filter((r) => !r.sent_at);
@@ -425,11 +431,13 @@ export async function briefFor(env, url) {
     ticketId = t.ticket_id;
     if (!t.opened_at) await env.DB.prepare("UPDATE access_tokens SET opened_at = ? WHERE id = ?").bind(now(), t.id).run();
   }
-  const person = await env.DB.prepare("SELECT name, ticket_ref FROM tickets WHERE id = ?").bind(ticketId).first();
+  const person = ticketId < 0
+    ? await env.DB.prepare("SELECT name, '' AS ticket_ref FROM lobby_team WHERE id = ? AND marshal = 1 AND removed_at IS NULL").bind(-ticketId).first()
+    : await env.DB.prepare("SELECT name, ticket_ref FROM tickets WHERE id = ?").bind(ticketId).first();
   if (!person) throw new HttpError(404, "This link is not valid.");
   const base = { name: person.name, ref: person.ticket_ref, unlockLabel: abujaLabel(s.brief_unlock_at) };
   if (!preview && Date.now() < Date.parse(s.brief_unlock_at)) return { ...base, locked: true };
-  const { results } = await env.DB.prepare(`SELECT role, content FROM packs WHERE ticket_id = ? ${role ? "AND role = ?" : ""} ORDER BY CASE role WHEN 'facilitator' THEN 0 WHEN 'mentor' THEN 1 ELSE 2 END`)
+  const { results } = await env.DB.prepare(`SELECT role, content FROM packs WHERE ticket_id = ? ${role ? "AND role = ?" : ""} ORDER BY CASE role WHEN 'marshal' THEN 0 WHEN 'mentor' THEN 1 ELSE 2 END`)
     .bind(...(role ? [ticketId, role] : [ticketId])).all();
   if (!results.length) return { ...base, locked: false, docs: [], empty: true };
   return { ...base, locked: false, preview: !!preview, docs: renderDocs(results) };
