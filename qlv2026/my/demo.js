@@ -63,6 +63,7 @@ function view() {
       messages: [...ROOM],
     }] : [],
     push: { key: "", state: null },
+    guide: { title: "How the sprint works: a worked example", url: "../files/QLV-2026-How-The-Sprint-Works.pdf" },
     installed: false,
   };
 }

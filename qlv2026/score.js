@@ -70,7 +70,7 @@ function draw() {
   const locked = t.state === "submitted";
   const vals = locked ? t.values : (drafts[t.table] || [null, null, null, null, null]);
   const net = outbox.length ? '<div class="net wait">' + (outbox.length === 1 ? "One score is" : outbox.length + " scores are") + " saved on this phone and will send when the connection returns. You can carry on.</div>"
-    : locked ? '<div class="net ok">Submitted and locked. If it needs changing, speak to the lead facilitator.</div>' : "";
+    : locked ? '<div class="net ok">Submitted and locked. If it needs changing, speak to the Lead Sprint Marshal.</div>' : "";
   $("#main").innerHTML = net + data.criteria.map((c, i) => '<fieldset><legend>' + esc(c.name) + '</legend><span class="crit">' + esc(c.name) + '</span><div class="opts">' +
     [1, 2, 3, 4, 5].map((n) => '<button type="button" data-c="' + i + '" data-n="' + n + '" aria-label="' + esc(c.name) + ", score " + n + '" aria-pressed="' + (vals[i] === n) + '"' + (locked ? " disabled" : "") + ">" + n + "</button>").join("") +
     '</div><p class="hint">' + esc(hintFor(c, vals[i])) + "</p></fieldset>").join("");
@@ -94,7 +94,7 @@ async function flush() {
       catch { break; } // offline: try again later
       if (res.ok || (res.status >= 400 && res.status < 500)) {
         // Accepted, or refused for good (already locked with other values): either way stop retrying it.
-        if (!res.ok) { const d = await res.json().catch(() => ({})); alert((d.error || "This score could not be saved.") + " Please speak to the lead facilitator."); }
+        if (!res.ok) { const d = await res.json().catch(() => ({})); alert((d.error || "This score could not be saved.") + " Please speak to the Lead Sprint Marshal."); }
         outbox.shift(); store.set(OUTBOX, outbox);
       } else break;
     }

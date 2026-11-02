@@ -6,8 +6,9 @@
 import { MONEY_STYLE, MONEY_HTML, MONEY_JS } from "./money-views.js";
 import { SCREEN_STYLE, SCREEN_HTML, SCREEN_JS } from "./screen-views.js";
 import { LOBBY_STYLE, LOBBY_HTML, LOBBY_JS } from "./lobby-views.js";
+import { SPRINT_STYLE, SPRINT_HTML, SPRINT_JS } from "./sprint-views.js";
 
-export const VIEWS_STYLE = MONEY_STYLE + SCREEN_STYLE + LOBBY_STYLE + String.raw`
+export const VIEWS_STYLE = MONEY_STYLE + SCREEN_STYLE + LOBBY_STYLE + SPRINT_STYLE + String.raw`
 .tabs{flex-wrap:wrap;column-gap:16px}
 td.mono,#eRows td:nth-child(5){white-space:nowrap}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:0 0 14px}
@@ -47,6 +48,7 @@ select{width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;pa
 export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + String.raw`
 <div id="tablesView" hidden>
   <p class="small" style="margin:0 0 12px">A seat fills when a payment is verified, or when a partner or sponsored seat is claimed. Only admin sees this page. Nothing here reaches participants.</p>
+  ${SPRINT_HTML}
   <div class="tiles" id="tTiles"></div>
   <div class="key" id="tKey"></div>
   <div class="grid"><div class="list" style="flex:3 1 600px"><div class="tgrid" id="tGrid"></div></div>
@@ -122,7 +124,7 @@ export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + String.raw`
   </div>
 </div>`;
 
-export const VIEWS_JS = MONEY_JS + SCREEN_JS + LOBBY_JS + String.raw`
+export const VIEWS_JS = MONEY_JS + SCREEN_JS + LOBBY_JS + SPRINT_JS + String.raw`
 const VIEWS = { tables: "tablesView", partners: "partnersView", screen: "screenView", lobby: "lobbyView", staff: "staffView", export: "exportView", money: "moneyView",
   rebalance: "rebalanceView", checkin: "checkinView", briefings: "briefingsView", scoring: "scoringView", stage: "stageView", settings: "settingsView" };
 const TIER_BG = { J: ["var(--yel)", "var(--ink)"], S: ["var(--navy)", "#fff"], C: ["#2C3E58", "#fff"], P: ["#E8E9EC", "var(--ink)"], T: ["#1F5F5B", "#fff"] };
@@ -130,7 +132,7 @@ let poll = null, curPartner = null, level = "lead", levels = [];
 function showView(tab) {
   Object.entries(VIEWS).forEach(([k, id]) => { $("#" + id).hidden = k !== tab; });
   clearInterval(poll); poll = null;
-  const load = { tables: loadTables, partners: loadPartners, screen: () => loadScreen(), lobby: () => loadLobby(), staff: () => Promise.all([loadStaff(), loadRoles()]), export: loadExport, money: loadMoney,
+  const load = { tables: () => Promise.all([loadTables(), loadSprint()]), partners: loadPartners, screen: () => loadScreen(), lobby: () => loadLobby(), staff: () => Promise.all([loadStaff(), loadRoles()]), export: loadExport, money: loadMoney,
     rebalance: loadRebalance, checkin: loadCheckin, briefings: loadBriefings, scoring: loadScoring, stage: loadStage, settings: loadSettings }[tab];
   if (load) load().catch((err) => msg(err.message));
   if (tab === "tables") poll = setInterval(() => { if (!document.hidden) loadTables().catch(() => {}); }, 15000);

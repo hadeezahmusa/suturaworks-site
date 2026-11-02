@@ -19,10 +19,11 @@ import * as ops from "./admin-ops.js";
 import * as money from "./money.js";
 import * as logos from "./logos.js";
 import * as lobby from "./lobby.js";
+import * as sprint from "./sprintpack.js";
 import { BOARD_CAN, boardSessionOk, boardView, boardAction, boardLogin, redact } from "./board.js";
 import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
 import { sendBatch, dailyRoom, DAILY_SAFE } from "./mailer.js";
-import { part2Routes, sheetsPage } from "./part2-admin.js";
+import { part2Routes } from "./part2-admin.js";
 import { P2_HTML, P2_JS, P2_STYLE, ONE_VIEW_JS } from "./part2-views.js";
 import { MONEY_HTML, MONEY_JS } from "./money-views.js";
 
@@ -1090,7 +1091,10 @@ export async function handleAdmin(req, env, ctx, url) {
     }
 
     const q = url.searchParams;
-    if (path === "/admin/print/sheets") return role === "admin" ? html(await sheetsPage(env, q.get("t") || "all")) : refuse();
+    // The sprint print packs and the task card preview: admin only, never the board.
+    if (path === "/admin/print/sheets") return role === "admin" ? new Response(null, { status: 303, headers: { location: "/admin/print/pack?kind=all" } }) : refuse();
+    if (path === "/admin/print/pack") return role === "admin" ? html(await sprint.packPage(env, q, who)) : refuse();
+    if (path === "/admin/print/taskcard") return role === "admin" ? html(await sprint.taskCardPreview(env, String(q.get("id") || ""))) : refuse();
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : null;
     const api = {
       "GET list": () => list(env, q.get("status") || "awaiting"),
@@ -1131,6 +1135,11 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET screen": () => logos.screenList(env),
       "GET board-access": () => boardView(env),
       "GET lobby": () => lobby.lobbyAdmin(env),
+      "GET sprint": async () => ({ ...(await sprint.assignments(env)), print: await sprint.printStatus(env), guideDownloads: await sprint.guideDownloads(env) }),
+      "POST sprint-task": () => sprint.saveTask(env, body, who),
+      "POST sprint-assign": () => sprint.autoAssign(env, who),
+      "POST sprint-table": () => sprint.setTableTask(env, body),
+      "POST sprint-lock": () => sprint.setLock(env, body, who),
       "POST lobby-open": () => lobby.openLobby(env, who),
       "POST lobby-rooms": () => lobby.openRooms(env, who),
       "POST lobby-settings": () => lobby.lobbySettings(env, body, who),

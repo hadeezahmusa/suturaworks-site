@@ -52,9 +52,8 @@ export const P2_HTML = String.raw`
         <div class="actions"><button class="btn" data-tpl="save">Save wording</button><button class="btn ghost" data-tpl="reset">Back to the original</button><span class="small" id="tplNote"></span></div></div>
     </div>
     <div class="side" style="flex:1 1 340px">
-      <div class="card" style="margin:0 0 14px"><h2>Tasks</h2><p class="small" style="margin:0 0 6px">Only admin can see these before the briefs open. They are never put in an email.</p><div id="bfTasks"></div></div>
+      <div class="card" style="margin:0 0 14px"><h2>The six tasks</h2><p class="small" style="margin:0 0 6px">Only admin can see these before the briefs open at 7:00am on Saturday. They are never put in an email. Which table has which task, and the print packs, are on the Tables page.</p><div id="bfTasks"></div></div>
       <div class="card" id="taskEdit" hidden style="margin:0 0 14px"></div>
-      <div class="card" style="margin:0 0 14px;background:var(--panel)"><h2>Printed table sheets</h2><p class="small" style="margin:0 0 10px">One set per table: task card, plan sheet, critique sheet and response sheet, A4. Open a table and choose Save as PDF.</p><div id="bfSheets"></div></div>
       <div class="card"><h2>Who does what</h2><p class="small" style="margin:0 0 10px">Mentor routes and facilitator tables are on the Staff tab.</p><button class="btn ghost" data-goto="staff">Open Staff</button></div>
     </div>
   </div>
@@ -88,7 +87,7 @@ export const P2_HTML = String.raw`
     <div class="side" style="flex:1 1 320px">
       <div class="card" style="margin:0 0 14px"><h2>Sound cues</h2>
         <p class="small" style="margin:0 0 4px">Sprint: chime at halfway and at 5 minutes, gong at zero.</p>
-        <p class="small" style="margin:0 0 10px">Presentations: soft chime at 2 minutes, gong at zero. No ticking.</p>
+        <p class="small" style="margin:0 0 10px">Presentations: 5 minutes each, soft chime at 1 minute, gong at zero. No ticking.</p>
         <button class="btn ghost" data-st="testSound" style="width:100%">Play a test sound on the display</button></div>
       <div class="card" style="margin:0 0 14px"><h2>On the display between sessions</h2><div id="stToggles"></div></div>
       <div class="card" style="background:#FFF8E2"><h2>Results</h2><p class="small" style="margin:0 0 10px">Opens once every score is in. The display shows the top three and the recognitions only. The full table stays on the Scoring tab.</p><div id="stReveal"></div></div>
@@ -174,14 +173,11 @@ function drawCheckin() {
 // ---------- Briefings ----------
 const ROLE_ORDER = ["facilitator", "mentor", "judge"];
 async function loadBriefings() {
-  const [p, t, tp] = await Promise.all([call("packs"), call("tasks"), call("templates")]);
+  const [p, t, tp] = await Promise.all([call("packs"), call("sprint"), call("templates")]);
   bfData = { packs: p, tasks: t };
   tplList = tp.templates;
   $("#bfLock").innerHTML = '<div><b>Briefs open at ' + esc(p.unlockLabel) + '</b><div class="small">Until then every brief link shows a holding page. Tasks are never attached to an email.</div></div><button class="btn ghost" data-goto="settings">Change the time</button>';
   drawRoles(); drawPeople(); drawTasks(); drawTemplates();
-  const used = t.tasks;
-  $("#bfSheets").innerHTML = '<a class="btn" href="/admin/print/sheets?t=all" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;margin:0 0 10px">Print table sheets, all tables</a><div>' +
-    used.map((x) => '<a class="tcount" href="/admin/print/sheets?t=' + x.table + '" target="_blank" rel="noopener">' + esc(x.name) + '</a>').join("") + '</div>';
 }
 function roleStatus(r) {
   if (!r.count) return '<span class="st released">Nobody in this role</span>';
@@ -223,22 +219,35 @@ function drawPeople() {
       (p.briefLink ? '<button class="link" data-reissue="' + p.id + '" data-kind="brief">New brief link</button>' : "") + '</td></tr>').join("") + '</tbody></table>'
     : '<p class="small">Nobody in this role yet.</p>';
 }
+// The six sprint tasks: edit any field, preview the printed card.
+const lines = (v) => String(v || "").split("\n").map((x) => x.trim()).filter(Boolean);
 function drawTasks() {
   const t = bfData.tasks;
-  $("#bfTasks").innerHTML = t.tasks.map((x) => '<div class="person"><div><b>' + esc(x.name) + ' · Task ' + x.number + '</b><span class="small">' + esc(x.title || "Not written yet") + '</span></div>' +
-    '<div style="display:flex;gap:8px;align-items:center"><span class="st ' + (x.written ? "confirmed" : "queried") + '">' + (x.written ? "Written" : "Missing") + '</span><button class="link" data-task="' + x.table + '">Edit</button></div></div>').join("") +
-    (t.orphans.length ? '<div class="miss">Written for a table that has closed: ' + esc(t.orphans.map((o) => o.name).join(", ")) + '. Copy it to another table if you need it.</div>' : "");
+  $("#bfTasks").innerHTML = t.tasks.map((x) => {
+    const tables = t.tables.filter((r) => r.taskId === x.id).map((r) => r.name);
+    return '<div class="person"><div><b>' + esc(x.code) + ' · ' + esc(x.title) + '</b><span class="small">' + esc(x.sector) + (tables.length ? " · " + esc(tables.join(", ")) : " · not on a table yet") + '</span></div>' +
+      '<div style="display:flex;gap:8px;align-items:center"><a class="link" href="/admin/print/taskcard?id=' + x.id + '" target="_blank" rel="noopener">Preview card</a><button class="link" data-task="' + x.id + '">Edit</button></div></div>';
+  }).join("");
 }
-function editTask(table) {
-  const x = bfData.tasks.tasks.concat(bfData.tasks.orphans).find((t) => t.table === table);
+function editTask(id) {
+  const x = bfData.tasks.tasks.find((t) => t.id === id);
   const box = $("#taskEdit");
   box.hidden = false;
-  box.innerHTML = '<form class="form2" id="taskForm" data-table="' + table + '"><h2>' + esc(x.name) + (x.number ? ' · Task ' + x.number : "") + '</h2>' +
-    '<label>Title<input name="title" maxlength="140" value="' + esc(x.title || "") + '"></label>' +
-    '<label>The situation<textarea name="situation">' + esc(x.situation || "") + '</textarea></label>' +
-    '<label>The problem to solve<textarea name="problem">' + esc(x.problem || "") + '</textarea></label>' +
-    '<label>What they have to work with (constraints)<textarea name="constraints">' + esc(x.constraints || "") + '</textarea></label>' +
-    '<div class="actions"><button class="btn">Save task</button><button type="button" class="btn ghost" data-taskclose="1">Close</button></div></form>';
+  const ta = (n, label, v, hint, rows) => '<label>' + label + (hint ? ' <span class="small" style="font-weight:400">' + hint + '</span>' : "") + '<textarea name="' + n + '" rows="' + (rows || 3) + '">' + esc(v) + '</textarea></label>';
+  box.innerHTML = '<form class="form2" id="taskForm" data-id="' + id + '"><h2>' + esc(x.code) + ' · ' + esc(x.title) + '</h2>' +
+    '<div class="three"><label>Code<input name="code" maxlength="30" value="' + esc(x.code) + '"></label><label style="grid-column:span 2">Sector<input name="sector" maxlength="120" value="' + esc(x.sector) + '"></label></div>' +
+    '<label>Title<input name="title" maxlength="140" value="' + esc(x.title) + '"></label>' +
+    ta("situation", "The situation", x.situation.join("\n"), "one paragraph per line", 5) +
+    ta("people", "The people", x.people.map((r) => r.join(" | ")).join("\n"), "one row per line: Role | Number | What they do now | Spare capacity", 6) +
+    ta("problem", "The problem to solve", x.problem, "", 3) +
+    ta("work", "What you have to work with", x.work.map((r) => r[0] + ": " + r[1]).join("\n"), "one per line, Label: text (Budget, Tools now, Decision rights, Timing)", 5) +
+    ta("out", "Out of bounds", x.out.join("\n"), "one per line", 3) +
+    ta("working", "What working looks like", x.working, "", 2) +
+    '<p class="small" style="margin:6px 0">For judges and mentors only, never on the card:</p>' +
+    ta("vulnerability", "The single point of failure", x.vulnerability, "judges' and mentors' guides", 2) +
+    ta("strong", "Strong plans usually", x.strong.join("\n"), "judges only, one per line", 5) +
+    ta("watch", "Watch for", x.watch.join("\n"), "judges only, one per line", 3) +
+    '<div class="actions"><button class="btn">Save task</button><a class="btn ghost" style="text-decoration:none" href="/admin/print/taskcard?id=' + id + '" target="_blank" rel="noopener">Preview card</a><button type="button" class="btn ghost" data-taskclose="1">Close</button></div></form>';
   box.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 function drawTemplates() {
@@ -262,7 +271,7 @@ async function loadRoles() {
     d.people.map((p) => {
       const fac = p.kind === "facilitator";
       return '<tr style="cursor:default"><td><b>' + esc(p.name) + '</b><div class="small mono">' + esc(p.ref) + '</div></td>' +
-        (fac ? '<td colspan="2"><select data-ftype="' + p.id + '">' + opts(p.facilitatorType, [{ v: "lead", l: "Lead facilitator" }, { v: "floor", l: "Floor facilitator" }]) + '</select></td>'
+        (fac ? '<td colspan="2"><select data-ftype="' + p.id + '">' + opts(p.facilitatorType, [{ v: "lead", l: "Lead Sprint Marshal" }, { v: "floor", l: "Floor facilitator" }]) + '</select></td>'
           : '<td><input type="checkbox" data-rolechk="mentor" data-id="' + p.id + '"' + (p.mentor ? " checked" : "") + ' style="width:20px;height:20px"></td><td><input type="checkbox" data-rolechk="judge" data-id="' + p.id + '"' + (p.judge ? " checked" : "") + ' style="width:20px;height:20px"></td>') +
         '<td>' + (p.mentor && !fac ? '<select data-pair="' + p.id + '"><option value="">Choose a pair</option>' + opts(JSON.stringify(p.tables), d.pairs.map((pr) => ({ v: JSON.stringify(pr.tables), l: pr.label }))) + '</select>' : '<span class="small">' + esc(p.tableNames.join(", ") || (fac ? "" : "Judges only")) + '</span>') + '</td>' +
         '<td>' + (p.mentor && !fac && p.tables.length ? '<select data-start="' + p.id + '">' + opts(p.startTable, p.tables.map((t, i) => ({ v: t, l: p.tableNames[i] }))) + '</select>' : "") + '</td></tr>';
@@ -310,7 +319,7 @@ function stRemaining() {
 function drawClock() {
   const d = stData, st = d.state, rem = stRemaining(), paused = st.clock.pausedMs !== null && st.clock.pausedMs !== undefined;
   const lab = { arrival: "Arrival and tea", sprint: "Planning round", handover: "Handover", critique: "Critique", response: "Response", lunch: "Lunch", presentations: "Presentations" + (d.queue.find((q) => q.state === "On stage") ? " · " + d.queue.find((q) => q.state === "On stage").name + " on stage" : ""), results: "Panel feedback and recognitions" }[st.phase];
-  const cue = { sprint: "Chime at halfway and at five minutes, gong at zero", handover: "Plans moving round the chain", critique: "Gap, question, strength", response: "Each team answers its critique", presentations: "Amber at 2:00, gong at zero", arrival: "Schedule and partner thanks on the display", lunch: "Judges are reading", results: st.revealed ? "Top three on the display" : "Waiting for every score" }[st.phase];
+  const cue = { sprint: "Chime at halfway and at five minutes, gong at zero", handover: "Plans moving round the chain", critique: "Gap, question, strength", response: "Each team answers its critique", presentations: "Amber at 1:00, gong at zero", arrival: "Schedule and partner thanks on the display", lunch: "Judges are reading", results: st.revealed ? "Top three on the display" : "Waiting for every score" }[st.phase];
   const timed = rem !== null;
   $("#stClock").innerHTML = '<div><div class="l">' + esc(lab) + (paused ? " · paused" : "") + '</div><div class="t"' + (timed ? "" : ' style="font-size:28px;padding:14px 0"') + '>' + (timed ? mmss(rem) : "No clock running") + '</div><div class="c">' + esc(cue) + '</div></div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:8px">' + (timed ? '<button class="btn ghost" data-st="' + (paused ? "resume" : "pause") + '">' + (paused ? "Resume" : "Pause") + '</button><button class="btn ghost" data-st="addMinute">Add 1 minute</button>' : "") +
@@ -393,7 +402,7 @@ document.addEventListener("click", async (e) => {
       return $("#scoringView").hidden ? loadBriefings() : loadScoring();
     }
     if (el("[data-copy]")) { await navigator.clipboard.writeText(el("[data-copy]").dataset.copy); el("[data-copy]").textContent = "Copied"; return; }
-    if (el("[data-task]")) return editTask(Number(el("[data-task]").dataset.task));
+    if (el("[data-task]")) return editTask(el("[data-task]").dataset.task);
     if (el("[data-taskclose]")) { $("#taskEdit").hidden = true; return; }
     if (el("[data-tpl]")) {
       const a = el("[data-tpl]").dataset.tpl;
@@ -450,8 +459,14 @@ document.addEventListener("submit", async (e) => {
     if (f.id === "taskForm") {
       e.preventDefault();
       const v = (n) => f.elements[n].value;
-      bfData.tasks = await call("task", { table: Number(f.dataset.table), title: v("title"), situation: v("situation"), problem: v("problem"), constraints: v("constraints") });
-      msg("Task saved.", true); drawTasks(); $("#taskEdit").hidden = true; return;
+      await call("sprint-task", {
+        id: f.dataset.id, code: v("code"), title: v("title"), sector: v("sector"), problem: v("problem"), working: v("working"), vulnerability: v("vulnerability"),
+        situation: lines(v("situation")), out: lines(v("out")), strong: lines(v("strong")), watch: lines(v("watch")),
+        people: lines(v("people")).map((l) => l.split("|").map((x) => x.trim())),
+        work: lines(v("work")).map((l) => { const i = l.indexOf(":"); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l, ""]; }),
+      });
+      bfData.tasks = await call("sprint");
+      msg("Task saved. Packs that include it are marked as changed.", true); drawTasks(); $("#taskEdit").hidden = true; return;
     }
     if (f.id === "setForm") {
       e.preventDefault();

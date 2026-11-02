@@ -110,6 +110,8 @@ textarea { resize: vertical; min-height: 64px; }
 .nudge .x { color: var(--body); font-size: 20px; line-height: 1; padding: 4px 8px; font-weight: 400; }
 .pin { display: block; width: 100%; text-align: left; background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--yel); border-radius: 10px; padding: 8px 12px; margin: 0 0 12px; cursor: pointer; font-family: var(--text); }
 .pin .pk { display: block; font-size: 11px; font-weight: 700; color: var(--teal); }
+.pin.guide { border-left-color: var(--teal); text-decoration: none; }
+.card.guide .btn { display: inline-block; text-decoration: none; }
 .pin .pt { display: block; font-size: 14px; font-weight: 700; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 body.chatting main { padding-bottom: 0; }
 .intro textarea { margin: 0 0 10px; }

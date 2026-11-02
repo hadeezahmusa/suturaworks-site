@@ -31,11 +31,12 @@ export const LOBBY_HTML = String.raw`
         <label class="fl">Goes out at (Abuja time)<input type="datetime-local" name="sendAt" min="2026-10-31T00:00" max="2026-11-08T23:59" required></label>
         <label class="fl">Where<select name="audience"><option value="lobby">Lobby</option><option value="rooms">All team rooms</option></select></label>
         <label class="fl">Post<textarea name="body" maxlength="600" required placeholder="First line: the headline people see in the notification.&#10;Then the rest of the post."></textarea></label>
-        <p class="small" style="margin:-6px 0 10px">Use {meet_link} or {explainer_link} and the link set below is filled in.</p>
+        <p class="small" style="margin:-6px 0 10px">Use {meet_link}, {explainer_link} or {walkthrough_link} and the link set below is filled in.</p>
         <div class="actions"><button class="btn">Save post</button><button type="button" class="btn ghost" id="lbPostCancel" hidden>Cancel editing</button></div></form>
       <form class="card lp-form" id="lbLinks" style="margin:0 0 14px"><h2>Links and closing</h2>
         <label class="fl">Google Meet link for Friday<input type="url" name="meet_link" placeholder="https://meet.google.com/…"></label>
         <label class="fl">Explainer video link<input type="url" name="explainer_link" placeholder="https://…"></label>
+        <label class="fl">"How the sprint works" guide link <span class="small" style="font-weight:400" id="lbGuideCount"></span><input type="url" name="walkthrough_link" placeholder="https://qlv2026.suturaworks.workers.dev/api/guide"></label>
         <label class="fl">Lobby and rooms close (Abuja time)<input type="datetime-local" name="close_at" min="2026-11-01T00:00" max="2026-11-30T23:59"></label>
         <button class="btn" style="width:100%">Save</button></form>
       <form class="card lp-form" id="lbTeam" style="margin:0 0 14px"><h2>QLV team</h2>
@@ -69,10 +70,11 @@ async function loadLobby(d) {
     (st.open && !st.shut ? '<button class="btn warn" data-lb="close">Close lobby and rooms</button>' : "") +
     (st.open && st.closed ? '<button class="btn ghost" data-lb="reopen">Reopen</button>' : "") + "</div></div>";
   const lf = $("#lbLinks");
-  if (document.activeElement?.form !== lf) { lf.meet_link.value = st.meet_link || ""; lf.explainer_link.value = st.explainer_link || ""; lf.close_at.value = abuja(st.close_at); }
+  if (document.activeElement?.form !== lf) { lf.meet_link.value = st.meet_link || ""; lf.explainer_link.value = st.explainer_link || ""; lf.walkthrough_link.value = st.walkthrough_link || ""; lf.close_at.value = abuja(st.close_at); }
+  $("#lbGuideCount").textContent = "· opened " + x.guideDownloads + (x.guideDownloads === 1 ? " time" : " times");
   $("#lbPosts").innerHTML = '<table><thead><tr><th>When</th><th>Where</th><th>Post</th><th>Status</th><th></th></tr></thead><tbody>' + x.posts.map((p) =>
     "<tr><td style=\"white-space:nowrap\">" + esc(when(p.sendAt)) + "</td><td>" + (p.audience === "rooms" ? "All rooms" : "Lobby") + '</td><td class="lp-body">' + lbBody(p.body) +
-    (p.waitingFor.length ? '<div class="flag" style="margin-top:4px">Waiting: set the ' + p.waitingFor.map((k) => k === "meet_link" ? "Meet link" : "explainer link").join(" and ") + " below</div>" : "") + "</td><td>" +
+    (p.waitingFor.length ? '<div class="flag" style="margin-top:4px">Waiting: set the ' + p.waitingFor.map((k) => ({ meet_link: "Meet link", explainer_link: "explainer link", walkthrough_link: "guide link" })[k]).join(" and ") + " below</div>" : "") + "</td><td>" +
     (p.status === "sent" ? '<span class="pill on">Sent</span><div class="tiny">' + esc(when(p.sentAt)) + (p.openedAfter !== null ? "<br>" + p.openedAfter + " opened the app since" : "") + "</div>" : p.status === "cancelled" ? '<span class="pill off">Cancelled</span>' : '<span class="pill warn">Scheduled</span>') +
     '</td><td style="white-space:nowrap">' + (p.status === "sent" ? "" : p.status === "cancelled" ? '<button class="link" data-lbp="restore" data-id="' + p.id + '">Restore</button>'
       : '<button class="link" data-lbedit="' + p.id + '">Edit</button> · <button class="link" data-lbp="send" data-id="' + p.id + '">Send now</button> · <button class="link" data-lbp="cancel" data-id="' + p.id + '">Cancel</button>') + "</td></tr>").join("") + "</tbody></table>";
@@ -116,7 +118,7 @@ $("#lbTeam").addEventListener("submit", async (e) => {
 $("#lbLinks").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.currentTarget;
-  try { await loadLobby(await call("lobby-settings", { meet_link: f.meet_link.value.trim(), explainer_link: f.explainer_link.value.trim(), close_at: f.close_at.value })); msg("Saved.", true); }
+  try { await loadLobby(await call("lobby-settings", { meet_link: f.meet_link.value.trim(), explainer_link: f.explainer_link.value.trim(), walkthrough_link: f.walkthrough_link.value.trim(), close_at: f.close_at.value })); msg("Saved.", true); }
   catch (err) { msg(err.message); }
 });
 $("#lobbyView").addEventListener("click", async (e) => {
