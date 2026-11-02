@@ -33,7 +33,7 @@ async function judgeFor(env, k) {
   const t = await tokenRow(env, k, "scoring");
   if (!t) throw new HttpError(404, "This scoring link is not valid. It may have been replaced: check your brief for the latest one.");
   const judge = (await judgesList(env)).find((j) => j.id === t.ticket_id);
-  if (!judge) throw new HttpError(404, "This link is no longer set up for judging. Please speak to the lead facilitator.");
+  if (!judge) throw new HttpError(404, "This link is no longer set up for judging. Please speak to the Lead Sprint Marshal.");
   return { t, judge };
 }
 
@@ -81,7 +81,7 @@ export async function submitScore(env, b) {
   if (cur && cur.locked) {
     const same = [cur.c1, cur.c2, cur.c3, cur.c4, cur.c5].every((x, i) => x === v[i]);
     if (same) return { ok: true, total, already: true };
-    throw new HttpError(409, "Your score for this table is already submitted and locked. If it needs changing, speak to the lead facilitator.");
+    throw new HttpError(409, "Your score for this table is already submitted and locked. If it needs changing, speak to the Lead Sprint Marshal.");
   }
   await env.DB.prepare(`INSERT INTO scores (judge_ticket_id, table_index, c1, c2, c3, c4, c5, total, submitted_at, locked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     ON CONFLICT (judge_ticket_id, table_index) DO UPDATE SET c1 = excluded.c1, c2 = excluded.c2, c3 = excluded.c3, c4 = excluded.c4, c5 = excluded.c5,

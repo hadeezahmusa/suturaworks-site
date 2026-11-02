@@ -315,7 +315,7 @@ function render() {
 function tick(fresh) {
   if (!st) return;
   const rem = remaining();
-  const amberAt = st.phase === "presentations" ? 120000 : 300000;
+  const amberAt = st.phase === "presentations" ? 60000 : 300000;
   updateRing(amberAt);
   if (st.phase === "sprint") updateBuilding();
   const sc = $("#smallClock");
@@ -331,7 +331,7 @@ function tick(fresh) {
     if (crossed(total / 2)) { play("chime"); banner("Halfway. If you haven’t named who owns each step, start now."); }
     if (total > 300000 && crossed(300000)) { play("chime"); banner("Five minutes. Finish your sentences, not your ideas."); }
   }
-  if (st.phase === "presentations" && crossed(120000)) play("chime");
+  if (st.phase === "presentations" && crossed(60000)) play("chime");
   if (crossed(0.5)) { play("gong"); flash(); if (st.phase === "sprint") banner("Pens down."); }
   prevRem = rem;
 }

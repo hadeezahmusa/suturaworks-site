@@ -32,7 +32,11 @@ const STATE_DEFAULT = {
   rooms_open: false, rooms_opened_at: null, announce_cursor: 0,
   close_at: "2026-11-08T22:59:00Z", closed: false,
   meet_link: "", explainer_link: "",
+  // Through the Worker, so downloads are counted; it then opens the PDF on the site.
+  walkthrough_link: "https://qlv2026.suturaworks.workers.dev/api/guide",
 };
+// Links admin sets on the Team rooms tab, used in posts as {meet_link} and so on.
+const LINKS = ["meet_link", "explainer_link", "walkthrough_link"];
 const MAX_MESSAGE = 280, MAX_INTRO = 140, MAX_POST = 600;
 const PUSH_PER_RUN = 35;          // the free plan allows 50 outside calls per request
 const TEAM_GAP = 15 * 60000;      // one team notification per person every 15 minutes
@@ -156,7 +160,7 @@ export async function markLobbyTold(env, ticketId) {
 // so the post waits.
 export function fillPost(body, st) {
   let out = body, missing = [];
-  for (const k of ["meet_link", "explainer_link"]) {
+  for (const k of LINKS) {
     if (!out.includes(`{${k}}`)) continue;
     if (!st[k]) missing.push(k);
     else out = out.split(`{${k}}`).join(st[k]);
@@ -215,6 +219,14 @@ async function introsOf(env, people) {
   };
 }
 
+// The "How the sprint works" guide is pinned once the post carrying its link
+// has gone out, and in every team room from the moment rooms open.
+function guideFor(st, posts) {
+  if (!st.walkthrough_link) return null;
+  const sent = posts.some((p) => (p.raw || "").includes("{walkthrough_link}"));
+  return sent || st.rooms_open ? { title: "How the sprint works: a worked example", url: st.walkthrough_link } : null;
+}
+
 // The whole page behind a personal link.
 export async function myView(env, url) {
   const st = await lobbyState(env);
@@ -229,7 +241,7 @@ export async function myView(env, url) {
   const card = await introsOf(env, everyone);
   const mine = (await env.DB.prepare("SELECT * FROM lobby_intros WHERE ticket_id = ?").bind(person.id).first()) || {};
   const posts = (await env.DB.prepare("SELECT id, audience, body, sent_at FROM lobby_posts WHERE status = 'sent' ORDER BY sent_at DESC").all()).results
-    .map((p) => ({ id: p.id, audience: p.audience, at: p.sent_at, ...splitPost(fillPost(p.body, st) ?? p.body) }));
+    .map((p) => ({ id: p.id, audience: p.audience, at: p.sent_at, raw: p.body, ...splitPost(fillPost(p.body, st) ?? p.body) }));
   const rooms = [];
   for (const t of spacesFor(person, st)) {
     const members = everyone.filter((p) => p.role === "participant" && p.rooms.includes(t));
@@ -248,14 +260,15 @@ export async function myView(env, url) {
     roomsOpen: !!st.rooms_open,
     countdownTo: s.teams_announced_at, announceLabel: "Teams are announced on Friday at 4:45pm.",
     saturday: SATURDAY,
-    posts: posts.filter((p) => p.audience === "lobby"),
-    roomPosts: posts.filter((p) => p.audience === "rooms"),
+    posts: posts.filter((p) => p.audience === "lobby").map(({ raw, ...p }) => p),
+    roomPosts: posts.filter((p) => p.audience === "rooms").map(({ raw, ...p }) => p),
     people: everyone.map(card),
     intro: { what: mine.what_you_do || "", hoping: mine.hoping_for || "", hideOrg: !!mine.hide_org, org: person.org },
     lobby: await messages(env, "lobby", 0, person.id),
     rooms,
     push: { key: (await vapidKeys(env)).publicKey, state: access.push_state || null },
     installed: !!access.installed || standalone,
+    guide: guideFor(st, posts),
   };
 }
 
@@ -597,6 +610,7 @@ export async function lobbyAdmin(env) {
   const msgs = (await env.DB.prepare("SELECT m.*, COALESCE(t.name, lt.name) AS name FROM lobby_messages m LEFT JOIN tickets t ON t.id = m.ticket_id LEFT JOIN lobby_team lt ON lt.id = -m.ticket_id ORDER BY m.id DESC LIMIT 120").all()).results;
   return {
     state: { ...st, shut: isShut(st), frozen: isFrozen(s), teamsAnnouncedAt: s.teams_announced_at },
+    guideDownloads: Number((await env.DB.prepare("SELECT value FROM settings WHERE key = 'guide_downloads'").first())?.value) || 0,
     welcomeWaiting: people.filter((p) => !access[p.id]?.notified_at && p.email).length,
     announceCount: people.filter((p) => p.role === "participant" && p.rooms.length).length,
     people: people.map((p) => {
@@ -621,7 +635,7 @@ export async function lobbyAdmin(env) {
     late: people.filter((p) => p.role === "participant" && st.rooms_open && !p.rooms.length).map((p) => ({ name: p.name, ref: p.ref })),
     posts: posts.map((p) => ({
       id: p.id, audience: p.audience, body: p.body, sendAt: p.send_at, status: p.status, sentAt: p.sent_at,
-      waitingFor: p.status === "scheduled" && fillPost(p.body, st) === null ? ["meet_link", "explainer_link"].filter((k) => p.body.includes(`{${k}}`) && !st[k]) : [],
+      waitingFor: p.status === "scheduled" && fillPost(p.body, st) === null ? LINKS.filter((k) => p.body.includes(`{${k}}`) && !st[k]) : [],
       openedAfter: p.sent_at ? opened.results.filter((o) => o.last_opened_at > p.sent_at).length : null,
     })),
     messages: msgs.map((m) => ({ id: m.id, space: m.space === "lobby" ? "Lobby" : tableName(Number(m.space.slice(2))), who: m.name || "QLV team", role: ROLE_LABEL[m.sender_role] || "", body: m.body, at: m.created_at, hidden: !!m.hidden })),
@@ -630,7 +644,7 @@ export async function lobbyAdmin(env) {
 
 export async function lobbySettings(env, b, who) {
   const st = await lobbyState(env);
-  for (const k of ["meet_link", "explainer_link"]) {
+  for (const k of LINKS) {
     if (!(k in b)) continue;
     const v = clean(b[k], 300);
     if (v && !/^https:\/\/\S+$/.test(v)) throw new HttpError(400, "Links must start with https://");

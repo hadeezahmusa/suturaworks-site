@@ -141,10 +141,17 @@ function msgHtml(m) {
 function chatHtml(id, msgs, placeholder, pinned) {
   const shut = D.state === "closed";
   return (shut ? '<div class="closed">This room has closed. Thank you for being part of QLV 2026.</div>' : "") +
-    nudgeHtml() +
+    nudgeHtml() + guideHtml() +
     (pinned ? `<button class="pin" data-sec="updates"><span class="pk">Latest from QLV</span><span class="pt">${esc(pinned.title)}</span></button>` : "") +
     `<div class="wall" id="wall-${id}">${msgs.length ? msgs.map(msgHtml).join("") : `<p class="empty" data-empty>No messages yet. Say hello 👋🏽</p>`}</div>` +
     (shut ? "" : `<form class="compose" data-compose><textarea maxlength="280" rows="1" placeholder="${esc(placeholder)}" aria-label="Your message"></textarea><button class="send" aria-label="Send"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg></button><span class="lim" data-lim hidden></span></form>`);
+}
+
+// The "How the sprint works" guide, pinned from Thursday and in every room.
+function guideHtml(card) {
+  if (!D.guide) return "";
+  if (card) return `<section class="card guide"><h2>${esc(D.guide.title)}</h2><p class="sub">The practice case, step by step: the task card, the A2 board, the plan, the critique, the response and how to present.</p><a class="btn" href="${esc(D.guide.url)}" target="_blank" rel="noopener">Download the guide (PDF)</a></section>`;
+  return `<a class="pin guide" href="${esc(D.guide.url)}" target="_blank" rel="noopener"><span class="pk">📘 Download the guide (PDF)</span><span class="pt">${esc(D.guide.title)}</span></a>`;
 }
 
 function introHtml() {
@@ -169,7 +176,7 @@ function drawSections(room) {
 function sectionHtml(room) {
   if (room) {
     if (section === "team") {
-      return (D.roomPosts.length ? `<section class="card">${postsHtml(D.roomPosts)}</section>` : "") +
+      return guideHtml(true) + (D.roomPosts.length ? `<section class="card">${postsHtml(D.roomPosts)}</section>` : "") +
         `<section class="card room-hero"><div class="nm">${esc(room.name)}</div>
         <p>${room.mentors.length ? `Your mentor: ${room.mentors.map(esc).join(" and ")}` : "Your mentor joins you on Saturday."}</p>
         <div class="sat">${esc(D.saturday)}</div></section>` +
@@ -178,7 +185,7 @@ function sectionHtml(room) {
     return chatHtml(room.space.replace(":", "-"), room.messages, `Message ${room.name}`, D.roomPosts[0]);
   }
   if (section === "people") return introHtml() + `<section class="card"><h2>Who's coming</h2><div class="people">${D.people.map(personHtml).join("")}</div></section>`;
-  if (section === "updates") return `<section class="card"><h2>From the QLV team</h2>${postsHtml(D.posts)}</section>`;
+  if (section === "updates") return guideHtml(true) + `<section class="card"><h2>From the QLV team</h2>${postsHtml(D.posts)}</section>`;
   return (D.me.note ? `<div class="closed">${esc(D.me.note)}</div>` : "") + chatHtml("lobby", D.lobby, "Say hello to everyone", D.posts[0]);
 }
 

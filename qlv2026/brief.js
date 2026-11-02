@@ -23,7 +23,6 @@ async function load() {
     return fail("We could not reach the server. Check your connection and refresh the page.");
   }
   $("#ref").textContent = d.ref;
-  $("#fref").textContent = d.ref;
   $("#title").textContent = d.name;
   if (d.preview) $("#pv").hidden = false;
   if (d.locked) {

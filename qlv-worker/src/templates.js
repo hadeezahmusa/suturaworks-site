@@ -15,10 +15,6 @@ export const TEMPLATE_KEYS = [
   ["mentor_route", "Mentor/Advisor route card"],
   ["judge_brief", "Judge brief"],
   ["criteria", "Scoring criteria"],
-  ["task_card", "Task card (printed)"],
-  ["plan_sheet", "Plan sheet (printed)"],
-  ["critique_sheet", "Critique sheet (printed)"],
-  ["response_sheet", "Response sheet (printed)"],
 ];
 
 export const DEFAULT_TEMPLATES = {
@@ -39,18 +35,18 @@ If anything changes on your side, call or message {{chair_name}} on {{chair_phon
 See you on Saturday,
 The QLV 2026 team, JCI Aso`,
 
-  facilitator_run_sheet: `**QLV 2026 run sheet · {{full_name}} · {{facilitator_type}} facilitator**
+  facilitator_run_sheet: `**QLV 2026 run sheet · {{full_name}} · {{facilitator_type}}**
 Tables you look after: {{tables_covered}}
 
 **Your job in one line.** You run the process: the clock, the handovers and the room. You never help with the content and you never score.
 
-**Friday 6 November, virtual** *(lead facilitator only. Suggested times, confirm with the chair.)*
+**Friday 6 November, virtual** *(Lead Sprint Marshal only. Suggested times, confirm with the chair.)*
 
 | Time | What happens | Your cue |
 |---|---|---|
 | 3:45pm | Open the call, test sound and screen share | |
 | 4:00pm | Welcome and why QLV 2026 | "Building systems that outlive you starts with how we work tomorrow." |
-| 4:10pm | How the sprint works | Walk through plan, hand over, critique, respond, present. Say clearly that nobody sees the task until Saturday. |
+| 4:10pm | How the sprint works | Walk through plan, hand over, critique, respond, present, using the "How the sprint works" guide in the lobby. Say clearly that nobody sees the task until Saturday. |
 | 4:25pm | Teams announced | Read out each table and its members. Post the list in the chat. |
 | 4:40pm | Teams meet: in breakout rooms if the call allows them, otherwise in each team's group chat | Ten minutes to say hello. No tasks, no homework. |
 | 4:55pm | Close | Arrival time on Saturday, what to bring (their reference). |
@@ -60,18 +56,18 @@ Tables you look after: {{tables_covered}}
 | Time | What happens | Your cue |
 |---|---|---|
 | 8:30 to 10:50 | Arrivals, tea and light snacks | Badge desk open. Send people to their table by the name on their badge. |
-| [confirm] | Opening protocol and partner remarks, 3 minutes each | Lead facilitator introduces each speaker and keeps time. |
+| [confirm] | Opening protocol and partner remarks, 3 minutes each | The Lead Sprint Marshal introduces each speaker and keeps time. |
 | 10:45 | Everyone seated | "Five minutes. Find your table." |
-| 10:50 | **Sprint opens.** Task cards handed out to every table at the same moment | Lead: "Your task is on the table. You have fifty minutes. Your plan has to work without you in the room." Start the clock on the screen. |
+| 10:50 | **Sprint opens.** Task cards handed out to every table at the same moment | Lead Sprint Marshal: "Your task is on the table. You have fifty minutes. Your plan has to work without you in the room." Start the clock on the screen. |
 | 11:15 | Halfway call | "Twenty-five minutes left. If you haven't named who owns each step, start now." |
 | 11:35 | Five-minute call | "Five minutes. Finish your sentences, not your ideas." |
 | 11:40 | **Plans locked and handed over** | Pens down. Floor facilitators carry each plan to the next table: {{handover_chain}} |
 | 11:45 | **Critique opens**, 35 minutes | "You're reviewing another team's plan. Find the gaps. Use the critique sheet: gap, question, strength." |
 | 12:20 | **Critiques returned.** Response opens, 15 minutes | Floor facilitators return each critique to the team that wrote the plan. "You have fifteen minutes to answer your critique on the response sheet." |
 | 12:35 | **Lunch.** Collect every plan, critique and response | Floor facilitators bundle each table's three sheets and hand them to the judges' table. |
-| 13:30 | **Presentations**, 10 minutes per team, 2 minutes changeover | Order: {{presentation_order}}. The timer turns amber at 2 minutes and red at zero. At zero, thank them and stop them. |
+| 13:30 | **Presentations**, 3 to 5 minutes per team from their A2 board, 2 minutes changeover | Order: {{presentation_order}}. The timer runs 5 minutes, turns amber at 1 minute and red at zero. At zero, thank them and stop them. |
 | 14:50 | **Panel feedback and recognitions** | Hand over to the judges' spokesperson. |
-| [confirm] | Close and certificates | Lead: thanks to partners, mentors/advisors, judges and the committee. |
+| [confirm] | Close and certificates | Lead Sprint Marshal: thanks to partners, mentors/advisors, judges and the committee. |
 | 16:00 | End | |
 
 **When things go wrong**
@@ -79,7 +75,7 @@ Tables you look after: {{tables_covered}}
 - **Someone arrives after 10:50.** Seat them at their own table. Don't stop the clock.
 - **A team finishes early.** Ask them to read their plan as if they were a stranger who has to run it tomorrow, then fix what's unclear.
 - **A team asks you for an idea.** "That's a great question for your mentor." Then point to the mentor on the floor.
-- **The screen or power fails.** The lead calls the times out loud. The sprint runs on paper anyway.`,
+- **The screen or power fails.** The Lead Sprint Marshal calls the times out loud. The sprint runs on paper anyway.`,
 
   mentor_brief: `**QLV 2026 · Mentor/Advisor brief · {{full_name}}**
 Reference {{reference}}
@@ -114,7 +110,7 @@ You own these two tables for the whole sprint, moving between them every ten min
 | 13:30 | Presentations. You watch. If you're also judging, see your judge brief |
 | 14:50 | Feedback and recognitions |
 
-**The tasks**
+**The tasks in one line each**
 {{tasks_block}}`,
 
   mentor_route: `**{{full_name}} · Route**
@@ -138,11 +134,11 @@ You advised these during the sprint, so you sit them out to keep the judging ind
 |---|---|
 | {{arrival_time}} | Arrive and collect your badge |
 | 12:35 | Lunch. Each table's plan, critique and response reach you to read |
-| 13:30 | Presentations, 10 minutes each. Score each team straight after it presents |
-| 14:40 | All scores in. The tally is checked |
+| 13:30 | Presentations, 3 to 5 minutes each, from the team's A2 board. Score each team straight after it presents |
+| About 14:35 | All scores in. The tally is checked |
 | 14:50 | The panel's spokesperson, {{spokesperson_name}}, gives the feedback |
 
-**How to score.** Give each criterion a 1, 3 or 5, or a 2 or 4 when the team is in between. A score locks once you submit it. If you make a mistake, tell the lead facilitator and admin can unlock that one score.
+**How to score.** Give each criterion a 1, 3 or 5, or a 2 or 4 when the team is in between. A score locks once you submit it. If you make a mistake, tell the Lead Sprint Marshal and admin can unlock that one score. Teams may have made up to two stated assumptions. Judge whether they were reasonable, not whether they existed.
 
 **The criteria**
 {{criteria_block}}
@@ -175,7 +171,7 @@ You advised these during the sprint, so you sit them out to keep the judging ind
 **Delivered clearly**
 - 1: Over time, or the plan was hard to follow.
 - 3: Clear enough, but with padding or rushing.
-- 5: Clear, within 10 minutes and the audience could repeat the plan back.`,
+- 5: Clear, within 5 minutes and the audience could repeat the plan back.`,
 
   task_card: `**{{table_name}} · Task {{task_number}}**
 

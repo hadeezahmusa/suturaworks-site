@@ -17,7 +17,7 @@ export const DEFAULTS = {
   checkin_enabled: false,
   sprint_start: "10:50",
   presentations_start: "13:30",
-  presentation_minutes: 10,
+  presentation_minutes: 5,
   changeover_minutes: 2,
   sprint_minutes: 50,
   critique_minutes: 35,

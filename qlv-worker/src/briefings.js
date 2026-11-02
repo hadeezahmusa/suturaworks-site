@@ -11,6 +11,7 @@ import { tableName, INITIAL_TABLES } from "./config.js";
 import { getSettings, abujaLabel, addClock } from "./settings.js";
 import { DEFAULT_TEMPLATES, TEMPLATE_KEYS, fill, render, parseCriteria, checkCriteria } from "./templates.js";
 import { sendBatch, dailyRoom } from "./mailer.js";
+import { tasksInUse, assignments } from "./sprintpack.js";
 import * as mail from "./emails.js";
 
 const ROLES = { facilitator: "Facilitator", mentor: "Mentor/Advisor", judge: "Judge" };
@@ -157,37 +158,18 @@ export async function saveStaffRole(env, b) {
 }
 
 // ---------- tasks ----------
+// The six sprint tasks and which table has which live in sprintpack.js.
+// Judges see each task's single point of failure, strong plans and what to
+// watch for; mentors only the title and the single point of failure.
 
-const taskDone = (t) => !!(t && t.title && t.situation && t.problem && t.constraints);
-
-export async function tasksView(env) {
-  const tables = await tablesNow(env);
-  const { results } = await env.DB.prepare("SELECT * FROM tasks").all();
-  const by = Object.fromEntries(results.map((t) => [t.table_index, t]));
-  const rows = tables.map((t, i) => ({ table: t, name: tableName(t), number: i + 1, ...(by[t] || {}), written: taskDone(by[t]) }));
-  // Tasks written for a table that has since closed stay visible, so nothing is lost.
-  const orphans = results.filter((t) => !tables.includes(t.table_index)).map((t) => ({ ...t, table: t.table_index, name: tableName(t.table_index), orphan: true }));
-  return { tasks: rows, orphans, written: rows.filter((r) => r.written).length };
-}
-
-export async function saveTask(env, b, who) {
-  const table = Number(b.table);
-  if (!Number.isInteger(table) || table < 0 || table > 40) throw new HttpError(400, "Choose a table.");
-  const v = { title: clean(b.title, 140), situation: clean(b.situation), problem: clean(b.problem), constraints: clean(b.constraints) };
-  await env.DB.batch([
-    env.DB.prepare(`INSERT INTO tasks (table_index, title, situation, problem, constraints, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (table_index) DO UPDATE SET title = excluded.title, situation = excluded.situation, problem = excluded.problem,
-        constraints = excluded.constraints, updated_at = excluded.updated_at, updated_by = excluded.updated_by`)
-      .bind(table, v.title, v.situation, v.problem, v.constraints, now(), who),
-    env.DB.prepare("UPDATE packs SET stale = 1"),
-  ]);
-  return tasksView(env);
-}
-
-function tasksBlock(tasks) {
+function tasksBlock(tasks, role) {
+  if (!tasks.length) return null;
+  if (role === "mentor") return tasks.map((t) => `- **${t.code} · ${t.title}:** ${t.vulnerability}`).join("\n");
   return tasks.map((t) => [
-    `**${t.name} · Task ${t.number}${t.title ? ": " + t.title : ""}**`,
-    t.written ? `**The situation.** ${t.situation}\n**The problem to solve.** ${t.problem}\n**What they have to work with.** ${t.constraints}` : "Not written yet.",
+    `**${t.code} · ${t.title}** *(${t.sector})*`,
+    `The single point of failure: ${t.vulnerability}`,
+    `Strong plans usually:\n${t.strong.map((x) => `- ${x}`).join("\n")}`,
+    `Watch for:\n${t.watch.map((x) => `- ${x}`).join("\n")}`,
   ].join("\n")).join("\n\n");
 }
 
@@ -265,10 +247,10 @@ async function sha(text) {
 
 // Everything the templates can ask for, for one person in one role.
 async function context(env) {
-  const [s, tables, people, tpl, tv] = await Promise.all([getSettings(env), tablesNow(env), staffPeople(env), templateMap(env), tasksView(env)]);
+  const [s, tables, people, tpl, tasks, a] = await Promise.all([getSettings(env), tablesNow(env), staffPeople(env), templateMap(env), tasksInUse(env), assignments(env)]);
   const crit = parseCriteria(tpl.criteria);
   const spokes = people.find((p) => p.id === s.spokesperson && p.judge);
-  return { s, tables, people, tpl, tasks: tv.tasks, crit, spokes };
+  return { s, tables, people, tpl, tasks, tasksComplete: a.complete, crit, spokes };
 }
 
 async function fieldsFor(env, ctx, p, role) {
@@ -282,12 +264,12 @@ async function fieldsFor(env, ctx, p, role) {
     presentation_order: presentationOrder(tables, s).map((o) => `${o.name} ${o.time}`).join(", "),
     chair_name: s.chair_name, chair_phone: s.chair_phone,
     brief_link: linkFor(env, "brief", await ensureToken(env, p.id, "brief")),
-    tasks_block: tasksBlock(ctx.tasks),
+    tasks_block: tasksBlock(ctx.tasks, role),
     criteria_block: ctx.crit.map((c) => `**${c.name}**\n- 1: ${c.anchors[1]}\n- 3: ${c.anchors[3]}\n- 5: ${c.anchors[5]}`).join("\n\n"),
     spokesperson_name: ctx.spokes?.name,
   };
   if (role === "facilitator") {
-    f.facilitator_type = p.facilitatorType === "lead" ? "Lead" : "Floor";
+    f.facilitator_type = p.facilitatorType === "lead" ? "Lead Sprint Marshal" : "Floor facilitator";
     f.tables_covered = list(p.tables.map(tableName)) || null;
   }
   if (role === "mentor") {
@@ -326,7 +308,7 @@ async function buildPack(env, ctx, p, role) {
   });
   const cover = fill(ctx.tpl.cover_email, f);
   cover.missing.forEach((m) => missing.add(m));
-  if (ctx.tasks.some((t) => !t.written)) missing.add("tasks");
+  if (!ctx.tasksComplete) missing.add("tasks");
   return { name: p.name, ref: p.ref, role, docs, cover: cover.text, link: f.brief_link, missing: [...missing] };
 }
 
@@ -460,34 +442,4 @@ export async function previewLink(env, b) {
   const tok = token(24);
   await env.KV.put(`preview:${tok}`, JSON.stringify({ ticketId: Number(b.id), role: String(b.role) }), { expirationTtl: 600 });
   return { url: `${env.SITE_URL}brief.html?p=${tok}` };
-}
-
-// ---------- printed table sheets ----------
-
-const SHEETS = [["task_card", "Task card"], ["plan_sheet", "Plan sheet"], ["critique_sheet", "Critique sheet"], ["response_sheet", "Response sheet"]];
-
-export async function sheetsData(env, which) {
-  const [tables, tpl, tv] = await Promise.all([tablesNow(env), templateMap(env), tasksView(env)]);
-  const chain = chainOf(tables);
-  const pick = which === "all" ? tables : tables.filter((t) => t === Number(which));
-  if (!pick.length) throw new HttpError(404, "That table is not in use.");
-  const missing = new Set();
-  const out = pick.map((t) => {
-    const task = tv.tasks.find((x) => x.table === t);
-    const f = {
-      table_name: tableName(t), task_number: task.number,
-      task_title: task.title || null, task_context: task.situation || null, task_problem: task.problem || null, task_constraints: task.constraints || null,
-      source_table_name: tableName(chain.find((c) => c.to === t).from),
-      critic_table_name: tableName(chain.find((c) => c.from === t).to),
-    };
-    return {
-      name: tableName(t),
-      pages: SHEETS.map(([key, title]) => {
-        const r = fill(tpl[key], f);
-        r.missing.forEach((m) => missing.add(`${tableName(t)}: ${m}`));
-        return { title, html: render(r.text) };
-      }),
-    };
-  });
-  return { tables: out, missing: [...missing] };
 }

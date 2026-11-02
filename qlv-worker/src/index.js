@@ -570,6 +570,11 @@ export default {
 
     // Sponsor logos for the projector: images, not JSON.
     if (url.pathname === "/api/logo" && req.method === "GET") return getLogo(env, url);
+    // The "How the sprint works" guide: counted, then the PDF on the site.
+    if (url.pathname === "/api/guide" && req.method === "GET") {
+      const { guideRedirect } = await import("./sprintpack.js");
+      return guideRedirect(env);
+    }
     // The home screen app's manifest, made for each person.
     if (url.pathname === "/api/manifest" && req.method === "GET") {
       try { return await lobby.manifest(env, url); } catch { return new Response("Not found.", { status: 404, headers: { "access-control-allow-origin": "*" } }); }

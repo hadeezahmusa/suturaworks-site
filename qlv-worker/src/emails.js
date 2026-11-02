@@ -419,7 +419,7 @@ export function briefCover({ subject, paragraphs, link, ref }) {
   }).join("");
   return {
     subject,
-    html: shell({ preheader: "Your brief opens on the morning of the day.", body, foot: `QLV 2026 &middot; <span style="font-family:${MONO};">${esc(ref)}</span>` }),
+    html: shell({ preheader: "Your brief opens on the morning of the day.", body, bare: true }),
     text: paragraphs.join("\n\n") + "\n",
   };
 }
