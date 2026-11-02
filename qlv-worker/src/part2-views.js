@@ -432,6 +432,15 @@ document.addEventListener("click", async (e) => {
       const a = el("[data-st]").dataset.st;
       if (a === "open") { const w = window.open("", "_blank"); const r = await call("display-link"); w.location = r.url; return; }
       if (a === "reveal" && !confirm("Show the top three on the display now? This cannot be taken back from the people in the room.")) return;
+      // The gold button acts on one press. Ask only when it would cut a clock short.
+      if (a === "next") {
+        const rem = stRemaining();
+        if (rem !== null && rem > 0) {
+          const on = (stData.queue.find((q) => q.state === "On stage") || {}).name;
+          const ask = stData.state.phase === "presentations" && on ? "End " + on + "'s presentation with " + mmss(rem) + " still on the clock?" : stData.nextLabel + "? " + mmss(rem) + " is still on the clock.";
+          if (!confirm(ask)) return;
+        }
+      }
       await call("stage", { action: a }); if (a === "testSound") msg("Test sound sent. It plays on the display if sound is on there.", true); return loadStage();
     }
     if (el("[data-announce]")) {
