@@ -91,6 +91,7 @@ export const P2_HTML = String.raw`
         <button class="btn ghost" data-st="testSound" style="width:100%">Play a test sound on the display</button></div>
       <div class="card" style="margin:0 0 14px"><h2>On the display between sessions</h2><div id="stToggles"></div></div>
       <div class="card" style="background:#FFF8E2"><h2>Results</h2><p class="small" style="margin:0 0 10px">Opens once every score is in. The display shows the top three and the recognitions only. The full table stays on the Scoring tab.</p><div id="stReveal"></div></div>
+      <div class="card" id="stResetCard" style="margin-top:14px"><h2>After a rehearsal</h2><p class="small" style="margin:0 0 10px">Puts the stage back to Arrival with no team presented and the results hidden. It can't be used once any judge has submitted a score.</p><button class="btn ghost" data-streset="1" style="width:100%">Reset the stage</button></div>
     </div>
   </div>
 </div>
@@ -296,6 +297,7 @@ async function loadScoring() {
 // ---------- Stage ----------
 async function loadStage() {
   const d = stData = await call("stage");
+  $("#stResetCard").hidden = ROLE !== "admin";
   stOffset = d.serverNow - Date.now();
   $("#stDisp").innerHTML = d.display.connected ? '<span class="ok2">Display connected · sound ' + (d.display.sound ? "on" : "off") + '</span>' : '<span class="no2">Display not connected</span>';
   $("#stPhases").innerHTML = d.phases.map((p) => '<button class="' + (p.on ? "on" : p.done ? "done" : "") + '" data-phase="' + p.id + '" aria-pressed="' + p.on + '">' + esc(p.label) + (p.done ? " ✓" : "") + '</button>').join("");
@@ -421,6 +423,10 @@ document.addEventListener("click", async (e) => {
       const p = el("[data-phase]").dataset.phase;
       if (!confirm("Move the display to " + el("[data-phase]").textContent.replace(" ✓", "") + "? A timed stage starts its clock from the beginning.")) return;
       stData = await call("stage", { action: "phase", phase: p }); return loadStage();
+    }
+    if (el("[data-streset]")) {
+      if (!confirm("Reset the stage? It goes back to Arrival, every team is marked as not yet presented and the results are hidden.")) return;
+      stData = await call("stage-reset", {}); msg("The stage is reset.", true); return loadStage();
     }
     if (el("[data-st]")) {
       const a = el("[data-st]").dataset.st;
