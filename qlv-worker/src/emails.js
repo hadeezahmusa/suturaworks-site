@@ -106,7 +106,7 @@ export function paidLine(ticket, reg) {
 
 // The ticket strip inside the email, after the mockup.
 function ticketCard(t) {
-  const [chip, bg, fg] = CHIP[t.kind] || CHIP.standard;
+  const [chip, bg, fg] = t.kind === "member" && t.intending ? ["Intending member", C.yel, C.navy] : CHIP[t.kind] || CHIP.standard;
   const border = t.kind === "adviser" ? `border:1.5px solid ${C.navy};` : "";
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;border:1px solid #D7E2EF;border-radius:10px;overflow:hidden;"><tr>
   <td width="150" valign="top" bgcolor="${C.navy}" style="width:150px;background:${C.navy};padding:16px;font-family:${FONT};">
@@ -342,7 +342,7 @@ export function answersReminder(t, answerUrl, closeDate) {
 // fix: null for the first send; { codeChanged } when the admin corrected the
 // member's name, code or email and is sending the code again.
 export function memberCode(m, siteUrl, closeDate, fix = null) {
-  const intro = !fix ? `Hello ${esc(first(m.name))}, as a JCI Aso member you can register for QLV 2026 at the member rate of ${ngn(8000)} instead of ${ngn(10000)}. Here is your personal code.`
+  const intro = !fix ? `Hello ${esc(first(m.name))}, as ${m.status === "intending" ? "an intending" : "a"} JCI Aso member you can register for QLV 2026 at the member rate of ${ngn(8000)} instead of ${ngn(10000)}. Here is your personal code.`
     : fix.codeChanged ? `Hello ${esc(first(m.name))}, thank you for letting us know. We have corrected your name on the JCI Aso list to <b>${esc(m.name)}</b>, and your code has changed to match it. Please use the code below from now on. You can register at the member rate of ${ngn(8000)} instead of ${ngn(10000)}.`
     : `Hello ${esc(first(m.name))}, thank you for letting us know. We have updated your details on the JCI Aso list, and your name now reads <b>${esc(m.name)}</b>. Your code is below. You can register at the member rate of ${ngn(8000)} instead of ${ngn(10000)}.`;
   const body = h1(fix ? "Your corrected member code for QLV 2026" : "Your member code for QLV 2026") +

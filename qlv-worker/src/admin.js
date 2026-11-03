@@ -129,7 +129,8 @@ async function list(env, filter) {
   const { results } = await env.DB.prepare(`SELECT r.ref, r.tier, r.size, r.amount, r.status, r.name, r.contact_person, r.organisation, r.email,
       r.created_at, r.proof_at, r.verified_at, r.sent_at,
       (SELECT COUNT(*) FROM tickets t WHERE t.reg_ref = r.ref AND t.kind IN ('sponsored', 'standard') AND t.ticket_ref != 'pending' AND t.sent_at IS NOT NULL) AS claimed,
-      (r.attendees IS NULL AND r.tier IN ('sponsored', 'standard') AND r.size > 1) AS shares
+      (r.attendees IS NULL AND r.tier IN ('sponsored', 'standard') AND r.size > 1) AS shares,
+      (r.tier = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.code = r.member_no AND m.status = 'intending')) AS intending
     FROM registrations r WHERE r.tier NOT IN ('partner', 'facilitator') ORDER BY r.created_at DESC`).all();
   const rows = results.map((r) => ({ ...r, flagged: flagged(r) }));
   const counts = { all: 0, awaiting: 0, flagged: 0, verified: 0, confirmed: 0, queried: 0, released: 0, adviser: 0 };
@@ -152,7 +153,7 @@ async function detail(env, ref) {
   const log = (await env.DB.prepare("SELECT kind, recipient, ok, created_at FROM email_log WHERE ref = ? ORDER BY id DESC LIMIT 30").bind(r.ref).all()).results;
   const { secret, ...safe } = r;
   return {
-    reg: { ...safe, attendees: r.attendees ? JSON.parse(r.attendees) : null, shares: sharesLink(r), flagged: flagged(r), tierName: TIER_NAME[r.tier], amountText: ngn(r.amount) },
+    reg: { ...safe, attendees: r.attendees ? JSON.parse(r.attendees) : null, shares: sharesLink(r), flagged: flagged(r), tierName: r.tier === "member" && (await isIntending(env, r.member_no)) ? "Intending JCI Aso member" : TIER_NAME[r.tier], intending: r.tier === "member" && (await isIntending(env, r.member_no)), amountText: ngn(r.amount) },
     tickets: (await (async () => { const free = new Set(await ops.replaceableIds(env, r.ref)); return t.map((x) => ({ ...x, replaceable: free.has(x.id) })); })()).map(({ token: _t, ...rest }) => ({ ...rest, table: rest.table_index === null || rest.table_index === undefined ? null : `${tableName(rest.table_index)}, seat ${rest.table_seat}` })),
     log,
     claimUrl: r.status === "confirmed" ? links(env, r).claim : null,
@@ -179,6 +180,7 @@ async function verify(env, ref, who) {
     stmts.push(env.DB.prepare("UPDATE registrations SET claim_token = COALESCE(claim_token, ?), manage_token = COALESCE(manage_token, ?) WHERE ref = ?").bind(token(10), token(24), r.ref));
   } else throw new HttpError(409, "Advisers are confirmed when they sign up.");
   stmts.push(env.DB.prepare("UPDATE registrations SET status = 'verified', verified_at = ?, verified_by = ?, updated_at = ? WHERE ref = ?").bind(stamp, who, stamp, r.ref));
+  stmts.push(env.DB.prepare(SYNC_INTENDING));
   await env.DB.batch(stmts);
   // Standard, member and corporate seats take a table the moment payment is verified.
   await seatPending(env);
@@ -330,7 +332,7 @@ const WAITING_SQL = `SELECT t.id, t.token, t.ticket_ref, t.reg_ref, t.name, t.em
 // ---------- member codes ----------
 // Each JCI Aso member with an email on file gets their own code once.
 // Members who have already registered with their code are skipped.
-const CODES_WAITING_SQL = `SELECT m.code, m.name, m.email FROM members m
+const CODES_WAITING_SQL = `SELECT m.code, m.name, m.email, m.status FROM members m
   WHERE m.email IS NOT NULL AND m.email != ''
     AND NOT EXISTS (SELECT 1 FROM email_log l WHERE l.kind = 'member_code' AND l.ok = 1 AND l.ref = m.code AND l.recipient = m.email)
     AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.tier = 'member' AND r.member_no = m.code AND r.status != 'released')
@@ -374,12 +376,20 @@ async function sendCodes(env) {
 // in member_changes, and the old code keeps working on the registration page.
 // A member who has already registered gets the corrected name on their
 // registration and ticket; their ticket reference does not change.
+// Members and intending members: the same rate and seating, a different label.
+// Each member ticket carries its own copy of the flag; this keeps it in step.
+export const SYNC_INTENDING = `UPDATE tickets SET intending = COALESCE((SELECT m.status = 'intending' FROM registrations r JOIN members m ON m.code = r.member_no
+    WHERE r.ref = tickets.reg_ref AND r.tier = 'member'), 0) WHERE kind = 'member'`;
+async function isIntending(env, code) {
+  return !!(code && (await env.DB.prepare("SELECT 1 FROM members WHERE code = ? AND status = 'intending'").bind(code).first()));
+}
+
 function initials(name) {
   return (String(name).match(/[A-Za-z][A-Za-z'-]*/g) || []).map((w) => w[0]).join("").toUpperCase();
 }
 
 async function membersList(env) {
-  const { results } = await env.DB.prepare(`SELECT m.code, m.name, m.email,
+  const { results } = await env.DB.prepare(`SELECT m.code, m.name, m.email, m.status, m.added_at, m.added_by,
       (SELECT r.ref FROM registrations r WHERE r.tier = 'member' AND r.member_no = m.code AND r.status != 'released' LIMIT 1) AS reg_ref,
       (SELECT MAX(l.created_at) FROM email_log l WHERE l.kind = 'member_code' AND l.ok = 1 AND l.ref = m.code) AS sent_at,
       (SELECT group_concat(c.old_code, ', ') FROM member_changes c WHERE c.code = m.code AND c.old_code != m.code) AS old_codes,
@@ -389,7 +399,7 @@ async function membersList(env) {
 }
 
 async function memberFix(env, b, who) {
-  const m = await env.DB.prepare("SELECT code, name, email FROM members WHERE code = ?").bind(String(b.code || "")).first();
+  const m = await env.DB.prepare("SELECT code, name, email, status FROM members WHERE code = ?").bind(String(b.code || "")).first();
   if (!m) throw new HttpError(404, "That member is no longer on the list. Refresh the page.");
   const name = String(b.name || "").replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
   if (initials(name).length < 2) throw new HttpError(400, "Type the member's full name, at least two names.");
@@ -397,8 +407,12 @@ async function memberFix(env, b, who) {
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, "That email address does not look right.");
   const code = String(b.newCode || "").replace(/\s+/g, "").toUpperCase();
   if (!/^[A-Z]{1,8}\d{3}$/.test(code)) throw new HttpError(400, "A code is letters followed by three numbers, for example AMS892.");
-  const codeChanged = code !== m.code, nameChanged = name !== m.name, emailChanged = email !== (m.email || null);
-  if (!codeChanged && !nameChanged && !emailChanged && !b.send) throw new HttpError(400, "Nothing has changed.");
+  const status = b.status === "intending" ? "intending" : b.status === "member" ? "member" : m.status;
+  const codeChanged = code !== m.code, nameChanged = name !== m.name, emailChanged = email !== (m.email || null), statusChanged = status !== m.status;
+  if (!codeChanged && !nameChanged && !emailChanged && !statusChanged && !b.send) throw new HttpError(400, "Nothing has changed.");
+  if (statusChanged && !codeChanged && !nameChanged && !emailChanged) {
+    await env.DB.batch([env.DB.prepare("UPDATE members SET status = ? WHERE code = ?").bind(status, m.code), env.DB.prepare(SYNC_INTENDING)]);
+  }
   if (codeChanged) {
     const clash = await env.DB.prepare(`SELECT code FROM members WHERE code = ?1
       UNION SELECT code FROM member_changes WHERE old_code = ?1 AND code != ?2 LIMIT 1`).bind(code, m.code).first();
@@ -410,9 +424,10 @@ async function memberFix(env, b, who) {
       env.DB.prepare("UPDATE member_changes SET code = ? WHERE code = ?").bind(code, m.code),
       env.DB.prepare(`INSERT INTO member_changes (old_code, code, old_name, new_name, old_email, new_email, changed_at, changed_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(m.code, code, m.name, name, m.email || null, email, stamp, who),
-      env.DB.prepare("UPDATE members SET code = ?, name = ?, email = ? WHERE code = ?").bind(code, name, email, m.code),
+      env.DB.prepare("UPDATE members SET code = ?, name = ?, email = ?, status = ? WHERE code = ?").bind(code, name, email, status, m.code),
       env.DB.prepare("UPDATE registrations SET member_no = ?, name = ?, updated_at = ? WHERE tier = 'member' AND member_no = ?").bind(code, name, stamp, m.code),
       env.DB.prepare("UPDATE tickets SET name = ? WHERE kind = 'member' AND reg_ref IN (SELECT ref FROM registrations WHERE tier = 'member' AND member_no = ?)").bind(name, code),
+      env.DB.prepare(SYNC_INTENDING),
     ]);
   }
   const reg = await env.DB.prepare("SELECT ref, status, sent_at FROM registrations WHERE tier = 'member' AND member_no = ? AND status != 'released' LIMIT 1").bind(code).first();
@@ -430,22 +445,60 @@ async function memberFix(env, b, who) {
       // a missing email alone sends the ordinary code email.
       const h = await env.DB.prepare("SELECT SUM(old_name IS NOT new_name OR old_code != code) AS fixed, SUM(old_code != code) AS moved FROM member_changes WHERE code = ?").bind(code).first();
       const fix = h.fixed ? { codeChanged: !!h.moved } : null;
-      emailed = await sendMail(env, { to: email, ...mail.memberCode({ code, name }, env.SITE_URL, closeLabel(close), fix) }, code, "member_code");
+      emailed = await sendMail(env, { to: email, ...mail.memberCode({ code, name, status }, env.SITE_URL, closeLabel(close), fix) }, code, "member_code");
       if (!emailed) warning = "Saved, but the email did not go. Try sending again in a few minutes.";
     }
   }
-  return { code, name, email, emailed, warning, reg: reg ? { ref: reg.ref, status: reg.status, ticketSent: !!reg.sent_at } : null, ...(await membersList(env)) };
+  return { code, name, email, status, emailed, warning, reg: reg ? { ref: reg.ref, status: reg.status, ticketSent: !!reg.sent_at } : null, ...(await membersList(env)) };
+}
+
+// A new member or intending member, with a code made from their initials and
+// three numbers no other member, past code or partner code uses.
+async function memberAdd(env, b, who) {
+  const name = String(b.name || "").replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
+  if (initials(name).length < 2) throw new HttpError(400, "Type the member's full name, at least two names.");
+  const email = String(b.email || "").trim().toLowerCase().slice(0, 160) || null;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, "That email address does not look right.");
+  const status = b.status === "intending" ? "intending" : "member";
+  if (email) {
+    const same = await env.DB.prepare("SELECT code, name FROM members WHERE lower(email) = ?").bind(email).first();
+    if (same) throw new HttpError(409, `${same.name} already has that email, with code ${same.code}. Search for them in the list instead.`);
+  }
+  const same = await env.DB.prepare("SELECT code FROM members WHERE lower(name) = lower(?)").bind(name).first();
+  if (same && !b.allowSameName) throw new HttpError(409, `A member called ${name} is already on the list, with code ${same.code}. If this is a different person, press Add again.`, "same_name");
+  const stem = initials(name).slice(0, 8);
+  let code = null;
+  for (let i = 0; i < 40 && !code; i++) {
+    const c = stem + (100 + (crypto.getRandomValues(new Uint16Array(1))[0] % 900));
+    const clash = await env.DB.prepare("SELECT 1 FROM members WHERE code = ?1 UNION SELECT 1 FROM member_changes WHERE old_code = ?1 UNION SELECT 1 FROM partner_codes WHERE code = ?1").bind(c).first();
+    if (!clash) code = c;
+  }
+  if (!code) throw new HttpError(500, "Could not make a code. Try again.");
+  await env.DB.prepare("INSERT INTO members (code, name, email, status, added_at, added_by) VALUES (?, ?, ?, ?, ?, ?)").bind(code, name, email, status, now(), who).run();
+  let emailed = false, warning = "";
+  if (b.send) {
+    const close = await closesAt(env);
+    if (!email) warning = "Added, but there is no email address to send the code to.";
+    else if (Date.now() >= Date.parse(close)) warning = "Added, but registration has closed, so the code was not sent.";
+    else if (!(await dailyRoom(env)).room) warning = `Added, but ${DAILY_SAFE} emails have gone out in the last 24 hours, the safe limit on the free plan. Send it tomorrow.`;
+    else {
+      emailed = await sendMail(env, { to: email, ...mail.memberCode({ code, name, status }, env.SITE_URL, closeLabel(close)) }, code, "member_code");
+      if (!emailed) warning = "Added, but the email did not go. Open them in the list and send it again.";
+    }
+  }
+  return { code, name, email, status, emailed, warning, ...(await membersList(env)) };
 }
 
 async function memberPreview(env, b) {
-  const m = await env.DB.prepare("SELECT code, name FROM members WHERE code = ?").bind(String(b.code || "")).first();
+  const m = await env.DB.prepare("SELECT code, name, status FROM members WHERE code = ?").bind(String(b.code || "")).first();
   if (!m) throw new HttpError(404, "That member is no longer on the list. Refresh the page.");
   const name = String(b.name || "").replace(/\s+/g, " ").trim().slice(0, 120) || m.name;
   const code = String(b.newCode || "").replace(/\s+/g, "").toUpperCase() || m.code;
   const h = await env.DB.prepare("SELECT SUM(old_name IS NOT new_name OR old_code != code) AS fixed, SUM(old_code != code) AS moved FROM member_changes WHERE code = ?").bind(m.code).first();
   const moved = code !== m.code || !!h.moved;
   const fix = name !== m.name || moved || h.fixed ? { codeChanged: moved } : null;
-  const r = mail.memberCode({ code, name }, env.SITE_URL, closeLabel(await closesAt(env)), fix);
+  const status = b.status === "intending" || b.status === "member" ? b.status : m.status;
+  const r = mail.memberCode({ code, name, status }, env.SITE_URL, closeLabel(await closesAt(env)), fix);
   return { subject: r.subject, html: r.html };
 }
 
@@ -606,7 +659,7 @@ async function call(path, body) {
   const res = await fetch("/admin/api/" + path, { credentials: "same-origin", ...opts });
   if (res.status === 401) { location.href = "/admin"; throw new Error("Signed out"); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Something went wrong.");
+  if (!res.ok) throw Object.assign(new Error(data.error || "Something went wrong."), { code: data.code });
   return data;
 }
 function msg(text, ok) { const m = $("#msg"); m.className = "msg " + (ok ? "ok" : "err"); m.textContent = text; m.hidden = !text; }
@@ -626,7 +679,7 @@ async function loadList() {
   $("#flagNote").textContent = "Flagged means still awaiting " + d.releaseAfterDays + " days after registering. Nothing is released until you press Release.";
   $("#rows").innerHTML = d.rows.map((r) => '<tr data-ref="' + esc(r.ref) + '" class="' + (current && current.reg.ref === r.ref ? "sel" : "") + '">' +
     '<td class="mono">' + esc(r.ref) + "</td><td>" + esc(r.contact_person ? r.name + " (" + r.contact_person + ")" : r.name) + '<div class="small">' + esc(r.email) + "</div></td>" +
-    "<td>" + TIER[r.tier] + (r.tier === "corporate" ? " of " + r.size : r.size > 1 ? " x" + r.size + (r.shares && r.status === "confirmed" ? ", " + r.claimed + " claimed" : "") : "") + "</td>" +
+    "<td>" + (r.intending ? "Intending member" : TIER[r.tier]) + (r.tier === "corporate" ? " of " + r.size : r.size > 1 ? " x" + r.size + (r.shares && r.status === "confirmed" ? ", " + r.claimed + " claimed" : "") : "") + "</td>" +
     "<td>" + (r.amount ? naira(r.amount) : "None") + '</td><td class="hide-s">' + (r.tier === "adviser" ? "" : r.proof_at ? "Yes" : '<span class="small">Not yet</span>') + '</td><td class="hide-s">' + when(r.created_at) + "</td>" +
     '<td><span class="st ' + r.status + '">' + STATUS[r.status] + "</span>" + (r.flagged ? '<div class="flag">Flagged for release</div>' : "") + "</td></tr>").join("") ||
     '<tr><td colspan="7" class="small">Nothing here.</td></tr>';
@@ -799,7 +852,7 @@ function drawMembers() {
   const q = $("#mbFind").value.trim().toLowerCase();
   const rows = members.filter((m) => !q || (m.code + " " + m.name + " " + (m.email || "") + " " + (m.old_codes || "")).toLowerCase().includes(q));
   $("#mbRows").innerHTML = rows.map((m) => '<tr data-mb="' + esc(m.code) + '"' + (m.code === mbCur ? ' class="sel"' : "") + '><td class="mono">' + esc(m.code) + "</td><td><b>" + esc(m.name) + "</b>" +
-    (m.changed_at ? '<div class="small">Corrected ' + when(m.changed_at) + (m.old_codes ? ", was " + esc(m.old_codes) : "") + "</div>" : "") + '</td><td class="hide-s small">' + esc(m.email || "") + "</td><td>" + mbStatus(m) + "</td></tr>").join("") ||
+    (m.changed_at ? '<div class="small">Corrected ' + when(m.changed_at) + (m.old_codes ? ", was " + esc(m.old_codes) : "") + "</div>" : "") + (m.status === "intending" ? ' <span class="pill wait">Intending</span>' : "") + (m.added_at ? '<div class="small">Added ' + when(m.added_at) + "</div>" : "") + '</td><td class="hide-s small">' + esc(m.email || "") + "</td><td>" + mbStatus(m) + "</td></tr>").join("") ||
     '<tr><td colspan="4" class="small">No member matches that search.</td></tr>';
 }
 function openMember(code) {
@@ -814,6 +867,7 @@ function openMember(code) {
     '<label class="fl">Code<input type="text" name="newCode" maxlength="12" class="mono" value="' + esc(m.code) + '" autocapitalize="characters"></label>' +
     '<p class="small" id="mbCodeNote" style="margin:-4px 0 10px"></p>' +
     '<label class="fl">Email<input type="email" name="email" maxlength="160" value="' + esc(m.email || "") + '" placeholder="No email on file yet"></label>' +
+    '<label class="fl">They are<select name="status"><option value="member"' + (m.status !== "intending" ? " selected" : "") + '>A member</option><option value="intending"' + (m.status === "intending" ? " selected" : "") + ">An intending member</option></select></label>" +
     (m.reg_ref
       ? '<div class="note">Already registered as <b class="mono">' + esc(m.reg_ref) + '</b>. Saving puts the corrected name on their registration and ticket; the ticket number stays the same. No code email goes out. To send them the corrected ticket, open ' + esc(m.reg_ref) + ' in Registrations and use Resend.</div>'
       : closed ? '<div class="note">Registration has closed, so no code email can go out. The correction is still saved.</div>'
@@ -839,7 +893,7 @@ function mbNote() {
 }
 async function saveMember(f) {
   const m = members.find((x) => x.code === mbCur);
-  const body = { code: m.code, name: f.name.value, newCode: f.newCode.value, email: f.email.value, send: !!(f.send && f.send.checked) };
+  const body = { code: m.code, name: f.name.value, newCode: f.newCode.value, email: f.email.value, status: f.status.value, send: !!(f.send && f.send.checked) };
   const what = body.send ? " and email the code to " + body.email : "";
   if (!confirm("Save " + body.name.trim() + " with code " + body.newCode.trim().toUpperCase() + what + "?")) return;
   $("#mbSave").disabled = true;
@@ -853,7 +907,7 @@ async function saveMember(f) {
 
 async function mbPreview() {
   const f = $("#mbForm");
-  const r = await call("member-preview", { code: mbCur, name: f.name.value, newCode: f.newCode.value });
+  const r = await call("member-preview", { code: mbCur, name: f.name.value, newCode: f.newCode.value, status: f.status.value });
   $("#mbFrame").innerHTML = '<div class="small" style="margin:6px 0">' + esc(r.subject) + '</div><iframe sandbox="" title="Corrected code email preview" id="mbPv"></iframe>';
   $("#mbPv").srcdoc = r.html;
 }
@@ -863,6 +917,23 @@ document.addEventListener("input", (e) => {
 });
 document.addEventListener("change", (e) => { if (e.target.closest("#mbForm") && e.target.name === "send") mbNote(); });
 document.addEventListener("submit", (e) => { if (e.target.id === "mbForm") { e.preventDefault(); saveMember(e.target); } });
+async function addMember(f, allowSameName) {
+  const body = { name: f.name.value, email: f.email.value, status: f.status.value, send: f.send.checked && /@/.test(f.email.value), allowSameName };
+  const who = body.status === "intending" ? "an intending member" : "a member";
+  if (!allowSameName && !confirm("Add " + body.name.trim() + " as " + who + (body.send ? " and email the code to " + body.email.trim() : "") + "?")) return;
+  const btn = f.querySelector("button"); btn.disabled = true;
+  try {
+    const r = await call("member-add", body);
+    f.reset(); f.send.checked = true;
+    mbCur = r.code; await loadMembers(r); loadCodes().catch(() => {});
+    if (r.warning) msg(r.warning + " Their code is " + r.code + ".");
+    else msg("Added " + r.name + " with code " + r.code + "." + (r.emailed ? " The code has gone to " + r.email + "." : " Give them the code yourself."), true);
+  } catch (err) {
+    if (err.code === "same_name" && confirm(err.message.replace(" If this is a different person, press Add again.", "") + " Add another person with the same name?")) { btn.disabled = false; return addMember(f, true); }
+    msg(err.message);
+  } finally { btn.disabled = false; }
+}
+document.addEventListener("submit", (e) => { if (e.target.id === "mbAdd") { e.preventDefault(); addMember(e.target, false); } });
 
 async function codes(kind, btn) {
   msg("");
@@ -983,9 +1054,18 @@ function appPage(email, role, site) {
       <div class="grid"><div class="list card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Ref</th><th>Who</th><th>Ticket</th><th>Amount</th><th class="hide-s">Proof</th><th class="hide-s">Registered</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
       <div class="side" id="detail"><div class="card small">Pick a registration to see its details${board ? "" : " and proof"}.</div></div></div></div>
     ${role === "admin" ? `<div id="codesView" hidden><div class="card" id="codesBox"></div>
+      <form class="card" id="mbAdd" style="margin-top:14px"><h2>Add a member</h2>
+        <p class="small" style="margin:-4px 0 10px">For someone not on the JCI Aso list yet. They get their own code, initials and three numbers, for the member rate. An intending member pays the same rate and sits like a member; their badge, ticket and emails say Intending member.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+          <label class="fl" style="flex:2 1 220px;margin:0">Full name<input type="text" name="name" maxlength="120" placeholder="First and last name" required></label>
+          <label class="fl" style="flex:2 1 220px;margin:0">Email <span class="small" style="font-weight:400">(to send the code)</span><input type="email" name="email" maxlength="160" placeholder="name@example.com"></label>
+          <label class="fl" style="flex:1 1 160px;margin:0">They are<select name="status"><option value="member">A member</option><option value="intending">An intending member</option></select></label>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:12px;margin:10px 0 0"><input type="checkbox" name="send" checked> Email them the code now</label>
+        <div class="actions"><button class="btn">Add and make a code</button></div></form>
       <div class="grid" style="margin-top:14px"><div class="list card" style="padding:0;overflow-x:auto">
-        <div style="padding:14px 16px 0"><h2>Correct a member's name, code or email</h2>
-          <p class="small" style="margin:0 0 10px">Pick a member to fix how their name is spelled or ordered. Their code follows the corrected initials and keeps its three numbers. The old code keeps working too, because the old list was shared on WhatsApp.</p>
+        <div style="padding:14px 16px 0"><h2>Correct a member's details</h2>
+          <p class="small" style="margin:0 0 10px">Pick a member to fix how their name is spelled or ordered, their email, or whether they are a member or an intending member. Their code follows the corrected initials and keeps its three numbers. The old code keeps working too, because the old list was shared on WhatsApp.</p>
           <input type="search" id="mbFind" placeholder="Search by name, code or email" aria-label="Search members" style="width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;padding:10px 12px;min-height:42px;margin:0 0 10px"></div>
         <table><thead><tr><th>Code</th><th>Name</th><th class="hide-s">Email</th><th>Status</th></tr></thead><tbody id="mbRows"></tbody></table></div>
       <div class="side" id="mbSide"><div class="card small">Pick a member to correct their details.</div></div></div></div>` : ""}
@@ -1110,6 +1190,7 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST codes": () => sendCodes(env),
       "GET members": () => membersList(env),
       "POST member-fix": () => memberFix(env, body, who),
+      "POST member-add": () => memberAdd(env, body, who),
       "POST member-preview": () => memberPreview(env, body),
       "POST verify": () => verify(env, body.ref, who),
       "POST unverify": () => unverify(env, body.ref, who, role),
@@ -1169,7 +1250,7 @@ export async function handleAdmin(req, env, ctx, url) {
     if (role !== "admin" && !CAN[role]?.has(`${req.method} ${path.slice("/admin/api/".length)}`)) return refuse();
     return json(role === "board" ? redact(await api()) : await api());
   } catch (err) {
-    if (err instanceof HttpError) return json({ error: err.message }, err.status);
+    if (err instanceof HttpError) return json({ error: err.message, code: err.code }, err.status);
     console.error(err);
     return json({ error: "Something went wrong. Try again in a minute." }, 500);
   }
