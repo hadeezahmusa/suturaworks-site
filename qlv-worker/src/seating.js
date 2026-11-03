@@ -15,7 +15,7 @@
 import { choose, tablesFrom, orgKey } from "./placement.js";
 import { getSettings, isFrozen } from "./settings.js";
 
-const DUE_SQL = `SELECT t.id, t.kind, t.organisation, t.reg_ref, r.size AS reg_size, r.organisation AS reg_org, p.name AS partner_name,
+const DUE_SQL = `SELECT t.id, t.kind, t.organisation, t.reg_ref, r.size AS reg_size, r.organisation AS reg_org, COALESCE(p.name, t.organisation) AS partner_name,
     CASE WHEN t.kind IN ('sponsored', 'partner') THEN t.created_at ELSE r.verified_at END AS due_at
   FROM tickets t JOIN registrations r ON r.ref = t.reg_ref LEFT JOIN partners p ON p.id = t.partner_id
   WHERE t.table_index IS NULL AND t.cancelled_at IS NULL AND t.ticket_ref != 'pending'

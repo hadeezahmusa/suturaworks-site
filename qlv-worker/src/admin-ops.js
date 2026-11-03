@@ -232,7 +232,7 @@ export async function exportRows(env) {
   await seatPending(env);
   const lock = await lastLock(env);
   const { results } = await env.DB.prepare(`SELECT t.id, t.kind, t.name, t.badge_name, t.ticket_ref, t.table_index, t.table_seat, t.seated_at, t.created_at,
-      t.organisation, t.days, r.organisation AS reg_org, r.mode, p.name AS partner_name
+      t.organisation, t.days, r.organisation AS reg_org, r.mode, COALESCE(p.name, t.organisation) AS partner_name
     FROM tickets t JOIN registrations r ON r.ref = t.reg_ref LEFT JOIN partners p ON p.id = t.partner_id
     WHERE t.cancelled_at IS NULL AND t.ticket_ref != 'pending'
       AND (t.table_index IS NOT NULL OR (t.kind IN ('facilitator', 'adviser', 'judge') AND t.sent_at IS NOT NULL))`).all();

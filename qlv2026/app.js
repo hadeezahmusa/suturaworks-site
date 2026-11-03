@@ -917,6 +917,62 @@ $("#f-claim").addEventListener("submit", async (e) => {
   }
 });
 
+// ---------- nominee of a non-paying partner ----------
+// The partner's code gives one free ticket. Check the code first, then the details.
+
+let nomCode = null;
+function openNominee() {
+  if (closed) return message("Registration has closed", `Registration for QLV 2026 closed on ${closeLabel(closeAt)}.`, false);
+  nomCode = null;
+  show("nomFound", false);
+  show("nomCheckBtn", true);
+  go("nominee", false);
+}
+async function nomineeCheck() {
+  const f = $("#f-nominee");
+  const code = $("#n-code").value.replace(/\s+/g, "").toUpperCase();
+  if (!code) return formError(f, "Please type the code your organisation gave you.");
+  formError(f, "");
+  try {
+    const r = await post("/api/nominee-check", { code });
+    nomCode = r.code;
+    $("#n-code").value = r.code;
+    $("#n-code").readOnly = true;
+    bind("nomPartner", r.partner);
+    bind("nomTitle", r.partner + " has a free seat for you");
+    show("nomCheckBtn", false);
+    show("nomFound", true);
+    $("#n-name").focus();
+  } catch (err) {
+    formError(f, err.message);
+  }
+}
+$("#n-check").addEventListener("click", nomineeCheck);
+$("#n-code").addEventListener("keydown", (e) => { if (e.key === "Enter" && !nomCode) { e.preventDefault(); nomineeCheck(); } });
+$("#f-nominee").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.currentTarget;
+  if (!nomCode) return nomineeCheck();
+  const msg = check(f);
+  if (msg) return formError(f, msg);
+  formError(f, "");
+  busy(f, true);
+  const v = values(f);
+  try {
+    const r = await post("/api/nominee", { ...v, code: nomCode });
+    bind("claimRef", r.ref);
+    bind("claimEmail", r.email);
+    Q.claimRef = r.ref;
+    Q.claimEmail = r.email;
+    openQuestions({ key: r.key, branch: v.situation, back: "claimed" });
+  } catch (err) {
+    if (err.code === "code_used") message("This code has already been used", "Each code is for one person. If you were expecting this seat, ask the person who gave you the code.", false);
+    else formError(f, err.message);
+  } finally {
+    busy(f, false);
+  }
+});
+
 // ---------- sponsor tracker ----------
 
 async function openSponsor(manage, refresh) {
@@ -1068,6 +1124,7 @@ async function init() {
 
   if (params.get("claim")) return openClaim(params.get("claim"));
   if (params.get("seat")) return openPartnerSeat(params.get("seat"));
+  if (params.has("nominee")) return openNominee();
   if (params.get("sponsor")) return openSponsor(params.get("sponsor"));
   if (params.get("ticket")) return openTicket(params.get("ticket"));
   if (params.get("answer")) return openAnswerLink(params.get("answer"));

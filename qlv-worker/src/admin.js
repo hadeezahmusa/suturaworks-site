@@ -20,6 +20,7 @@ import * as money from "./money.js";
 import * as logos from "./logos.js";
 import * as lobby from "./lobby.js";
 import * as sprint from "./sprintpack.js";
+import * as pcodes from "./partnercodes.js";
 import { BOARD_CAN, boardSessionOk, boardView, boardAction, boardLogin, redact } from "./board.js";
 import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
 import { sendBatch, dailyRoom, DAILY_SAFE } from "./mailer.js";
@@ -1122,6 +1123,9 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET tables": () => ops.tablesView(env),
       "POST lock": () => ops.lockExport(env, who),
       "GET partners": () => ops.partnersList(env),
+      "GET partner-codes": () => pcodes.codesView(env),
+      "POST partner-codes-create": () => pcodes.createMissing(env, who),
+      "POST partner-code-replace": () => pcodes.replaceCode(env, body, who),
       "GET partner": () => ops.partnerDetail(env, q.get("id")),
       "POST partner": () => ops.createPartner(env, body, who),
       "POST partner-confirm": () => ops.confirmPartner(env, body, who),
