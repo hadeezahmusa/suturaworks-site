@@ -537,7 +537,7 @@ async function ticketByToken(env, t) {
 async function ticketView(url, env) {
   const t = await ticketByToken(env, url.searchParams.get("t"));
   if (!t || !t.sent_at || t.cancelled_at) throw new HttpError(404, "Ticket not found.");
-  return { name: t.name, ref: t.ticket_ref, kind: t.kind, mode: t.mode, situation: t.situation, days: mail.dayLines(t).map(([k]) => k), paidLine: mail.paidLine(t, t) };
+  return { name: t.name, ref: t.ticket_ref, kind: t.kind, intending: !!t.intending, mode: t.mode, situation: t.situation, days: mail.dayLines(t).map(([k]) => k), paidLine: mail.paidLine(t, t) };
 }
 
 // An answer key is either a registration secret (standard and member, from

@@ -1021,7 +1021,7 @@ const TICKET = {
 async function openTicket(token) {
   try {
     const t = await api("/api/ticket?t=" + encodeURIComponent(token));
-    const style = TICKET[t.kind] || TICKET.standard;
+    const style = t.kind === "member" && t.intending ? { ...TICKET.member, chip: "Intending member" } : TICKET[t.kind] || TICKET.standard;
     const chip = $("#tkChip");
     chip.textContent = style.chip;
     chip.style.background = style.bg;

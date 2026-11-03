@@ -231,7 +231,7 @@ const DAYS = { both: "Both", sat: "Saturday", fri: "Friday" };
 export async function exportRows(env) {
   await seatPending(env);
   const lock = await lastLock(env);
-  const { results } = await env.DB.prepare(`SELECT t.id, t.kind, t.name, t.badge_name, t.ticket_ref, t.table_index, t.table_seat, t.seated_at, t.created_at,
+  const { results } = await env.DB.prepare(`SELECT t.id, t.kind, t.intending, t.name, t.badge_name, t.ticket_ref, t.table_index, t.table_seat, t.seated_at, t.created_at,
       t.organisation, t.days, r.organisation AS reg_org, r.mode, COALESCE(p.name, t.organisation) AS partner_name
     FROM tickets t JOIN registrations r ON r.ref = t.reg_ref LEFT JOIN partners p ON p.id = t.partner_id
     WHERE t.cancelled_at IS NULL AND t.ticket_ref != 'pending'
@@ -244,7 +244,7 @@ export async function exportRows(env) {
     return {
       id: t.id, name: t.name, badge: t.badge_name || t.name, staff: !!role,
       table: role || tableName(t.table_index), seat: role ? "" : String(t.table_seat),
-      ref: t.ticket_ref, type: TYPE[t.kind] || (t.kind === "judge" ? "Judge" : t.mode === "judge" ? "Judge" : "Adviser"),
+      ref: t.ticket_ref, type: t.kind === "member" && t.intending ? "Intending member" : TYPE[t.kind] || (t.kind === "judge" ? "Judge" : t.mode === "judge" ? "Judge" : "Adviser"),
       org: org || "", days: t.kind === "adviser" ? "Saturday" : DAYS[t.days] || "Both",
       late: !!(lock && when > lock.created_at), sortT: role ? 999 : t.table_index, sortS: role ? 0 : t.table_seat,
     };
