@@ -617,6 +617,10 @@ export default {
     // Sponsor logos for the projector: images, not JSON.
     if (url.pathname === "/api/logo" && req.method === "GET") return getLogo(env, url);
     // The "How the sprint works" guide: counted, then the PDF on the site.
+    if (url.pathname === "/api/certificate" && req.method === "GET") {
+      const { certificateFile } = await import("./certs.js");
+      return certificateFile(env, url);
+    }
     if (url.pathname === "/api/guide" && req.method === "GET") {
       const { guideRedirect } = await import("./sprintpack.js");
       return guideRedirect(env);

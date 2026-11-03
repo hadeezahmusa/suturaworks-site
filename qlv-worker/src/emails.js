@@ -423,3 +423,24 @@ export function briefCover({ subject, paragraphs, link, ref }) {
     text: paragraphs.join("\n\n") + "\n",
   };
 }
+
+// The certificate email: the PDF is attached, and the link fetches it again.
+// No footer, as on the certificate itself.
+export function certificateEmail({ first: name, link }) {
+  const body = p(`Dear ${esc(name)},`) +
+    p("Thank you for being part of Quality Leadership Value 2026. Your certificate is attached.") +
+    p("You can also download it here:") + button(link, "Download your certificate") +
+    p("Warm regards,<br>The QLV 2026 team, JCI Aso", "margin:0;");
+  return {
+    subject: "Your QLV 2026 certificate",
+    html: shell({ preheader: "Your certificate is attached.", body, bare: true }),
+    text: `Dear ${name},\n\nThank you for being part of Quality Leadership Value 2026. Your certificate is attached.\n\nYou can also download it here: ${link}\n\nWarm regards,\nThe QLV 2026 team, JCI Aso\n`,
+  };
+}
+
+// A thank-you to a judge, mentor, the marshal or a desk volunteer. The words
+// are set on the E-certificates tab. No footer.
+export function thankYou({ subject, paragraphs }) {
+  const body = paragraphs.map((x, i) => p(esc(x).replace(/\n/g, "<br>"), i === paragraphs.length - 1 ? "margin:0;" : "")).join("");
+  return { subject, html: shell({ preheader: paragraphs[1] || subject, body, bare: true }), text: paragraphs.join("\n\n") + "\n" };
+}
