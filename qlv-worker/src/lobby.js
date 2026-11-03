@@ -81,7 +81,7 @@ export async function lobbyPeople(env) {
   const [parts, staff, tables, team] = await Promise.all([
     env.DB.prepare(`SELECT t.id, t.kind, t.name, t.email, t.ticket_ref, t.table_index, t.late_after_freeze, t.sent_at,
         CASE
-          WHEN t.kind = 'partner' THEN p.name
+          WHEN t.kind = 'partner' THEN COALESCE(p.name, t.organisation)
           WHEN t.kind = 'corporate' THEN r.organisation
           WHEN NULLIF(t.organisation, '') IS NOT NULL THEN t.organisation
           WHEN t.kind IN ('standard', 'member') AND (r.size = 1 OR lower(t.email) = lower(r.email)) THEN NULLIF(r.organisation, '')

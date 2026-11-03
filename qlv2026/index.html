@@ -617,6 +617,41 @@
   </div>
 </section>
 
+<!-- NOMINEE OF A NON-PAYING PARTNER -->
+<section class="screen" id="nominee">
+  <div class="phonewrap">
+    <div class="phone">
+      <div class="phonehd">
+        <div style="margin-bottom:18px"><span class="logos" style="gap:12px"><img src="assets/jci-aso-white.png" alt="JCI Aso" height="32" style="height:32px"><i aria-hidden="true"></i><img src="assets/qlv-white.png" alt="Quality Leadership Value" height="40" style="height:40px"></span></div>
+        <div class="lock"><span>QUALITY</span><span class="y">LEADERSHIP</span><span style="margin-left:52px">VALUE</span></div>
+      </div>
+      <form id="f-nominee" novalidate style="padding:18px 20px 22px;display:flex;flex-direction:column;gap:14px">
+        <div><h1 style="font-size:18px" data-bind="nomTitle">Your organisation has a free seat for you</h1><p style="font-size:12px;margin-top:5px">Type the code your organisation gave you. Then fill in your details and your ticket comes straight to your email. Nothing to pay.</p></div>
+        <div class="card" style="padding:13px 15px">
+          <div style="display:flex;gap:10px;margin-bottom:7px"><b style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--blue)">D1</b><span style="font-size:11px;font-weight:500">Fri 6 Nov, 4:00pm. Virtual</span></div>
+          <div style="display:flex;gap:10px"><b style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--blue)">D2</b><span style="font-size:11px;font-weight:500">Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja</span></div>
+        </div>
+        <div><label class="f" for="n-code">Your code</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" id="n-code" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="For example NILE482" required style="flex:1 1 160px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:1.5px;text-transform:uppercase">
+          <button type="button" class="btn" id="n-check" data-show="nomCheckBtn">Check code</button></div></div>
+        <div data-show="nomFound" hidden style="display:flex;flex-direction:column;gap:14px">
+          <div class="card" style="padding:11px 14px;border-color:var(--teal);background:#F2FAFA;font-size:12px">Code accepted. Your seat is covered by <b data-bind="nomPartner"></b>.</div>
+          <div><label class="f" for="n-name">Full name</label><input type="text" id="n-name" name="name" autocomplete="name" maxlength="120" placeholder="As it should read on your ticket" required></div>
+          <div><label class="f" for="n-email">Email</label><input type="email" id="n-email" name="email" autocomplete="email" maxlength="160" placeholder="Your ticket goes here" required></div>
+          <div><label class="f" for="n-phone">Phone</label><input type="tel" id="n-phone" name="phone" autocomplete="tel" maxlength="30" placeholder="0800 000 0000" required></div>
+          <div><label class="f" for="n-sit">Which is closest to you?</label><select id="n-sit" name="situation" class="js-sit"></select></div>
+          <div class="note"><input type="checkbox" id="n-und" name="understand" required><label for="n-und">I understand that teams are announced on day one, that my team's task is handed out at the start of the sprint on day two, and that I need to attend both days.</label></div>
+          <button type="submit" class="btn" style="width:100%;justify-content:center">Get my ticket</button>
+        </div>
+        <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="formerr" data-err hidden></div>
+        <p class="fine" style="text-align:center">One code is for one person. It works until registration closes on <span data-bind="closeDate">4 November</span>. You will be asked three short questions after this.</p>
+        <p class="privacy js-privacy" style="text-align:center"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
 <!-- A1. ADVISER -->
 <section class="screen" id="adviser">
   <div class="wrap"><div class="inner">

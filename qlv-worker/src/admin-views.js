@@ -69,6 +69,7 @@ export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + String.raw`
       <div class="card" style="padding:0;overflow-x:auto;margin:0 0 14px"><div style="padding:14px 16px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><h2>All partners</h2><span class="small" id="pIncome"></span></div>
         <table><thead><tr><th>Partner</th><th>Level</th><th>Investment</th><th>Status</th><th>Seats claimed</th></tr></thead><tbody id="pRows"></tbody></table></div>
       <div id="pDetail"></div>
+      <div class="card" id="pcBox" style="padding:0;overflow-x:auto;margin:14px 0 0" hidden></div>
     </div>
     <div class="side" style="flex:1 1 320px">
       <form class="card" id="pForm"><h2>Add a partner</h2>
@@ -185,7 +186,41 @@ async function loadPartners() {
     '<tr><td colspan="5" class="small">No partners yet. Add one on the right.</td></tr>';
   drawLevels();
   if (curPartner) openPartner(curPartner).catch(() => {});
+  if (ROLE === "admin") loadPartnerCodes().catch((err) => msg(err.message));
 }
+
+// Non-paying partners: the JCI Aso members' businesses on the logo wall.
+// One code each; their nominee redeems it for one free ticket.
+let pcData = null;
+function drawPartnerCodes(d) {
+  pcData = d;
+  const box = $("#pcBox");
+  box.hidden = false;
+  const missing = d.total - d.withCode;
+  box.innerHTML = '<div style="padding:14px 16px 0"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:flex-start"><div><h2 style="margin:0">Non-paying partners: nominee codes</h2>' +
+    '<p class="small" style="margin:4px 0 10px">The JCI Aso members\' businesses on the On screen tab. Each has one code for one free ticket. Their nominee types it at <a href="' + esc(d.link) + '" target="_blank" rel="noopener">' + esc(d.link) + '</a> until registration closes. ' +
+    d.redeemed + " of " + d.total + " used.</p></div>" +
+    (missing ? '<button class="btn" data-pc="create">Make ' + missing + (missing === 1 ? " code" : " codes") + "</button>" : '<button class="btn ghost" data-pc="copy">Copy the link</button>') + "</div></div>" +
+    '<table><thead><tr><th>Partner</th><th>Logo</th><th>Code</th><th>Nominee</th><th></th></tr></thead><tbody>' +
+    d.rows.map((r) => "<tr><td><b>" + esc(r.name) + "</b></td><td>" + (r.hasLogo ? '<span class="pill ok">Yes</span>' : '<span class="pill off">No</span>') + "</td>" +
+      '<td class="mono">' + (r.code ? esc(r.code) : '<span class="small">None yet</span>') + "</td><td class=\"small\">" +
+      (r.redeemed ? esc(r.redeemed.name) + " · " + esc(r.redeemed.ref) + (r.redeemed.cancelled ? " · cancelled" : "") + "<br>" + esc(when(r.redeemed.at)) : r.code ? "Not used yet" : "") + "</td><td>" +
+      (r.code && !r.redeemed ? '<button class="link" data-pcnew="' + r.logoId + '" data-name="' + esc(r.name) + '">New code</button>' : "") + "</td></tr>").join("") +
+    "</tbody></table>";
+}
+async function loadPartnerCodes() { drawPartnerCodes(await call("partner-codes")); }
+document.addEventListener("click", async (e) => {
+  const a = e.target.closest("[data-pc]"), n = e.target.closest("[data-pcnew]");
+  if (!a && !n) return;
+  try {
+    if (a && a.dataset.pc === "create") { drawPartnerCodes(await call("partner-codes-create", {})); msg("Codes made. Send each partner their own code with the link.", true); }
+    if (a && a.dataset.pc === "copy") { await navigator.clipboard.writeText(pcData.link); msg("Link copied.", true); }
+    if (n) {
+      if (!confirm("Make a new code for " + n.dataset.name + "? The old code stops working straight away.")) return;
+      drawPartnerCodes(await call("partner-code-replace", { logoId: Number(n.dataset.pcnew) })); msg("New code made. Send it to " + n.dataset.name + ".", true);
+    }
+  } catch (err) { msg(err.message); }
+});
 function drawLevels() {
   $("#pLevels").innerHTML = levels.map((l) => '<button type="button" class="lvl' + (l.id === level ? " on" : "") + '" data-level="' + l.id + '" aria-pressed="' + (l.id === level) + '"><span>' + esc(l.name) + '</span><span style="font-weight:400">' + l.amountText + " · " + l.seats + (l.seats === 1 ? " seat" : " seats") + "</span></button>").join("");
   const l = levels.find((x) => x.id === level);

@@ -15,6 +15,7 @@ import { scoringPage, submitScore } from "./scoring.js";
 import { displayPoll } from "./stage.js";
 import { getLogo } from "./logos.js";
 import * as lobby from "./lobby.js";
+import { codeFor, FREE_REF } from "./partnercodes.js";
 
 const MAX_PROOF = 5 * 1024 * 1024;
 const MAX_JSON = 30000;
@@ -418,6 +419,49 @@ async function claim(req, env, ctx) {
   return { ref: t.ticket_ref, key: t.token, email: c.email };
 }
 
+// ---------- non-paying partners' nominees ----------
+// One code per partner, one free ticket per code. Open while registration is.
+
+async function nomineeCheck(req, env) {
+  const b = await readJson(req);
+  if (isClosed(await closesAt(env))) throw new HttpError(403, "Registration for QLV 2026 has closed.", "closed");
+  await brake(env, req, "nominee", 15);
+  const c = await codeFor(env, b.code);
+  return { code: c.code, partner: c.partner };
+}
+
+async function nomineeClaim(req, env, ctx) {
+  const b = await readJson(req);
+  if (b.website) throw new HttpError(400, "We could not accept that.");
+  if (isClosed(await closesAt(env))) throw new HttpError(403, "Registration for QLV 2026 has closed.", "closed");
+  const c = await codeFor(env, b.code);
+  const v = {
+    name: need(clean(b.name, 120), "your full name"),
+    email: need(clean(b.email).toLowerCase(), "your email", "email"),
+    phone: need(clean(b.phone, 30), "your phone number", "phone"),
+    situation: SITS.has(b.situation) ? b.situation : "emp",
+  };
+  if (b.understand !== true) throw new HttpError(400, "Please tick the box to confirm you can attend both days.");
+  await brake(env, req, "claim", 20);
+  const stamp = now();
+  const t = { token: token(24), reg_ref: FREE_REF, kind: "partner", ...v, organisation: c.partner };
+  const row = await env.DB.prepare(`INSERT INTO tickets (token, reg_ref, ticket_ref, kind, name, email, phone, situation, organisation, created_at)
+    VALUES (?, ?, 'pending', 'partner', ?, ?, ?, ?, ?, ?) RETURNING id`).bind(t.token, FREE_REF, v.name, v.email, v.phone, v.situation, c.partner, stamp).first();
+  // Using the code is one conditional update, so the same code typed twice
+  // at the same moment gives only one ticket.
+  const took = await env.DB.prepare("UPDATE partner_codes SET ticket_id = ?, redeemed_at = ? WHERE id = ? AND ticket_id IS NULL AND voided_at IS NULL").bind(row.id, stamp, c.id).run();
+  if (!took.meta.changes) {
+    await env.DB.prepare("DELETE FROM tickets WHERE id = ?").bind(row.id).run();
+    throw new HttpError(409, "This code has already been used for a ticket.", "code_used");
+  }
+  t.ticket_ref = await nextRef(env, "partner");
+  const lobbyLink = await lobby.lobbyLinkForTicket(env, { id: row.id, kind: "partner" });
+  await env.DB.prepare("UPDATE tickets SET ticket_ref = ?, sent_at = ? WHERE id = ?").bind(t.ticket_ref, stamp, row.id).run();
+  await seatPending(env);
+  ctx.waitUntil(sendMail(env, { to: v.email, ...mail.ticketIssued(t, {}, { ...ticketLinks(env, t), lobby: lobbyLink }) }, t.ticket_ref, "ticket_issued"));
+  return { ref: t.ticket_ref, key: t.token, email: v.email, partner: c.partner };
+}
+
 // ---------- partner seats ----------
 // Each partner seat has its own link. Same claim form as sponsored seats; the
 // organisation used for seating is the partner's.
@@ -545,6 +589,8 @@ const ROUTES = {
   "GET /api/sponsor": (req, env, ctx, url) => sponsorView(url, env),
   "GET /api/partner-seat": (req, env, ctx, url) => partnerSeatInfo(url, env),
   "POST /api/partner-seat": (req, env, ctx) => partnerSeatClaim(req, env, ctx),
+  "POST /api/nominee-check": (req, env) => nomineeCheck(req, env),
+  "POST /api/nominee": (req, env, ctx) => nomineeClaim(req, env, ctx),
   "GET /api/ticket": (req, env, ctx, url) => ticketView(url, env),
   "GET /api/answer-context": (req, env, ctx, url) => answerContext(url, env),
   "POST /api/answers": (req, env) => answers(req, env),
