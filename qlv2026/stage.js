@@ -95,16 +95,30 @@ function floaters(names) {
 function sponsors() {
   return data.sponsors || data.partners.map((name) => ({ name, size: 2, logo: null }));
 }
-// Tile sizes on the 1920 by 1080 stage, and how much of the wall each takes.
-const TILE = { 4: [430, 226], 3: [340, 178], 2: [262, 138], 1: [200, 106] };
-const WALL_W = 1770, WALL_H = 560, GAP = 30;
-// Splits the wall into slides so nothing is ever pushed off screen: lays the
-// tiles into rows the way the page wraps them, and starts a new slide when
-// the next row would not fit under the heading.
-function thanksPages() {
+// Each level has its own slide, so paying partners get the room they were
+// promised: Lead partners alone and largest, Supporting partners next, then
+// Community partners (the community level and JCI Aso members' businesses)
+// together, smallest. The level follows the logo size the Worker sends:
+// 4 lead, 3 supporting, 2 or 1 community. A level with nobody gets no slide.
+const LEVELS = [
+  { id: "lead", one: "Lead partner", many: "Lead partners", sizes: [4], secs: 15 },
+  { id: "supporting", one: "Supporting partner", many: "Supporting partners", sizes: [3], secs: 12 },
+  { id: "community", one: "Community partner", many: "Community partners", sizes: [2, 1], secs: 10 },
+];
+// Tile sizes on the 1920 by 1080 stage. A lone lead partner gets the biggest
+// tile; the gap between levels stays plain to see.
+const TILE = { lead1: [900, 474], 4: [780, 410], 3: [520, 274], 2: [300, 158], 1: [240, 126] };
+const WALL_W = 1770, WALL_H = 600, GAP = 30;
+function tileFor(x, page) {
+  if (x.size === 4 && page.length === 1) return TILE.lead1;
+  return TILE[x.size] || TILE[2];
+}
+// Lays tiles into rows the way the page wraps them and starts a new slide
+// when the next row would not fit under the heading.
+function pack(list) {
   const pages = [];
   let page = [], rowW = 0, rowH = 0, height = 0;
-  for (const x of sponsors()) {
+  for (const x of list) {
     const [w, h] = TILE[x.size] || TILE[2];
     if (rowW && rowW + GAP + w > WALL_W) { height += rowH + GAP; rowW = 0; rowH = 0; }
     if (page.length && height + Math.max(rowH, h) > WALL_H) { pages.push(page); page = []; rowW = 0; rowH = 0; height = 0; }
@@ -112,6 +126,15 @@ function thanksPages() {
     page.push(x);
   }
   if (page.length) pages.push(page);
+  return pages;
+}
+function thanksPages() {
+  const all = sponsors();
+  const pages = [];
+  for (const lv of LEVELS) {
+    const list = all.filter((x) => lv.sizes.includes(x.size >= 4 ? 4 : x.size === 3 ? 3 : x.size === 2 ? 2 : 1));
+    for (const page of pack(list)) pages.push({ level: lv, list: page });
+  }
   return pages;
 }
 // Fetches every logo once, so a slide never waits on the network and a
@@ -131,7 +154,7 @@ function arrivalSlides() {
 function sceneArrival() {
   const slides = arrivalSlides();
   const which = slides[slide % slides.length];
-  if (which.startsWith("thanks:")) return thanksHTML(thanksPages()[Number(which.slice(7))] || []);
+  if (which.startsWith("thanks:")) return thanksHTML(thanksPages()[Number(which.slice(7))] || { level: LEVELS[2], list: [] });
   if (which === "opening") return openingHTML();
   const sched = st.toggles.schedule ? '<div class="sched"><b>Today</b>' + data.schedule.map((x, i) => '<div style="animation-delay:' + (0.3 + i * 0.12) + 's"><span>' + esc(x.t) + "</span><span>" + esc(x.what) + "</span></div>").join("") + "</div>" : "";
   return floaters(data.order.map((o) => o.name)) + '<div class="arrival"><div class="l"><span class="eyebrow">Welcome to QLV 2026</span><span class="big" style="font-size:' + (sched ? 96 : 120) + 'px">Find your table by the name on your badge.</span>' +
@@ -140,11 +163,12 @@ function sceneArrival() {
 
 // The logo wall: each logo on a white tile, sized by what was given, popping
 // in and then drifting gently in place. Names stand in for missing logos.
-function thanksHTML(list) {
-  return '<div class="thanks"><span class="eyebrow">With thanks</span><span class="big" style="font-size:76px">Our partners and sponsors</span><div class="wall">' +
+function thanksHTML(page) {
+  const list = page.list, lv = page.level;
+  return '<div class="thanks"><span class="eyebrow">With thanks to our</span><span class="big" style="font-size:76px">' + esc(list.length === 1 ? lv.one : lv.many) + '</span><div class="wall">' +
     list.map((x, i) => {
-      const [w, h] = TILE[x.size] || TILE[2];
-      const inner = x.logo ? '<img alt="" src="' + esc(API + x.logo) + '">' : "<b style=\"font-size:" + Math.round(h / 4.6) + 'px">' + esc(x.name) + "</b>";
+      const [w, h] = tileFor(x, list);
+      const inner = x.logo ? '<img alt="" src="' + esc(API + x.logo) + '">' : "<b style=\"font-size:" + Math.round(Math.min(h / 4.6, 64, (w * 2.6) / Math.max(10, x.name.length))) + 'px">' + esc(x.name) + "</b>";
       return '<span class="tile s' + x.size + '" style="width:' + w + "px;height:" + h + "px;animation-delay:" + (0.3 + i * 0.12).toFixed(2) + "s," + (1 + i * 0.12).toFixed(2) + "s;animation-duration:.6s," + (5 + (i % 4) * 0.9).toFixed(1) + 's" title="' + esc(x.name) + '">' + inner + "</span>";
     }).join("") + "</div></div>";
 }
@@ -306,7 +330,8 @@ function render() {
   clearTimeout(slideTimer);
   if (st.phase === "arrival" && arrivalSlides().length > 1) {
     const which = arrivalSlides()[slide % arrivalSlides().length];
-    slideTimer = setTimeout(() => { slide++; render(); }, DEMO ? (which === "opening" ? 7000 : 6000) : which === "opening" ? 9000 : which.startsWith("thanks:") ? 10000 : 15000);
+    const thanksSecs = which.startsWith("thanks:") ? ((thanksPages()[Number(which.slice(7))] || {}).level || LEVELS[2]).secs : 0;
+    slideTimer = setTimeout(() => { slide++; render(); }, DEMO ? (which === "opening" ? 7000 : 6000) : which === "opening" ? 9000 : thanksSecs ? thanksSecs * 1000 : 15000);
   }
   tick(true);
 }
