@@ -102,7 +102,6 @@ export async function saveInvoice(env, b, who) {
   if (b.id) {
     const cur = await env.DB.prepare("SELECT * FROM invoices WHERE id = ?").bind(Number(b.id)).first();
     if (!cur) throw new HttpError(404, "That invoice is not there. Refresh the page.");
-    if (cur.cancelled_at || cur.emailed_at) throw new HttpError(409, `${invoiceNo(cur.number)} has been ${cur.cancelled_at ? "cancelled" : "sent"}, so it can't be changed. Make a copy instead.`);
     await env.DB.prepare(`UPDATE invoices SET bill_org = ?, bill_contact = ?, bill_title = ?, bill_address = ?, bill_email = ?, bill_phone = ?, issue_date = ?, due_date = ?,
       lines = ?, subtotal = ?, total = ?, seats = ?, updated_at = ? WHERE id = ?`).bind(...vals, stamp, cur.id).run();
     return { id: cur.id, ...(await invoicesView(env)) };
@@ -110,7 +109,8 @@ export async function saveInvoice(env, b, who) {
   // Numbers run on from the highest given, or the setting if that is higher. Never reused.
   for (let i = 0; i < 5; i++) {
     const top = await env.DB.prepare("SELECT MAX(number) AS n FROM invoices").first();
-    const number = Math.max((top && top.n) || 0, Number(s.nextNumber) - 1) + 1;
+    const high = Number(await env.KV.get("inv:high")) || 0;
+    const number = Math.max((top && top.n) || 0, high, Number(s.nextNumber) - 1) + 1;
     try {
       const row = await env.DB.prepare(`INSERT INTO invoices (number, bill_org, bill_contact, bill_title, bill_address, bill_email, bill_phone, issue_date, due_date, lines, subtotal, total, seats,
         created_at, created_by, updated_at, copied_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
@@ -121,6 +121,16 @@ export async function saveInvoice(env, b, who) {
     }
   }
   throw new HttpError(500, "Could not number the invoice. Try again.");
+}
+
+export async function deleteInvoice(env, b) {
+  // A number that went out by email is never given again; an unsent one can be.
+  const cur = await env.DB.prepare("SELECT number, emailed_at FROM invoices WHERE id = ?").bind(Number(b.id)).first();
+  const high = Number(await env.KV.get("inv:high")) || 0;
+  if (cur && cur.emailed_at && cur.number > high) await env.KV.put("inv:high", String(cur.number));
+  const r = await env.DB.prepare("DELETE FROM invoices WHERE id = ?").bind(Number(b.id)).run();
+  if (!r.meta.changes) throw new HttpError(404, "That invoice is not there. Refresh the page.");
+  return invoicesView(env);
 }
 
 export async function cancelInvoice(env, b, who) {
