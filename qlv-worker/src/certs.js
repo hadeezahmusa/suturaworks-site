@@ -161,7 +161,13 @@ export async function saveSignature(env, b, who) {
 
 export async function signatureImages(env) {
   const [p, c] = await Promise.all([env.KV.get(SIG.president, "arrayBuffer"), env.KV.get(SIG.chair, "arrayBuffer")]);
-  const url = (buf) => buf ? "data:image/png;base64," + btoa(String.fromCharCode(...new Uint8Array(buf))) : null;
+  // In chunks: spreading a large image into one call overflows the stack.
+  const url = (buf) => {
+    if (!buf) return null;
+    const b = new Uint8Array(buf); let s = "";
+    for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+    return "data:image/png;base64," + btoa(s);
+  };
   return { president: url(p), chair: url(c) };
 }
 
@@ -183,7 +189,7 @@ export async function sendCertificate(env, b, who) {
   const m = /^[A-Za-z0-9+/=]+$/.exec(String(b.pdf || ""));
   if (!m) throw new HttpError(400, "The certificate did not come through. Try again.");
   const bytes = Uint8Array.from(atob(b.pdf), (x) => x.charCodeAt(0));
-  if (bytes.length < 1000 || bytes.length > 4000000 || String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") throw new HttpError(400, "That is not a certificate PDF.");
+  if (bytes.length < 1000 || bytes.length > 4000000 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") throw new HttpError(400, "That is not a certificate PDF.");
   if (!(await dailyRoom(env)).room) throw new HttpError(409, "The day's email allowance on the free plan is used up. Send the rest tomorrow.");
   const row = await env.DB.prepare("SELECT token FROM certificates WHERE ticket_id = ?").bind(c.ticketId).first();
   await env.KV.put(`cert:pdf:${c.n}`, bytes, { metadata: { hash: c.hash, at: now() } });

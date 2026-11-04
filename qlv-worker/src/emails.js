@@ -444,3 +444,24 @@ export function thankYou({ subject, paragraphs }) {
   const body = paragraphs.map((x, i) => p(esc(x).replace(/\n/g, "<br>"), i === paragraphs.length - 1 ? "margin:0;" : "")).join("");
   return { subject, html: shell({ preheader: paragraphs[1] || subject, body, bare: true }), text: paragraphs.join("\n\n") + "\n" };
 }
+
+// An email written on the Email tab: the admin's own words in the QLV look,
+// paragraph by paragraph. No footer.
+export function composed({ subject, paragraphs }) {
+  const body = paragraphs.map((x, i) => p(esc(x).replace(/\n/g, "<br>"), i === paragraphs.length - 1 ? "margin:0;" : "")).join("");
+  return { subject, html: shell({ preheader: (paragraphs[0] || subject).slice(0, 120), body, bare: true }), text: paragraphs.join("\n\n") + "\n" };
+}
+
+// To the sponsor after admin uploads their people. No footer.
+export function uploadSummary({ first: name, n, used, seats, manage }) {
+  const people = n === 1 ? "1 person" : `${n} people`;
+  const body = p(`Hi ${esc(name || "there")},`) +
+    p(`${used} of your ${seats} seats are now filled. Each person has been sent their ticket.`) +
+    (manage ? p("You can see who is registered, and share your link for any seats still free, on your sponsor page:") + button(manage, "Open your sponsor page") : "") +
+    p("The QLV 2026 team, JCI Aso", "margin:0;");
+  return {
+    subject: `${people} registered for QLV 2026`,
+    html: shell({ preheader: `${used} of your ${seats} seats are now filled.`, body, bare: true }),
+    text: `Hi ${name || "there"},\n\n${used} of your ${seats} seats are now filled. Each person has been sent their ticket.\n\n${manage ? `You can see who is registered, and share your link for any seats still free, on your sponsor page: ${manage}\n\n` : ""}The QLV 2026 team, JCI Aso\n`,
+  };
+}
