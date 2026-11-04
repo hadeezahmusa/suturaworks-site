@@ -56,7 +56,7 @@ Tables you look after: {{tables_covered}}
 
 | Time | What happens | Your cue |
 |---|---|---|
-| 8:30 to 10:50 | Arrivals, tea and light snacks | Badge desk open. Send people to their table by the name on their badge. |
+| 8:30 to 10:50 | Arrivals | Badge desk open. Send people to their table by the name on their badge. |
 | [confirm] | Opening protocol, keynote from Saturday's facilitator and partner remarks, 3 minutes each | Introduce each speaker and keep time. |
 | 10:45 | Everyone seated | "Five minutes. Find your table." |
 | 10:50 | **Sprint opens.** Task cards handed out to every table at the same moment | "Your task is on the table. You have fifty minutes. Your plan has to work without you in the room." Start the clock on the screen. |

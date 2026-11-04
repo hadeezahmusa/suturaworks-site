@@ -56,7 +56,8 @@ async function check(env, r, rows) {
       first: clean(x.first, 60), last: clean(x.last, 60), email: clean(x.email).toLowerCase(), phone: clean(x.phone, 30),
       organisation: clean(x.organisation) || r.name, situationText: clean(x.situation, 80),
     };
-    row.situation = SIT[row.situationText.toLowerCase()] || null;
+    // Optional: a template sent out without this column, or a blank cell, counts as working for an organisation.
+    row.situation = row.situationText ? SIT[row.situationText.toLowerCase()] || null : "emp";
     const errors = [];
     if (!row.first) errors.push("First name is empty");
     if (!row.last) errors.push("Last name is empty");
@@ -64,8 +65,7 @@ async function check(env, r, rows) {
     else if (!EMAIL_RE.test(row.email)) errors.push("Email is not valid");
     if (!row.phone) errors.push("Phone is empty");
     else if (!/^[+0-9 ()-]{7,20}$/.test(row.phone) || row.phone.replace(/\D/g, "").length < 7) errors.push("Phone needs at least seven digits");
-    if (!row.situationText) errors.push("Which is closest to you? is empty");
-    else if (!row.situation) errors.push("Which is closest to you? is not one of the choices");
+    if (!row.situation) errors.push("Which is closest to you? is not one of the choices");
     if (row.email && seen.has(row.email)) errors.push(`Same email as line ${seen.get(row.email)}`);
     if (row.email && !seen.has(row.email)) seen.set(row.email, row.line);
     row.errors = errors;

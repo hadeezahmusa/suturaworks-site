@@ -308,12 +308,12 @@ async function seatRead(file) {
   const heads = grid[hi].map(norm);
   const need = { first: "first name", last: "last name", email: "email", phone: "phone", organisation: "organisation", situation: "which is closest to you?" };
   const at = {};
-  for (const [k, h] of Object.entries(need)) { at[k] = heads.indexOf(h); if (at[k] < 0) throw new Error('The heading "' + h.replace(/^./, (x) => x.toUpperCase()) + '" is missing or changed. Use the template, and keep its headings as they are.'); }
+  for (const [k, h] of Object.entries(need)) { at[k] = heads.indexOf(h); if (at[k] < 0 && k !== "situation" && k !== "organisation") throw new Error('The heading "' + h.replace(/^./, (x) => x.toUpperCase()) + '" is missing or changed. Use the template, and keep its headings as they are.'); }
   const rows = [];
   for (let i = hi + 1; i < grid.length; i++) {
     const r = grid[i] || [];
-    const row = { line: i + 1 }; for (const k of Object.keys(need)) row[k] = (r[at[k]] || "").trim();
-    if (["first", "last", "email", "phone", "situation"].some((k) => row[k])) rows.push(row);
+    const row = { line: i + 1 }; for (const k of Object.keys(need)) row[k] = at[k] < 0 ? "" : (r[at[k]] || "").trim();
+    if (["first", "last", "email", "phone"].some((k) => row[k])) rows.push(row);
   }
   return { rows, fileRef };
 }

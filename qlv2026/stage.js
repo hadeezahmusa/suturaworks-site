@@ -158,7 +158,7 @@ function sceneArrival() {
   if (which === "opening") return openingHTML();
   const sched = st.toggles.schedule ? '<div class="sched"><b>Today</b>' + data.schedule.map((x, i) => '<div style="animation-delay:' + (0.3 + i * 0.12) + 's"><span>' + esc(x.t) + "</span><span>" + esc(x.what) + "</span></div>").join("") + "</div>" : "";
   return floaters(data.order.map((o) => o.name)) + '<div class="arrival"><div class="l"><span class="eyebrow">Welcome to QLV 2026</span><span class="big" style="font-size:' + (sched ? 96 : 120) + 'px">Find your table by the name on your badge.</span>' +
-    '<span class="lede">Tea and light snacks are served. The sprint opens at ' + esc((data.schedule.find((x) => /sprint/i.test(x.what)) || { t: "10:50" }).t) + ".</span></div>" + sched + "</div>";
+    '<span class="lede">The sprint opens at ' + esc((data.schedule.find((x) => /sprint/i.test(x.what)) || { t: "10:50" }).t) + ".</span></div>" + sched + "</div>";
 }
 
 // The logo wall: each logo on a white tile, sized by what was given, popping
@@ -392,7 +392,7 @@ function runDemo() {
   const phases = ["arrival", "sprint", "handover", "critique", "response", "lunch", "presentations", "results"];
   data = {
     phases: phases.map((id) => ({ id, label: id[0].toUpperCase() + id.slice(1) })),
-    schedule: [["8:30", "Arrival, tea and light snacks"], ["10:50", "The sprint opens"], ["11:40", "Plans handed over"], ["11:45", "Critique"], ["12:20", "Response"], ["12:35", "Lunch"], ["13:30", "Presentations"], ["14:50", "Feedback and recognitions"]].map(([t, what]) => ({ t, what })),
+    schedule: [["8:30", "Arrival"], ["10:50", "The sprint opens"], ["11:40", "Plans handed over"], ["11:45", "Critique"], ["12:20", "Response"], ["12:35", "Lunch"], ["13:30", "Presentations"], ["14:50", "Feedback and recognitions"]].map(([t, what]) => ({ t, what })),
     order: names.map((name, i) => ({ name, time: times[i] })),
     chain: names.concat(names[0]),
     partners: ["Sutura Works Limited", "Your lead partner", "A supporting partner", "A sponsor", "A member's business", "Another member's business"],
