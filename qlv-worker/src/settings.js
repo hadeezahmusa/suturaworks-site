@@ -23,7 +23,7 @@ export const DEFAULTS = {
   critique_minutes: 35,
   response_minutes: 15,
   schedule: [
-    { t: "8:30", what: "Arrival, tea and light snacks" },
+    { t: "8:30", what: "Arrival" },
     { t: "10:50", what: "The sprint opens" },
     { t: "11:40", what: "Plans handed over" },
     { t: "11:45", what: "Critique" },

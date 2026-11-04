@@ -320,7 +320,7 @@ function stRemaining() {
 }
 function drawClock() {
   const d = stData, st = d.state, rem = stRemaining(), paused = st.clock.pausedMs !== null && st.clock.pausedMs !== undefined;
-  const lab = { arrival: "Arrival and tea", sprint: "Planning round", handover: "Handover", critique: "Critique", response: "Response", lunch: "Lunch", presentations: "Presentations" + (d.queue.find((q) => q.state === "On stage") ? " · " + d.queue.find((q) => q.state === "On stage").name + " on stage" : ""), results: "Panel feedback and recognitions" }[st.phase];
+  const lab = { arrival: "Arrival", sprint: "Planning round", handover: "Handover", critique: "Critique", response: "Response", lunch: "Lunch", presentations: "Presentations" + (d.queue.find((q) => q.state === "On stage") ? " · " + d.queue.find((q) => q.state === "On stage").name + " on stage" : ""), results: "Panel feedback and recognitions" }[st.phase];
   const cue = { sprint: "Chime at halfway and at five minutes, gong at zero", handover: "Plans moving round the chain", critique: "Gap, question, strength", response: "Each team answers its critique", presentations: "Amber at 1:00, gong at zero", arrival: "Schedule and partner thanks on the display", lunch: "Judges are reading", results: st.revealed ? "Top three on the display" : "Waiting for every score" }[st.phase];
   const timed = rem !== null;
   $("#stClock").innerHTML = '<div><div class="l">' + esc(lab) + (paused ? " · paused" : "") + '</div><div class="t"' + (timed ? "" : ' style="font-size:28px;padding:14px 0"') + '>' + (timed ? mmss(rem) : "No clock running") + '</div><div class="c">' + esc(cue) + '</div></div>' +
