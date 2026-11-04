@@ -1217,6 +1217,7 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET invoice-signatures": () => invoices.invoiceSignatureImages(env),
       "POST invoice-save": () => invoices.saveInvoice(env, body, who),
       "POST invoice-cancel": () => invoices.cancelInvoice(env, body, who),
+      "POST invoice-delete": () => invoices.deleteInvoice(env, body),
       "POST invoice-settings": () => invoices.saveInvoiceSettings(env, body),
       "POST invoice-signature": () => invoices.saveInvoiceSignature(env, body, who),
       "GET seats": () => uploads.seatsView(env, q.get("ref")),
