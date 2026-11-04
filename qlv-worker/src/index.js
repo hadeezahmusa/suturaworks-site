@@ -118,7 +118,7 @@ export async function sendMail(env, msg, ref, kind) {
         method: "POST",
         headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
         body: JSON.stringify({
-          from: env.MAIL_FROM, to: [msg.to], reply_to: env.REPLY_TO,
+          from: env.MAIL_FROM, to: [].concat(msg.to), reply_to: env.REPLY_TO, ...(msg.cc && msg.cc.length ? { cc: msg.cc } : {}),
           subject: msg.subject, html: msg.html, text: msg.text, attachments: msg.attachments,
         }),
       });
@@ -132,8 +132,10 @@ export async function sendMail(env, msg, ref, kind) {
   } catch (err) {
     detail = String(err).slice(0, 300);
   }
-  await env.DB.prepare("INSERT INTO email_log (ref, kind, recipient, ok, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .bind(ref || null, kind, msg.to, ok ? 1 : 0, detail, now()).run();
+  // One log row per recipient, To and CC, so the daily allowance counts them all.
+  const stamp = now();
+  await env.DB.batch([...[].concat(msg.to), ...(msg.cc || [])].map((r) => env.DB.prepare("INSERT INTO email_log (ref, kind, recipient, ok, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(ref || null, kind, r, ok ? 1 : 0, detail, stamp)));
   return ok;
 }
 

@@ -22,6 +22,9 @@ import * as lobby from "./lobby.js";
 import * as sprint from "./sprintpack.js";
 import * as pcodes from "./partnercodes.js";
 import * as certs from "./certs.js";
+import * as mailtab from "./mailtab.js";
+import * as invoices from "./invoices.js";
+import * as uploads from "./uploads.js";
 import { BOARD_CAN, boardSessionOk, boardView, boardAction, boardLogin, redact } from "./board.js";
 import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
 import { sendBatch, dailyRoom, DAILY_SAFE } from "./mailer.js";
@@ -758,6 +761,7 @@ function renderDetail(d) {
     actions + people(d) + ticketRows(d) + proof +
     (d.log.length ? '<div class="hr"></div><h2>Emails</h2>' + d.log.map((l) => '<div class="small">' + when(l.created_at) + ", " + esc(l.kind.replace(/_/g, " ")) + " to " + esc(l.recipient) + (l.ok ? "" : ' <b style="color:#8A2A20">failed</b>') + "</div>").join("") : "") + "</div>";
   if (r.status === "verified" && ROLE === "admin") loadPreviews(r.ref);
+  if (r.tier === "sponsored" && ROLE === "admin") { $("#detail .card").insertAdjacentHTML("beforeend", '<div id="seatUp"></div>'); loadSeatUpload(r.ref).catch((err) => msg(err.message)); }
   document.querySelectorAll("#rows tr").forEach((tr) => tr.classList.toggle("sel", tr.dataset.ref === r.ref));
 }
 
@@ -1042,7 +1046,7 @@ function appPage(email, role, site) {
   <div class="wrap">
     ${!admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="money">Money</button></div>` : ""}
     ${board ? boardTabs : ""}
-    ${role === "admin" ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="lobby">Team rooms</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="certs">E-certificates</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
+    ${role === "admin" ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Partners</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="lobby">Team rooms</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="certs">E-certificates</button><button data-tab="invoices">Invoices</button><button data-tab="mail">Email</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
     <div id="msg" class="msg" hidden role="status"></div>
     ${role === "admin" ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="closeDate" style="font-weight:600">Registration closes at the end of</label>
@@ -1207,6 +1211,17 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET partners": () => ops.partnersList(env),
       "GET partner-codes": () => pcodes.codesView(env),
       "GET certs": () => certs.certView(env),
+      "GET mail": () => mailtab.mailView(env),
+      "POST mail-send": () => mailtab.sendCompose(env, body, who),
+      "GET invoices": () => invoices.invoicesView(env),
+      "GET invoice-signatures": () => invoices.invoiceSignatureImages(env),
+      "POST invoice-save": () => invoices.saveInvoice(env, body, who),
+      "POST invoice-cancel": () => invoices.cancelInvoice(env, body, who),
+      "POST invoice-settings": () => invoices.saveInvoiceSettings(env, body),
+      "POST invoice-signature": () => invoices.saveInvoiceSignature(env, body, who),
+      "GET seats": () => uploads.seatsView(env, q.get("ref")),
+      "POST seats-preview": () => uploads.previewUpload(env, body),
+      "POST seats-import": () => uploads.importUpload(env, body, who),
       "GET cert-signatures": () => certs.signatureImages(env),
       "POST cert-results": () => certs.confirmResults(env, body, who),
       "POST cert-name": () => certs.setPrintedName(env, body, who),

@@ -8,8 +8,9 @@ import { SCREEN_STYLE, SCREEN_HTML, SCREEN_JS } from "./screen-views.js";
 import { LOBBY_STYLE, LOBBY_HTML, LOBBY_JS } from "./lobby-views.js";
 import { SPRINT_STYLE, SPRINT_HTML, SPRINT_JS } from "./sprint-views.js";
 import { CERTS_STYLE, CERTS_HTML, CERTS_JS } from "./certs-views.js";
+import { OFFICE_STYLE, OFFICE_HTML, OFFICE_JS } from "./office-views.js";
 
-export const VIEWS_STYLE = MONEY_STYLE + SCREEN_STYLE + LOBBY_STYLE + SPRINT_STYLE + CERTS_STYLE + String.raw`
+export const VIEWS_STYLE = MONEY_STYLE + SCREEN_STYLE + LOBBY_STYLE + SPRINT_STYLE + CERTS_STYLE + OFFICE_STYLE + String.raw`
 .tabs{flex-wrap:wrap;column-gap:16px}
 td.mono,#eRows td:nth-child(5){white-space:nowrap}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:0 0 14px}
@@ -46,7 +47,7 @@ label.fl{display:block;font-size:11px;font-weight:600;color:var(--body);margin:0
 select{width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;padding:10px 12px;min-height:42px;background:#fff}
 `;
 
-export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + CERTS_HTML + String.raw`
+export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + CERTS_HTML + OFFICE_HTML + String.raw`
 <div id="tablesView" hidden>
   <p class="small" style="margin:0 0 12px">A seat fills when a payment is verified, or when a partner or sponsored seat is claimed. Only admin sees this page. Nothing here reaches participants.</p>
   ${SPRINT_HTML}
@@ -126,16 +127,16 @@ export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + CERTS_HTML + S
   </div>
 </div>`;
 
-export const VIEWS_JS = MONEY_JS + SCREEN_JS + LOBBY_JS + SPRINT_JS + CERTS_JS + String.raw`
+export const VIEWS_JS = MONEY_JS + SCREEN_JS + LOBBY_JS + SPRINT_JS + CERTS_JS + OFFICE_JS + String.raw`
 const VIEWS = { tables: "tablesView", partners: "partnersView", screen: "screenView", lobby: "lobbyView", staff: "staffView", export: "exportView", money: "moneyView",
-  rebalance: "rebalanceView", checkin: "checkinView", briefings: "briefingsView", scoring: "scoringView", stage: "stageView", settings: "settingsView", certs: "certsView" };
+  rebalance: "rebalanceView", checkin: "checkinView", briefings: "briefingsView", scoring: "scoringView", stage: "stageView", settings: "settingsView", certs: "certsView", mail: "mailView", invoices: "invView" };
 const TIER_BG = { J: ["var(--yel)", "var(--ink)"], S: ["var(--navy)", "#fff"], C: ["#2C3E58", "#fff"], P: ["#E8E9EC", "var(--ink)"], T: ["#1F5F5B", "#fff"] };
 let poll = null, curPartner = null, level = "lead", levels = [];
 function showView(tab) {
   Object.entries(VIEWS).forEach(([k, id]) => { $("#" + id).hidden = k !== tab; });
   clearInterval(poll); poll = null;
   const load = { tables: () => Promise.all([loadTables(), loadSprint()]), partners: loadPartners, screen: () => loadScreen(), lobby: () => loadLobby(), staff: () => Promise.all([loadStaff(), loadRoles()]), export: loadExport, money: loadMoney,
-    rebalance: loadRebalance, checkin: loadCheckin, briefings: loadBriefings, scoring: loadScoring, stage: loadStage, settings: loadSettings, certs: loadCerts }[tab];
+    rebalance: loadRebalance, checkin: loadCheckin, briefings: loadBriefings, scoring: loadScoring, stage: loadStage, settings: loadSettings, certs: loadCerts, mail: loadMail, invoices: loadInvoices }[tab];
   if (load) load().catch((err) => msg(err.message));
   if (tab === "tables") poll = setInterval(() => { if (!document.hidden) loadTables().catch(() => {}); }, 15000);
   if (tab === "stage") poll = setInterval(() => { if (!document.hidden) loadStage().catch(() => {}); }, 3000);
