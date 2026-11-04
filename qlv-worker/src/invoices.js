@@ -115,8 +115,6 @@ export async function saveInvoice(env, b, who) {
       const row = await env.DB.prepare(`INSERT INTO invoices (number, bill_org, bill_contact, bill_title, bill_address, bill_email, bill_phone, issue_date, due_date, lines, subtotal, total, seats,
         created_at, created_by, updated_at, copied_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
         .bind(number, ...vals, stamp, who, stamp, b.copiedFrom ? Number(b.copiedFrom) : null).first();
-      // Remembered, so a deleted invoice's number is never given again.
-      await env.KV.put("inv:high", String(Math.max(number, high)));
       return { id: row.id, ...(await invoicesView(env)) };
     } catch (err) {
       if (!/UNIQUE/i.test(String(err))) throw err;
@@ -126,6 +124,10 @@ export async function saveInvoice(env, b, who) {
 }
 
 export async function deleteInvoice(env, b) {
+  // A number that went out by email is never given again; an unsent one can be.
+  const cur = await env.DB.prepare("SELECT number, emailed_at FROM invoices WHERE id = ?").bind(Number(b.id)).first();
+  const high = Number(await env.KV.get("inv:high")) || 0;
+  if (cur && cur.emailed_at && cur.number > high) await env.KV.put("inv:high", String(cur.number));
   const r = await env.DB.prepare("DELETE FROM invoices WHERE id = ?").bind(Number(b.id)).run();
   if (!r.meta.changes) throw new HttpError(404, "That invoice is not there. Refresh the page.");
   return invoicesView(env);
