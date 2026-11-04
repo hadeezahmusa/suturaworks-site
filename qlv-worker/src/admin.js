@@ -758,10 +758,10 @@ function renderDetail(d) {
   }
 
   $("#detail").innerHTML = '<div class="card"><h1 style="margin-bottom:12px">' + esc(r.ref) + "</h1><dl>" + rows.map((x) => "<dt>" + x[0] + "</dt><dd>" + x[1] + "</dd>").join("") + "</dl>" +
-    actions + people(d) + ticketRows(d) + proof +
+    (r.tier === "sponsored" && ROLE === "admin" ? '<div id="seatUp"></div>' : "") + actions + people(d) + ticketRows(d) + proof +
     (d.log.length ? '<div class="hr"></div><h2>Emails</h2>' + d.log.map((l) => '<div class="small">' + when(l.created_at) + ", " + esc(l.kind.replace(/_/g, " ")) + " to " + esc(l.recipient) + (l.ok ? "" : ' <b style="color:#8A2A20">failed</b>') + "</div>").join("") : "") + "</div>";
   if (r.status === "verified" && ROLE === "admin") loadPreviews(r.ref);
-  if (r.tier === "sponsored" && ROLE === "admin") { $("#detail .card").insertAdjacentHTML("beforeend", '<div id="seatUp"></div>'); loadSeatUpload(r.ref).catch((err) => msg(err.message)); }
+  if (r.tier === "sponsored" && ROLE === "admin") loadSeatUpload(r.ref).catch((err) => msg(err.message));
   document.querySelectorAll("#rows tr").forEach((tr) => tr.classList.toggle("sel", tr.dataset.ref === r.ref));
 }
 
