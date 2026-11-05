@@ -15,7 +15,7 @@
 import { choose, tablesFrom, orgKey } from "./placement.js";
 import { getSettings, isFrozen } from "./settings.js";
 
-const DUE_SQL = `SELECT t.id, t.kind, t.organisation, t.reg_ref, r.size AS reg_size, r.organisation AS reg_org, COALESCE(p.name, t.organisation) AS partner_name,
+export const DUE_SQL = `SELECT t.id, t.kind, t.organisation, t.reg_ref, r.size AS reg_size, r.organisation AS reg_org, COALESCE(p.name, t.organisation) AS partner_name,
     CASE WHEN t.kind IN ('sponsored', 'partner') THEN t.created_at ELSE r.verified_at END AS due_at
   FROM tickets t JOIN registrations r ON r.ref = t.reg_ref LEFT JOIN partners p ON p.id = t.partner_id
   WHERE t.table_index IS NULL AND t.cancelled_at IS NULL AND t.ticket_ref != 'pending'
@@ -40,7 +40,7 @@ export function orgFor(t) {
 // exists, never a new one, even if every table has eight: the same rule,
 // limited to tables in use and with no ceiling. They are flagged so the team
 // can be told directly.
-function chooseFrozen(rows, person) {
+export function chooseFrozen(rows, person) {
   const inUse = [...new Set(rows.map((r) => r.table_index))].sort((a, b) => a - b);
   if (!inUse.length) return choose(tablesFrom(rows), person);
   const all = tablesFrom(rows);
@@ -50,8 +50,15 @@ function chooseFrozen(rows, person) {
 
 export async function seatPending(env) {
   for (let attempt = 0; attempt < 4; attempt++) {
-    const [seated, due] = await env.DB.batch([env.DB.prepare(SEATED_SQL), env.DB.prepare(DUE_SQL)]);
+    const [seated, due, lock] = await env.DB.batch([env.DB.prepare(SEATED_SQL), env.DB.prepare(DUE_SQL), env.DB.prepare("SELECT created_at FROM export_snapshots WHERE locked = 1 ORDER BY id DESC LIMIT 1")]);
     if (!due.results.length) return 0;
+    // After Lock and stamp nobody is seated automatically: they become late
+    // additions, seated by hand by admin or the desk (late.js).
+    if (lock.results.length) {
+      await env.DB.prepare("UPDATE tickets SET late_addition = 1, late_added_at = COALESCE(late_added_at, ?) WHERE table_index IS NULL AND id IN (SELECT value FROM json_each(?))")
+        .bind(new Date().toISOString(), JSON.stringify(due.results.map((t) => t.id))).run();
+      return 0;
+    }
     const frozen = isFrozen(await getSettings(env));
     const rows = [...seated.results];
     const stamp = new Date().toISOString();
@@ -70,7 +77,7 @@ export async function seatPending(env) {
           table_index = (SELECT json_extract(value, '$.t') FROM json_each(?1) WHERE json_extract(value, '$.id') = tickets.id),
           table_seat = (SELECT json_extract(value, '$.s') FROM json_each(?1) WHERE json_extract(value, '$.id') = tickets.id),
           org_key = (SELECT json_extract(value, '$.o') FROM json_each(?1) WHERE json_extract(value, '$.id') = tickets.id),
-          seated_at = ?2, late_after_freeze = ?3
+          seated_at = ?2, late_after_freeze = ?3, seated_by = 'auto'
         WHERE table_index IS NULL AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?1))`).bind(json, stamp, frozen ? 1 : null).run();
       return plan.length;
     } catch (err) {

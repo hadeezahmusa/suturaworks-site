@@ -50,6 +50,8 @@ select{width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;pa
 export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + CERTS_HTML + OFFICE_HTML + String.raw`
 <div id="tablesView" hidden>
   <p class="small" style="margin:0 0 12px">A seat fills when a payment is verified, or when a partner or sponsored seat is claimed. Only admin sees this page. Nothing here reaches participants.</p>
+  <div id="lateT"></div>
+  <div class="card" id="stkBox" style="margin:0 0 14px" hidden></div>
   ${SPRINT_HTML}
   <div class="tiles" id="tTiles"></div>
   <div class="key" id="tKey"></div>
@@ -135,7 +137,7 @@ let poll = null, curPartner = null, level = "lead", levels = [];
 function showView(tab) {
   Object.entries(VIEWS).forEach(([k, id]) => { $("#" + id).hidden = k !== tab; });
   clearInterval(poll); poll = null;
-  const load = { tables: () => Promise.all([loadTables(), loadSprint()]), partners: loadPartners, screen: () => loadScreen(), lobby: () => loadLobby(), staff: () => Promise.all([loadStaff(), loadRoles()]), export: loadExport, money: loadMoney,
+  const load = { tables: () => Promise.all([loadTables(), loadSprint(), loadLate("#lateT"), loadStickers()]), partners: loadPartners, screen: () => loadScreen(), lobby: () => loadLobby(), staff: () => Promise.all([loadStaff(), loadRoles()]), export: loadExport, money: loadMoney,
     rebalance: loadRebalance, checkin: loadCheckin, briefings: loadBriefings, scoring: loadScoring, stage: loadStage, settings: loadSettings, certs: loadCerts, mail: loadMail, invoices: loadInvoices }[tab];
   if (load) load().catch((err) => msg(err.message));
   if (tab === "tables") poll = setInterval(() => { if (!document.hidden) loadTables().catch(() => {}); }, 15000);
