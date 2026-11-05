@@ -240,7 +240,7 @@ async function loadSeatUpload(ref) {
   const label = { ok: '<span class="st good">Will register</span>', registered: '<span class="st amb">Already registered, skipped</span>', error: '<span class="st bad">Fix in the file</span>' };
   box.innerHTML = '<div class="hr"></div><h2>Register people from a file</h2>' +
     '<p class="small" style="margin:0 0 8px"><b>' + d.used + " of " + d.seats + " seats used</b>, " + d.free + " free. The share link keeps working for the free seats; nobody can go over " + d.seats + ". " +
-      (d.paid ? "Payment is verified, so everyone registered from a file gets their ticket straight away." : "<b>Verify the payment first:</b> tickets from a file go out straight away.") + "</p>" +
+      (d.paid ? "Payment is verified. You can send each person their ticket straight away, or seat them now and send the tickets later." : "Payment is not verified yet. You can still register and seat everyone now; their tickets wait until you send them.") + "</p>" +
     '<div class="actions" style="margin:0 0 10px"><button class="btn ghost" data-seat="template"' + (d.free ? "" : " disabled") + ">Download the template (" + d.free + (d.free === 1 ? " row)" : " rows)") + "</button>" +
       '<label class="btn ghost" style="cursor:pointer">Upload the filled file<input type="file" id="seatFile" accept=".xlsx,.csv" hidden></label></div>' +
     (pv ? '<div class="card" style="padding:12px;margin:0 0 10px"><b>' + esc(pv.fileName) + "</b>: " + pv.ok + " to register, " + pv.registered + " already registered, " + pv.errors + " to fix." +
@@ -248,9 +248,16 @@ async function loadSeatUpload(ref) {
       '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th>Line</th><th>Person</th><th>Status</th></tr></thead><tbody>' +
       pv.rows.map((x) => "<tr><td>" + x.line + "</td><td><b>" + esc((x.first + " " + x.last).trim()) + '</b><div class="small">' + esc(x.email) + (x.phone ? " · " + esc(x.phone) : "") + "</div><div class=\"small\">" + esc(x.organisation) + "</div></td><td>" + label[x.status] + (x.errors.length ? '<div class="small">' + esc(x.errors.join("; ")) + "</div>" : "") + "</td></tr>").join("") +
       "</tbody></table></div>" +
-      (pv.ok && !pv.blocked && d.paid ? '<label style="display:flex;gap:8px;align-items:center;font-size:12px;margin:10px 0 0"><input type="checkbox" id="seatNotify" checked> Email ' + esc(d.contact || d.org) + " a short summary</label>" +
-        '<div class="actions"><button class="btn gold" data-seat="import">Register the ' + pv.ok + (pv.ok === 1 ? " valid row" : " valid rows") + '</button><button class="btn ghost" data-seat="discard">Discard</button></div>' : '<div class="actions"><button class="btn ghost" data-seat="discard">Discard</button></div>') + "</div>" : "") +
-    (d.holders.length ? '<details><summary class="small" style="cursor:pointer">Who holds the ' + d.used + " seats</summary>" + d.holders.map((h) => '<div class="small">' + esc(h.name) + " · " + esc(h.ref) + " · " + esc(h.via) + (h.cancelled ? " · cancelled" : "") + "</div>").join("") + "</details>" : "") +
+      (pv.ok && !pv.blocked ? (d.paid ? '<label style="display:flex;gap:8px;align-items:center;font-size:12px;margin:10px 0 0"><input type="checkbox" id="seatNotify" checked> Email ' + esc(d.contact || d.org) + " a short summary</label>" : "") +
+        '<div class="actions">' + (d.paid ? '<button class="btn gold" data-seat="import">Register and send ' + pv.ok + (pv.ok === 1 ? " ticket" : " tickets") + '</button>' : "") +
+        '<button class="btn' + (d.paid ? " ghost" : " gold") + '" data-seat="hold">Seat ' + pv.ok + (pv.ok === 1 ? " person" : " people") + ', send tickets later</button><button class="btn ghost" data-seat="discard">Discard</button></div>' : '<div class="actions"><button class="btn ghost" data-seat="discard">Discard</button></div>') + "</div>" : "") +
+    (d.unsent ? '<div class="card" style="padding:12px;margin:0 0 10px;background:#FFF8E2"><b>' + d.unsent + (d.unsent === 1 ? " ticket is" : " tickets are") + " seated but not sent.</b> " +
+      (d.paid ? "" : "Payment is not verified yet. ") + "They can't open their QLV page until their ticket arrives." +
+      '<div class="actions"><button class="btn gold" data-seat="send">Send all ' + d.unsent + (d.unsent === 1 ? " ticket" : " tickets") + "</button></div></div>" : "") +
+    (d.holders.length ? '<details' + (d.unsent ? " open" : "") + '><summary class="small" style="cursor:pointer">Who holds the ' + d.used + " seats, and their tables</summary>" +
+      '<div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Ticket</th><th>Table</th><th>Ticket sent</th></tr></thead><tbody>' +
+      d.holders.map((h) => "<tr" + (h.cancelled ? ' style="opacity:.55"' : "") + "><td>" + esc(h.name) + '<div class="small">' + esc(h.via) + (h.cancelled ? " · cancelled" : "") + "</div></td><td>" + esc(h.ref) + "</td><td>" + (h.table ? esc(h.table.name) + " (" + h.table.no + ")" : '<span class="small">Not seated</span>') + "</td><td>" + (h.sent ? "Sent" : '<span class="st amb">Not sent</span>') + "</td></tr>").join("") +
+      "</tbody></table></div></details>" : "") +
     (d.uploads.length ? '<div class="small" style="margin-top:6px">' + d.uploads.map((u) => esc(when(u.uploaded_at)) + ": " + esc(u.file_name) + ", " + u.imported + " registered, " + u.skipped + " skipped, " + u.failed + " to fix, by " + esc(u.uploaded_by)).join("<br>") + "</div>" : "");
 }
 async function seatTemplate() {
@@ -334,6 +341,21 @@ document.addEventListener("click", async (e) => {
   try {
     if (b.dataset.seat === "template") return seatTemplate();
     if (b.dataset.seat === "discard") { seatPreview = null; return loadSeatUpload(seatData.ref); }
+    if (b.dataset.seat === "hold") {
+      if (!confirm("Register and seat " + seatPreview.ok + (seatPreview.ok === 1 ? " person" : " people") + " on " + seatData.ref + "? Nobody is emailed until you press Send.")) return;
+      b.disabled = true;
+      const r = await call("seats-import", { ref: seatData.ref, rows: seatPreview.sent, fileRef: seatPreview.fileRef, fileName: seatPreview.fileName, hold: true });
+      seatPreview = null;
+      msg(r.imported + " registered and seated. Their tickets are waiting to be sent." + (r.skipped ? " " + r.skipped + " skipped." : "") + (r.failed ? " " + r.failed + " to fix in the file." : ""), true);
+      return openReg(seatData.ref);
+    }
+    if (b.dataset.seat === "send") {
+      if (!confirm("Email " + seatData.unsent + (seatData.unsent === 1 ? " person their ticket" : " people their tickets") + " on " + seatData.ref + " now?" + (seatData.paid ? "" : " Payment is not verified yet."))) return;
+      b.disabled = true;
+      const r = await call("seats-send", { ref: seatData.ref });
+      msg(r.sent + (r.sent === 1 ? " ticket" : " tickets") + " sent.", true);
+      return openReg(seatData.ref);
+    }
     if (b.dataset.seat === "import") {
       if (!confirm("Register " + seatPreview.ok + (seatPreview.ok === 1 ? " person" : " people") + " on " + seatData.ref + " and email each their ticket now?")) return;
       b.disabled = true;
