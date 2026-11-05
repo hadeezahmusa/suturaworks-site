@@ -10,6 +10,7 @@
 // (ExcelJS); the rows come here as plain fields and are checked again here.
 
 import { HttpError, now, token, nextRef, ticketLinks, sendMail, links, closesAt } from "./index.js";
+import { tableName } from "./config.js";
 import { SITUATIONS } from "../../qlv2026/questions.js";
 import { closeLabel } from "../../qlv2026/event.js";
 import { seatPending } from "./seating.js";
@@ -31,13 +32,15 @@ async function booking(env, ref) {
 export async function seatsView(env, ref) {
   const r = await booking(env, ref);
   const [{ results: held }, { results: log }] = await Promise.all([
-    env.DB.prepare("SELECT id, name, email, ticket_ref, via, sent_at, cancelled_at FROM tickets WHERE reg_ref = ? AND kind = 'sponsored' ORDER BY id").bind(r.ref).all(),
+    env.DB.prepare("SELECT id, name, email, ticket_ref, via, sent_at, cancelled_at, table_index FROM tickets WHERE reg_ref = ? AND kind = 'sponsored' ORDER BY id").bind(r.ref).all(),
     env.DB.prepare("SELECT * FROM seat_uploads WHERE reg_ref = ? ORDER BY id DESC").bind(r.ref).all(),
   ]);
   return {
     ref: r.ref, org: r.name, contact: r.contact_person, email: r.email, seats: r.size, status: r.status,
     paid: r.status === "verified" || r.status === "confirmed", used: held.length, free: Math.max(0, r.size - held.length),
-    holders: held.map((t) => ({ name: t.name, email: t.email, ref: t.ticket_ref, via: t.via === "upload" ? "Upload" : "Share link", cancelled: !!t.cancelled_at })),
+    holders: held.map((t) => ({ name: t.name, email: t.email, ref: t.ticket_ref, via: t.via === "upload" ? "Upload" : "Share link", cancelled: !!t.cancelled_at, sent: !!t.sent_at,
+      table: t.table_index === null ? null : { no: t.table_index + 1, name: tableName(t.table_index) } })),
+    unsent: held.filter((t) => !t.sent_at && !t.cancelled_at && t.ticket_ref !== "pending").length,
     uploads: log, columns: COLUMNS, situations: SITUATIONS.map((s) => s.label),
   };
 }
@@ -86,18 +89,21 @@ export async function previewUpload(env, b) {
   return { ...(await check(env, r, b.rows)), ...(await seatsView(env, r.ref)) };
 }
 
-// Registers the valid rows. Payment must be verified first, so tickets can
-// go out straight away.
+// Registers the valid rows. With b.hold the people are registered and seated
+// but nothing is sent, and payment need not be verified yet: "Send their
+// tickets" (sendHeld) sends them later in one go. Without it, payment must be
+// verified first, so tickets go out straight away.
 export async function importUpload(env, b, who) {
+  const hold = !!b.hold;
   const r = await booking(env, b.ref);
   if (b.fileRef && b.fileRef !== r.ref) throw new HttpError(409, `This file is for booking ${b.fileRef}, not ${r.ref}.`);
-  if (!(r.status === "verified" || r.status === "confirmed")) throw new HttpError(409, "Verify this booking's payment first. Tickets from an upload go out straight away.");
+  if (!hold && !(r.status === "verified" || r.status === "confirmed")) throw new HttpError(409, "Verify this booking's payment first. Tickets from an upload go out straight away.");
   const c = await check(env, r, b.rows);
   if (c.blocked) throw new HttpError(409, c.blocked);
   const add = c.rows.filter((x) => x.status === "ok");
   if (!add.length) throw new HttpError(409, "There is nobody new to register in this file.");
   const { room } = await dailyRoom(env);
-  if (add.length + (b.notify ? 1 : 0) > room) throw new HttpError(409, `${add.length} tickets need ${add.length} emails, and only ${room} can go today on the free plan.`);
+  if (!hold && add.length + (b.notify ? 1 : 0) > room) throw new HttpError(409, `${add.length} tickets need ${add.length} emails, and only ${room} can go today on the free plan.`);
   const stamp = now();
   const made = [];
   for (const x of add) {
@@ -112,24 +118,44 @@ export async function importUpload(env, b, who) {
     const { n } = await env.DB.prepare("SELECT COUNT(*) AS n FROM tickets WHERE reg_ref = ? AND kind = 'sponsored' AND id <= ?").bind(r.ref, ins.id).first();
     t.id = ins.id;
     t.ticket_ref = await nextRef(env, "sponsored");
-    await env.DB.prepare("UPDATE tickets SET ticket_ref = ?, seat_no = ?, sent_at = ? WHERE id = ?").bind(t.ticket_ref, n, stamp, ins.id).run();
+    await env.DB.prepare("UPDATE tickets SET ticket_ref = ?, seat_no = ?, sent_at = ? WHERE id = ?").bind(t.ticket_ref, n, hold ? null : stamp, ins.id).run();
     made.push(t);
   }
   await seatPending(env);
   // Each person gets the normal ticket email, with their lobby link once the lobby is open.
-  const msgs = [];
-  for (const t of made) {
-    const lobbyLink = await lobby.lobbyLinkForTicket(env, { id: t.id, kind: "sponsored" });
-    msgs.push({ ref: t.ticket_ref, to: t.email, ...mail.ticketIssued(t, r, { ...ticketLinks(env, t), lobby: lobbyLink }) });
-  }
-  for (let i = 0; i < msgs.length; i += 90) await sendBatch(env, msgs.slice(i, i + 90), "ticket_issued");
+  if (!hold) await sendTickets(env, r, made);
   const skipped = c.registered + (add.length - made.length);
   await env.DB.prepare("INSERT INTO seat_uploads (reg_ref, file_name, uploaded_by, uploaded_at, imported, skipped, failed) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .bind(r.ref, clean(b.fileName, 120) || "upload", who, stamp, made.length, skipped, c.errors).run();
   let sponsorEmailed = false;
-  if (b.notify && r.email && made.length) {
+  if (!hold && b.notify && r.email && made.length) {
     const v = await seatsView(env, r.ref);
     sponsorEmailed = await sendMail(env, { to: r.email, ...mail.uploadSummary({ first: (r.contact_person || r.name || "").split(" ")[0], n: made.length, used: v.used, seats: r.size, manage: r.manage_token ? links(env, r).manage : null, close: closeLabel(await closesAt(env)) }) }, r.ref, "upload_summary");
   }
-  return { imported: made.length, skipped, failed: c.errors, sponsorEmailed, ...(await seatsView(env, r.ref)) };
+  return { imported: made.length, held: hold, skipped, failed: c.errors, sponsorEmailed, ...(await seatsView(env, r.ref)) };
+}
+
+async function sendTickets(env, r, list) {
+  const msgs = [];
+  for (const t of list) {
+    const lobbyLink = await lobby.lobbyLinkForTicket(env, { id: t.id, kind: "sponsored" });
+    msgs.push({ ref: t.ticket_ref, to: t.email, ...mail.ticketIssued(t, r, { ...ticketLinks(env, t), lobby: lobbyLink }) });
+  }
+  for (let i = 0; i < msgs.length; i += 90) await sendBatch(env, msgs.slice(i, i + 90), "ticket_issued");
+}
+
+// Sends every ticket on this booking that was registered but held back.
+// Each batch is marked sent only once Resend has taken it.
+export async function sendHeld(env, b, who) {
+  const r = await booking(env, b.ref);
+  const { results: list } = await env.DB.prepare(`SELECT * FROM tickets WHERE reg_ref = ? AND kind = 'sponsored' AND sent_at IS NULL AND cancelled_at IS NULL AND ticket_ref != 'pending' ORDER BY id`).bind(r.ref).all();
+  if (!list.length) throw new HttpError(409, "Every ticket on this booking has already been sent.");
+  const { room } = await dailyRoom(env);
+  if (list.length > room) throw new HttpError(409, `${list.length} tickets need ${list.length} emails, and only ${room} can go today on the free plan.`);
+  for (let i = 0; i < list.length; i += 90) {
+    const part = list.slice(i, i + 90);
+    await sendTickets(env, r, part);
+    await env.DB.prepare("UPDATE tickets SET sent_at = ? WHERE id IN (SELECT value FROM json_each(?))").bind(now(), JSON.stringify(part.map((t) => t.id))).run();
+  }
+  return { sent: list.length, by: who, ...(await seatsView(env, r.ref)) };
 }

@@ -171,7 +171,7 @@ async function verify(env, ref, who) {
   const r = await reg(env, ref);
   if (!["awaiting", "queried"].includes(r.status)) throw new HttpError(409, `This registration is ${r.status}, so it cannot be verified now.`);
   const stamp = now();
-  const stmts = [env.DB.prepare("DELETE FROM tickets WHERE reg_ref = ? AND sent_at IS NULL").bind(r.ref)];
+  const stmts = [env.DB.prepare("DELETE FROM tickets WHERE reg_ref = ? AND sent_at IS NULL AND kind != 'sponsored'").bind(r.ref)];
   const add = (kind, seat, p, ref = r.ref) => env.DB.prepare("INSERT INTO tickets (token, reg_ref, ticket_ref, kind, seat_no, name, email, phone, role, situation, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
     .bind(token(24), r.ref, ref, kind, seat, p.name, p.email, p.phone || null, p.role || null, p.situation || null, stamp);
   if (r.tier === "standard" && r.size > 1 && r.attendees) {
@@ -198,7 +198,7 @@ async function unverify(env, ref, who, role) {
   if (role === "verifier" && r.verified_by !== who) throw new HttpError(403, "Only the person who verified this can undo it.");
   const stamp = now();
   await env.DB.batch([
-    env.DB.prepare("DELETE FROM tickets WHERE reg_ref = ? AND sent_at IS NULL").bind(r.ref),
+    env.DB.prepare("DELETE FROM tickets WHERE reg_ref = ? AND sent_at IS NULL AND kind != 'sponsored'").bind(r.ref),
     env.DB.prepare("UPDATE registrations SET status = 'awaiting', verified_at = NULL, verified_by = NULL, updated_at = ? WHERE ref = ?").bind(stamp, r.ref),
   ]);
   return detail(env, r.ref);
@@ -274,7 +274,11 @@ async function release(env, ref) {
   const r = await reg(env, ref);
   if (!["awaiting", "queried"].includes(r.status)) throw new HttpError(409, `This registration is ${r.status}, so it cannot be released.`);
   const stamp = now();
-  await env.DB.prepare("UPDATE registrations SET status = 'released', released_at = ?, updated_at = ? WHERE ref = ?").bind(stamp, stamp, r.ref).run();
+  // People seated from a file but never sent their tickets lose their seats too.
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM tickets WHERE reg_ref = ? AND kind = 'sponsored' AND sent_at IS NULL").bind(r.ref),
+    env.DB.prepare("UPDATE registrations SET status = 'released', released_at = ?, updated_at = ? WHERE ref = ?").bind(stamp, stamp, r.ref),
+  ]);
   return detail(env, r.ref);
 }
 async function reopen(env, ref) {
@@ -1230,6 +1234,7 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST sticker-layout": () => late.saveStickerLayout(env, body),
       "POST seats-preview": () => uploads.previewUpload(env, body),
       "POST seats-import": () => uploads.importUpload(env, body, who),
+      "POST seats-send": () => uploads.sendHeld(env, body, who),
       "GET cert-signatures": () => certs.signatureImages(env),
       "POST cert-results": () => certs.confirmResults(env, body, who),
       "POST cert-name": () => certs.setPrintedName(env, body, who),
