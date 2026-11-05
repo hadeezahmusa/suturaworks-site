@@ -465,3 +465,16 @@ export function uploadSummary({ first: name, n, used, seats, manage }) {
     text: `Hi ${name || "there"},\n\n${used} of your ${seats} seats are now filled. Each person has been sent their ticket.\n\n${manage ? `You can see who is registered, and share your link for any seats still free, on your sponsor page: ${manage}\n\n` : ""}The QLV 2026 team, JCI Aso\n`,
   };
 }
+
+// A late addition, seated by hand, told their table when admin asks. No footer.
+export function lateSeated({ first: name, table, no, link }) {
+  const body = p(`Hello ${esc(name || "there")},`) +
+    p(`You're at table <b>${no} · ${esc(table)}</b> for QLV 2026. Find it by the number on your table when you arrive.`) +
+    (link ? p("Your team room is open, so you can meet your team before the sprint:") + button(link, "Open your team room") : "") +
+    p("See you there,<br>The QLV 2026 team, JCI Aso", "margin:0;");
+  return {
+    subject: `Your table at QLV 2026: ${table}`,
+    html: shell({ preheader: `You're at table ${no}, ${table}.`, body, bare: true }),
+    text: `Hello ${name || "there"},\n\nYou're at table ${no} · ${table} for QLV 2026. Find it by the number on your table when you arrive.\n\n${link ? `Your team room is open, so you can meet your team before the sprint: ${link}\n\n` : ""}See you there,\nThe QLV 2026 team, JCI Aso\n`,
+  };
+}

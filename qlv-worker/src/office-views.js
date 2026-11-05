@@ -17,6 +17,8 @@ export const OFFICE_STYLE = String.raw`
 #invView .tot{display:flex;justify-content:flex-end;gap:24px;font-weight:600;margin:6px 0 0}
 #seatUp .st.bad{background:#FBE3E0;color:#8A2A20}#seatUp .st.amb{background:#FFF1D6;color:#7A5300}#seatUp .st.good{background:#E2F2F2;color:#19646D}
 #seatUp table td{vertical-align:top}
+#stkBox .pk{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:12px;flex-wrap:wrap}
+#stkBox .pk .link{font-weight:600}
 `;
 
 export const OFFICE_HTML = String.raw`<div id="mailView" hidden><div id="mailBox"></div></div><div id="invView" hidden><div id="invBox"></div></div>`;
@@ -341,5 +343,79 @@ document.addEventListener("click", async (e) => {
       openReg(seatData.ref);
     }
   } catch (err) { msg(err.message); b.disabled = false; }
+});
+
+// ---------- name stickers (Tables page) ----------
+let stkData = null, stkSort = "name";
+async function stkLibs() { for (const f of ["vendor/pdf-lib.min.js", "vendor/fontkit.umd.min.js", "stickers.js"]) await offScript(f); await QLVStickers.load(SITE); }
+async function loadStickers() {
+  const box = $("#stkBox"); if (!box) return;
+  if (ROLE !== "admin") { box.hidden = true; return; }
+  const d = stkData = await call("stickers");
+  box.hidden = false;
+  if (!d.locked) { box.innerHTML = '<h2>Name stickers</h2><p class="small" style="margin:0">Press <b>Lock and stamp</b> on the Badge export first. Stickers come from that locked snapshot, so the printed names and tables match.</p>'; return; }
+  let long = [];
+  try { await stkLibs(); long = d.rows.filter((r) => !QLVStickers.fit(r.name)); } catch (err) { msg(err.message); }
+  const dl = (k) => d.downloads[k] ? (d.downloads[k].changed ? ' <span class="chg" style="color:#8A2A20;font-weight:700">changed since download</span>' : ' <span class="tiny">downloaded ' + esc(when(d.downloads[k].at)) + "</span>") : "";
+  const L = d.layout;
+  box.innerHTML = '<h2>Name stickers</h2><p class="small" style="margin:-4px 0 10px"><b>' + d.rows.length + " sprinters</b> from the snapshot locked " + esc(when(d.lockedAt)) + " by " + esc(d.lockedBy) + ". Staff wear badges and are never on a sticker. " +
+      (d.late ? d.late + (d.late === 1 ? " late addition gets" : " late additions get") + " a blank sticker filled in by hand, or their own once seated." : "") + "</p>" +
+    (long.length ? '<div class="miss" style="margin:0 0 10px">Name too long, edit the badge name on the Badge export: ' + long.map((r) => esc(r.name)).join("; ") + ". They print at the smallest size until then.</div>" : "") +
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 8px"><label class="small">Order <select id="stkSort" style="font:inherit;border:1px solid var(--rule);border-radius:6px;padding:5px 8px"><option value="name"' + (stkSort === "name" ? " selected" : "") + '>Alphabetical by name</option><option value="table"' + (stkSort === "table" ? " selected" : "") + ">By table</option></select></label></div>" +
+    '<div class="pk"><span>Stickers, A4 sheets (8 per sheet)' + dl("stickers_a4") + '</span><button class="link" data-stk="a4">Download</button></div>' +
+    '<div class="pk"><span>Stickers, one per page at label size, with a CSV' + dl("stickers_single") + '</span><button class="link" data-stk="single">Download</button></div>' +
+    '<div class="pk"><span>Blank stickers for late additions <input type="number" id="stkBlank" min="1" max="200" value="10" style="width:70px;font:inherit;border:1px solid var(--rule);border-radius:6px;padding:3px 6px"></span><button class="link" data-stk="blank">Download</button></div>' +
+    '<div class="pk"><span>Sticker for one person <input list="stkPeople" id="stkOne" placeholder="Type a name or ticket" style="width:240px;font:inherit;border:1px solid var(--rule);border-radius:6px;padding:3px 6px"><datalist id="stkPeople">' +
+      d.rows.map((r) => '<option value="' + esc(r.name + " · " + r.ticket) + '">').join("") + '</datalist></span><button class="link" data-stk="one">Download</button></div>' +
+    '<details style="margin-top:8px"><summary class="small" style="cursor:pointer">Label sheet layout (mm)</summary><p class="small">Set for 8 per A4 (99.1 by 67.7 mm, as Avery L7165). Print one sheet on plain paper and hold it against a label sheet before printing in bulk.</p><form id="stkLayout" style="display:flex;flex-wrap:wrap;gap:8px">' +
+      [["left", "Left margin"], ["top", "Top margin"], ["colPitch", "Column pitch"], ["rowPitch", "Row pitch"], ["cols", "Columns"], ["rows", "Rows"]].map(([k, n]) => '<label class="small">' + n + '<br><input name="' + k + '" value="' + L[k] + '" style="width:80px;font:inherit;border:1px solid var(--rule);border-radius:6px;padding:4px 6px"></label>').join("") +
+      '<div class="actions" style="width:100%"><button class="btn ghost">Save layout</button><button type="button" class="link" data-stk="layoutreset">Back to the standard layout</button></div></form></details>';
+}
+function stkList() {
+  const rows = [...stkData.rows];
+  if (stkSort === "table") rows.sort((a, b) => a.tableNo - b.tableNo || a.name.localeCompare(b.name));
+  return rows;
+}
+async function stkSave(bytes, name, kind, target) {
+  offDownload(new Blob([bytes], { type: "application/pdf" }), name);
+  stkData = await call("stickers-downloaded", { kind, signature: stkData.signature, target: target || "all" });
+  loadStickers();
+}
+document.addEventListener("change", (e) => { if (e.target.id === "stkSort") stkSort = e.target.value; });
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-stk], [data-latestk]"); if (!b) return;
+  try {
+    await stkLibs();
+    if (b.dataset.latestk) {
+      const s = await call("sticker-one?id=" + b.dataset.latestk);
+      return stkSave(await QLVStickers.singles([s]), "QLV-2026-Sticker-" + s.ticket + ".pdf", "sticker_one", s.ticket);
+    }
+    const k = b.dataset.stk;
+    if (k === "a4") return stkSave(await QLVStickers.sheets(stkList(), stkData.layout), "QLV-2026-Name-Stickers-A4.pdf", "stickers_a4");
+    if (k === "single") {
+      const rows = stkList();
+      const csv = "Name,Table number,Table,Ticket\n" + rows.map((r) => [r.name, r.tableNo, r.table, r.ticket].map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n") + "\n";
+      offDownload(new Blob([csv], { type: "text/csv" }), "QLV-2026-Name-Stickers.csv");
+      return stkSave(await QLVStickers.singles(rows), "QLV-2026-Name-Stickers-Single.pdf", "stickers_single");
+    }
+    if (k === "blank") {
+      const n = Math.max(1, Math.min(200, Math.floor(Number($("#stkBlank").value) || 10)));
+      const per = stkData.layout.cols * stkData.layout.rows, total = Math.ceil(n / per) * per;
+      return stkSave(await QLVStickers.sheets(Array.from({ length: total }, () => ({ blank: true })), stkData.layout), "QLV-2026-Blank-Stickers.pdf", "stickers_blank", String(total));
+    }
+    if (k === "one") {
+      const v = $("#stkOne").value.trim().toLowerCase();
+      const r = stkData.rows.find((x) => (x.name + " · " + x.ticket).toLowerCase() === v) || stkData.rows.find((x) => x.ticket.toLowerCase() === v) || stkData.rows.find((x) => x.name.toLowerCase() === v);
+      if (!r) return msg("Choose someone from the list. For a late addition, use Sticker in Late additions once they are seated.");
+      return stkSave(await QLVStickers.singles([r]), "QLV-2026-Sticker-" + r.ticket + ".pdf", "sticker_one", r.ticket);
+    }
+    if (k === "layoutreset") { stkData = await call("sticker-layout", { reset: true }); return loadStickers(); }
+  } catch (err) { msg(err.message); }
+});
+document.addEventListener("submit", async (e) => {
+  if (e.target.id !== "stkLayout") return;
+  e.preventDefault();
+  const f = e.target, b = {}; ["left", "top", "colPitch", "rowPitch", "cols", "rows"].forEach((k) => { b[k] = f[k].value; });
+  try { stkData = await call("sticker-layout", b); msg("Layout saved.", true); loadStickers(); } catch (err) { msg(err.message); }
 });
 `;

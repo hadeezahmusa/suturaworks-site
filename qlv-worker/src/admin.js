@@ -25,6 +25,7 @@ import * as certs from "./certs.js";
 import * as mailtab from "./mailtab.js";
 import * as invoices from "./invoices.js";
 import * as uploads from "./uploads.js";
+import * as late from "./late.js";
 import { BOARD_CAN, boardSessionOk, boardView, boardAction, boardLogin, redact } from "./board.js";
 import { VIEWS_HTML, VIEWS_JS, VIEWS_STYLE } from "./admin-views.js";
 import { sendBatch, dailyRoom, DAILY_SAFE } from "./mailer.js";
@@ -65,7 +66,7 @@ async function roleOf(env, email) {
 // What each role besides admin may call. Anything not listed is admin only.
 const CAN = {
   verifier: new Set(["GET list", "GET reg", "POST verify", "POST unverify", "GET money"]),
-  desk: new Set(["GET checkin", "POST checkin"]),
+  desk: new Set(["GET checkin", "POST checkin", "GET late", "POST seat-late"]),
   stage: new Set(["GET stage", "POST stage", "GET display-link"]),
   board: BOARD_CAN,
 };
@@ -1221,6 +1222,12 @@ export async function handleAdmin(req, env, ctx, url) {
       "POST invoice-settings": () => invoices.saveInvoiceSettings(env, body),
       "POST invoice-signature": () => invoices.saveInvoiceSignature(env, body, who),
       "GET seats": () => uploads.seatsView(env, q.get("ref")),
+      "GET late": () => late.lateView(env),
+      "POST seat-late": () => late.seatLate(env, body, who, role),
+      "GET stickers": () => late.stickersView(env),
+      "GET sticker-one": () => late.stickerFor(env, q.get("id")),
+      "POST stickers-downloaded": () => late.stickerDownloaded(env, body, who),
+      "POST sticker-layout": () => late.saveStickerLayout(env, body),
       "POST seats-preview": () => uploads.previewUpload(env, body),
       "POST seats-import": () => uploads.importUpload(env, body, who),
       "GET cert-signatures": () => certs.signatureImages(env),

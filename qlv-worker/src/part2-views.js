@@ -151,18 +151,55 @@ async function loadRebalance() {
 
 // ---------- Check-in ----------
 let ciData = null;
+
+// ---------- late additions, seated by hand (Tables page and the desk) ----------
+let lateData = null, lateBox = null;
+async function loadLate(sel) {
+  lateBox = sel || lateBox;
+  const box = $(lateBox); if (!box) return;
+  const d = lateData = await call("late");
+  if (!d.locked || !d.people.length) { box.innerHTML = ""; return; }
+  const waiting = d.people.filter((p) => !p.table), seated = d.people.filter((p) => p.table);
+  const opts = (p) => d.tables.map((t) => '<option value="' + t.index + '"' + ((p.table ? p.table.index : p.suggested) === t.index ? " selected" : "") + ">" + esc(t.name) + " (" + t.no + ") · " + t.count + " seated" + (t.index === p.suggested ? " · suggested" : "") + "</option>").join("");
+  const row = (p) => '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)">' +
+    '<span><b>' + esc(p.name) + '</b> <span class="small mono">' + esc(p.ref) + "</span>" + (p.organisation ? '<div class="small">' + esc(p.organisation) + "</div>" : "") +
+    '<div class="small">Added ' + esc(when(p.addedAt)) + (p.table ? " · at " + esc(p.table.name) + " (" + p.table.no + ")" + (p.checkedIn ? ", checked in" : "") : "") + "</div></span>" +
+    (p.checkedIn ? (ROLE === "admin" ? '<button class="link" data-latestk="' + p.id + '">Sticker</button>' : "") :
+      '<span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select data-lateat="' + p.id + '" style="font:inherit;border:1px solid var(--rule);border-radius:6px;padding:6px 8px;min-height:36px">' + opts(p) + "</select>" +
+      (ROLE === "admin" ? '<label class="small" style="display:flex;gap:4px;align-items:center"><input type="checkbox" data-latemail="' + p.id + '"> Email their table</label>' : "") +
+      '<button class="btn' + (p.table ? " ghost" : "") + '" data-lateseat="' + p.id + '">' + (p.table ? "Move" : "Seat") + "</button>" + (p.table && ROLE === "admin" ? '<button class="link" data-latestk="' + p.id + '">Sticker</button>' : "") + "</span>") + "</div>";
+  box.innerHTML = '<div class="card" style="margin:0 0 14px;border-color:#EFC22D"><h2 style="margin:0">Late additions · ' + waiting.length + ' waiting for a table</h2>' +
+    '<p class="small" style="margin:4px 0 6px">Registered or verified after names were locked ' + esc(when(d.lockedAt)) + '. Nobody seats them automatically. The suggested table has the fewest people and nobody from the same organisation. Write the table and ticket on their blank sticker. A late addition can be moved until they check in.</p>' +
+    (waiting.length ? waiting.map(row).join("") : '<p class="small" style="margin:0">Nobody waiting.</p>') +
+    (seated.length ? '<details style="margin-top:8px"><summary class="small" style="cursor:pointer">Seated by hand · ' + seated.length + "</summary>" + seated.map(row).join("") + "</details>" : "") + "</div>";
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-lateseat]");
+  if (!b) return;
+  const id = Number(b.dataset.lateseat), p = lateData.people.find((x) => x.id === id);
+  const sel = document.querySelector('[data-lateat="' + id + '"]'), t = lateData.tables.find((x) => x.index === Number(sel.value));
+  const mailBox = document.querySelector('[data-latemail="' + id + '"]');
+  if (!confirm((p.table ? "Move " : "Seat ") + p.name + " at " + t.name + " (" + t.no + ")?" + (t.count >= 8 ? " That table already has " + t.count + "." : ""))) return;
+  b.disabled = true;
+  try {
+    lateData = await call("seat-late", { id, table: t.index, notify: !!(mailBox && mailBox.checked) });
+    msg(p.name + " is at " + t.name + " (" + t.no + "). Write " + t.no + " " + t.name + " and " + p.ref + " on their sticker." + (t.count + 1 >= 9 ? " " + t.name + " now has " + (t.count + 1) + "." : ""), true);
+    loadLate(); if (typeof loadCheckin === "function" && document.getElementById("ciBox") && !document.getElementById("ciBox").closest("[hidden]")) loadCheckin().catch(() => {});
+  } catch (err) { msg(err.message); b.disabled = false; }
+});
 async function loadCheckin() {
   const d = ciData = await call("checkin");
   const box = $("#ciBox");
   const sw = ROLE === "admin" ? '<button type="button" class="switch" role="switch" aria-checked="' + d.enabled + '" data-ci="toggle"><i></i><span>Check-in is ' + (d.enabled ? "on" : "off") + '</span></button>' : "";
   let h = '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-end;margin:0 0 14px"><div><h1>Check-in</h1><p class="small" style="margin:4px 0 0">Optional. Use it only if there are hands at the desk. Nothing else depends on it.</p></div>' + sw + '</div>';
   if (!d.enabled) { box.innerHTML = h + '<div class="card"><b>Check-in is switched off</b><p class="small" style="margin:6px 0 0;line-height:1.6">Switch it on if you have people at the badge desk on the day. The desk searches a name or reference and taps Arrived, and the Tables page shows how many have arrived at each table. Tables never change because of it.</p></div>'; return; }
-  h += '<div class="card" style="margin:0 0 14px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end"><label style="flex:1 1 320px;font-size:12px;font-weight:600">Find someone<input type="search" id="ciFind" placeholder="Name or reference, e.g. QLV26-014" style="margin-top:4px;width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;padding:10px 12px;min-height:44px"></label>' +
+  h += '<div id="lateCi"></div><div class="card" style="margin:0 0 14px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end"><label style="flex:1 1 320px;font-size:12px;font-weight:600">Find someone<input type="search" id="ciFind" placeholder="Name or reference, e.g. QLV26-014" style="margin-top:4px;width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;padding:10px 12px;min-height:44px"></label>' +
     '<div><span class="small">Arrived</span><div style="font-size:26px;font-weight:700" id="ciCount">' + d.arrived + ' of ' + d.seated + '</div></div></div>' +
     '<div style="margin:0 0 10px">' + d.tables.map((t) => '<span class="tcount"><b>' + esc(t.name) + '</b> ' + t.count + ' of ' + t.of + '</span>').join("") + '</div>' +
     '<div class="card" id="ciList"></div>';
   box.innerHTML = h;
   drawCheckin();
+  loadLate("#lateCi").catch(() => {});
 }
 function drawCheckin() {
   const q = ($("#ciFind") ? $("#ciFind").value : "").trim().toLowerCase();
