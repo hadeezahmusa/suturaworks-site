@@ -1098,7 +1098,7 @@ boardLock();
 // payments, no personal details beyond name, reference and table.
 function oneViewPage(email, role, site) {
   const desk = role === "desk";
-  return page(desk ? "QLV 2026 check-in" : "QLV 2026 stage", `<div class="top"><b>QLV 2026 ${desk ? "check-in desk" : "stage"}</b><span class="who">Signed in as ${e(email)}
+  return page(desk ? "QLV 2026 check-in" : "QLV 2026 stage coordinator", `<div class="top"><b>QLV 2026 ${desk ? "check-in desk" : "stage coordinator"}</b><span class="who">Signed in as ${e(email)}
     &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
   <div class="wrap"><div id="msg" class="msg" hidden role="status"></div>${P2_HTML}</div>`,
   `const ROLE = ${JSON.stringify(role)}; const SITE = ${JSON.stringify(site)};

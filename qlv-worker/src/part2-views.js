@@ -102,10 +102,10 @@ export const P2_HTML = String.raw`
     <form class="list card form2" id="setForm" style="flex:3 1 560px"></form>
     <div class="side" style="flex:1 1 340px">
       <div class="card" style="margin:0 0 14px"><h2>Teams</h2><div id="setTeams"></div></div>
-      <div class="card"><h2>Other sign-ins</h2><p class="small" style="margin:0 0 10px">Desk volunteers see only Check-in: names, references and tables. Stage operators see only Stage. They sign in with their email like you do.</p>
+      <div class="card"><h2>Other sign-ins</h2><p class="small" style="margin:0 0 10px">Desk volunteers see only Check-in: names, references and tables. The stage coordinator sees only Stage. They sign in with their email like you do.</p>
         <div id="setAccess"></div>
         <form id="accForm" class="form2" style="margin-top:10px"><label>Email<input type="email" name="email" required placeholder="volunteer@example.com"></label>
-          <label>Can see<select name="role"><option value="desk">Check-in desk</option><option value="stage">Stage</option></select></label><button class="btn" style="width:100%">Add sign-in</button></form></div>
+          <label>Can see<select name="role"><option value="desk">Check-in desk</option><option value="stage">Stage coordinator</option></select></label><button class="btn" style="width:100%">Add sign-in</button></form></div>
       <div class="card" style="margin-top:14px"><h2>Board view</h2><p class="small" style="margin:0 0 10px">A read-only look round the admin for the board, opened with one passcode. They see registrations, tables, partners, sponsors, staff, scoring, the stage, check-in, badges and money. Emails, phone numbers, proofs of payment, private links, the tasks, member codes and the three answers stay hidden.</p><div id="setBoard"></div></div>
     </div>
   </div>
@@ -395,7 +395,7 @@ async function loadSettings() {
     '<div class="actions"><button class="btn">Save settings</button></div>';
   $("#setTeams").innerHTML = d.frozen ? '<p class="ok2" style="display:inline-block">Teams have been announced</p><p class="small">Nobody already seated can be moved. Late additions are flagged on the Tables page.</p>'
     : '<p class="small" style="margin:0 0 10px">Tables freeze automatically at ' + esc(when(s.teams_announced_at)) + '. If you announce earlier, press this as you do.</p><button class="btn warn" data-announce="1" style="width:100%">Teams have been announced</button>';
-  $("#setAccess").innerHTML = d.access.map((a) => '<div class="q"><span>' + esc(a.email) + '<div class="small">' + (a.role === "desk" ? "Check-in desk" : "Stage") + '</div></span><button class="link" data-accrm="' + esc(a.email) + '">Remove</button></div>').join("") || '<p class="small">Nobody else yet.</p>';
+  $("#setAccess").innerHTML = d.access.map((a) => '<div class="q"><span>' + esc(a.email) + '<div class="small">' + (a.role === "desk" ? "Check-in desk" : "Stage coordinator") + '</div></span><button class="link" data-accrm="' + esc(a.email) + '">Remove</button></div>').join("") || '<p class="small">Nobody else yet.</p>';
 }
 
 // ---------- events ----------
