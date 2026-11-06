@@ -23,14 +23,18 @@ export const DEFAULTS = {
   critique_minutes: 35,
   response_minutes: 15,
   schedule: [
-    { t: "8:30", what: "Arrival" },
+    { t: "8:30", what: "Arrivals and check-in" },
+    { t: "10:00", what: "Opening, welcome and lead sponsor remarks" },
+    { t: "10:15", what: "Keynote" },
+    { t: "10:45", what: "Everyone seated" },
     { t: "10:50", what: "The sprint opens" },
     { t: "11:40", what: "Plans handed over" },
     { t: "11:45", what: "Critique" },
     { t: "12:20", what: "Response" },
     { t: "12:35", what: "Lunch" },
     { t: "13:30", what: "Presentations" },
-    { t: "14:50", what: "Feedback and recognitions" },
+    { t: "14:50", what: "Feedback, recognitions and close" },
+    { t: "16:00", what: "End" },
   ],
   rebalance_dismissed: "",                      // the table counts the flag was dismissed for
 };

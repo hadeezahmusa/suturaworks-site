@@ -141,12 +141,14 @@ function thanksPages() {
 // wifi drop later in the day does not blank them.
 const preloaded = new Set();
 function preloadLogos() {
-  for (const x of sponsors()) if (x.logo && !preloaded.has(x.logo)) { preloaded.add(x.logo); new Image().src = API + x.logo; }
+  const more = (data.speakers || []).map((x) => x.logo).concat(data.judgesPhoto ? [data.judgesPhoto] : []);
+  for (const p of sponsors().map((x) => x.logo).concat(more)) if (p && !preloaded.has(p)) { preloaded.add(p); new Image().src = API + p; }
 }
 
 function arrivalSlides() {
   const s = ["welcome"];
   if (st.toggles.partners) thanksPages().forEach((_, i) => s.push("thanks:" + i));
+  if (data.judgesPhoto) s.push("judges");
   if (st.toggles.animation) s.push("opening");
   return s;
 }
@@ -156,8 +158,9 @@ function sceneArrival() {
   const which = slides[slide % slides.length];
   if (which.startsWith("thanks:")) return thanksHTML(thanksPages()[Number(which.slice(7))] || { level: LEVELS[2], list: [] });
   if (which === "opening") return openingHTML();
-  const sched = st.toggles.schedule ? '<div class="sched"><b>Today</b>' + data.schedule.map((x, i) => '<div style="animation-delay:' + (0.3 + i * 0.12) + 's"><span>' + esc(x.t) + "</span><span>" + esc(x.what) + "</span></div>").join("") + "</div>" : "";
-  return floaters(data.order.map((o) => o.name)) + '<div class="arrival"><div class="l"><span class="eyebrow">Welcome to QLV 2026</span><span class="big" style="font-size:' + (sched ? 96 : 120) + 'px">Find your table by the name on your badge.</span>' +
+  if (which === "judges") return judgesHTML();
+  const sched = st.toggles.schedule ? '<div class="sched' + (data.schedule.length > 9 ? " long" : "") + '"><b>Today</b>' + data.schedule.map((x, i) => '<div style="animation-delay:' + (0.3 + i * 0.12) + 's"><span>' + esc(x.t) + "</span><span>" + esc(x.what) + "</span></div>").join("") + "</div>" : "";
+  return floaters(data.order.map((o) => o.name)) + '<div class="arrival"><div class="l"><span class="eyebrow">Welcome to QLV 2026</span><span class="big" style="font-size:' + (sched ? 96 : 120) + 'px">Your table is on your name sticker.</span>' +
     '<span class="lede">The sprint opens at ' + esc((data.schedule.find((x) => /sprint/i.test(x.what)) || { t: "10:50" }).t) + ".</span></div>" + sched + "</div>";
 }
 
@@ -171,6 +174,17 @@ function thanksHTML(page) {
       const inner = x.logo ? '<img alt="" src="' + esc(API + x.logo) + '">' : "<b style=\"font-size:" + Math.round(Math.min(h / 4.6, 64, (w * 2.6) / Math.max(10, x.name.length))) + 'px">' + esc(x.name) + "</b>";
       return '<span class="tile s' + x.size + '" style="width:' + w + "px;height:" + h + "px;animation-delay:" + (0.3 + i * 0.12).toFixed(2) + "s," + (1 + i * 0.12).toFixed(2) + "s;animation-duration:.6s," + (5 + (i % 4) * 0.9).toFixed(1) + 's" title="' + esc(x.name) + '">' + inner + "</span>";
     }).join("") + "</div></div>";
+}
+
+function judgesHTML() {
+  return '<div class="judges"><span class="eyebrow">Today’s judges</span><div class="photo"><img alt="" src="' + esc(API + data.judgesPhoto) + '"></div></div>';
+}
+// Who is speaking, with the logo of who they represent.
+function speakerHTML(x) {
+  return '<div class="speaker"><span class="eyebrow">' + esc(x.eyebrow) + "</span>" + (x.logo ? '<div class="logo"><img alt="" src="' + esc(API + x.logo) + '"></div>' : "") +
+    // A sponsor's logo already says who they are, so their name stays small.
+    (x.role || !x.logo ? '<div class="who"><span class="big">' + esc(x.name) + "</span>" + (x.role ? '<span class="lede">' + esc(x.role) + "</span>" : "") + "</div>"
+      : '<div class="who"><span class="lede">' + esc(x.name) + "</span></div>") + "</div>";
 }
 
 function openingHTML() {
@@ -307,12 +321,14 @@ function sceneResults() {
 }
 
 function render() {
-  const key = [st.phase, st.flash, data && data.onStage, st.revealed, JSON.stringify(st.toggles), slide, data && data.lastScores && data.lastScores.n, data && data.partners.join("/"), data && data.sponsors && data.sponsors.map((x) => x.logo).join("/")].join("|");
+  const key = [st.speaker, data && data.judgesPhoto, st.phase, st.flash, data && data.onStage, st.revealed, JSON.stringify(st.toggles), slide, data && data.lastScores && data.lastScores.n, data && data.partners.join("/"), data && data.sponsors && data.sponsors.map((x) => x.logo).join("/")].join("|");
   if (key === sceneKey) return;
   sceneKey = key;
   clearInterval(hopTimer);
   let html;
-  switch (st.phase) {
+  const speaking = st.speaker && (data.speakers || []).find((x) => x.id === st.speaker);
+  if (speaking) html = speakerHTML(speaking);
+  else switch (st.phase) {
     case "arrival": html = sceneArrival(); break;
     case "sprint": case "critique": case "response": html = sceneRound(st.phase); break;
     case "handover": html = sceneHandover(); break;
@@ -321,14 +337,14 @@ function render() {
     default: html = sceneResults();
   }
   $("#scene").innerHTML = '<div class="scene">' + html + "</div>";
-  if (st.phase === "handover") requestAnimationFrame(startHops);
+  if (!speaking && st.phase === "handover") requestAnimationFrame(startHops);
   $("#progress").innerHTML = data.phases.map((p, i) => {
     const at = data.phases.findIndex((x) => x.id === st.phase);
     return '<div class="' + (i < at ? "done" : i === at ? "on" : "") + '"><i></i><span>' + esc(p.label.toUpperCase()) + "</span></div>";
   }).join("");
   // Arrival rotates through its slides; the opening animation gets a shorter turn.
   clearTimeout(slideTimer);
-  if (st.phase === "arrival" && arrivalSlides().length > 1) {
+  if (!speaking && st.phase === "arrival" && arrivalSlides().length > 1) {
     const which = arrivalSlides()[slide % arrivalSlides().length];
     const thanksSecs = which.startsWith("thanks:") ? ((thanksPages()[Number(which.slice(7))] || {}).level || LEVELS[2]).secs : 0;
     slideTimer = setTimeout(() => { slide++; render(); }, DEMO ? (which === "opening" ? 7000 : 6000) : which === "opening" ? 9000 : thanksSecs ? thanksSecs * 1000 : 15000);

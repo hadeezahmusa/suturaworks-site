@@ -4,15 +4,15 @@
 
 export const SCREEN_STYLE = String.raw`
 #scRows td{vertical-align:middle}
-.sc-logo{width:96px;height:56px;background:#fff;border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.sc-logo img{max-width:84px;max-height:44px;object-fit:contain}.sc-logo span{font-size:10px;color:var(--mute);text-align:center;padding:4px}
+.sc-logo{width:96px;height:56px;background:#0F2B63;border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sc-logo img{max-width:84px;max-height:44px;object-fit:contain}.sc-logo span{font-size:10px;color:#C9D6EC;text-align:center;padding:4px}
 .sc-name{display:flex;gap:6px;align-items:center}.sc-name input{min-width:0;flex:1 1 160px;padding:7px 9px;font:inherit;border:1px solid var(--rule);border-radius:6px}
 .sc-off{opacity:.55}
 .sc-size{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--mute);white-space:nowrap}
 #scPreview{background:linear-gradient(160deg,#0A1F4D,#07183B);border-radius:10px;aspect-ratio:16/9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4%;padding:4%;overflow:hidden}
 #scPreview .t{color:#EFC22D;font-weight:700;font-size:10px;letter-spacing:2px;text-transform:uppercase}
 #scPreview .w{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 8px}
-#scPreview .w i{background:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:700;color:#0F2B63;text-align:center;line-height:1.1;overflow:hidden}
+#scPreview .w i{border-radius:4px;display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:700;color:#fff;text-align:center;line-height:1.1;overflow:hidden}
 #scPreview .w img{max-width:86%;max-height:78%;object-fit:contain}
 `;
 
@@ -34,7 +34,7 @@ export const SCREEN_HTML = String.raw`
         <p class="small" style="margin:8px 0 0">Members' businesses are listed free and show at the small size.</p>
       </form>
       <div class="card"><h2>Preview</h2><div id="scPreview"></div><p class="small" style="margin:8px 0 0">A rough guide. On the day the logos drift gently in place, and a long list splits across two or more slides.</p></div>
-      <div class="note"><b>Sizes</b><br>Lead partner, or a sponsor who paid ₦200,000 or more: largest. Supporting partner, or ₦100,000 or more: large. Community partner and other sponsors: medium. Members' businesses: small.<br><br><b>Logos</b><br>PNG or JPG up to 1MB. A PNG with a transparent background looks best. Each logo sits on a white tile on screen.</div>
+      <div class="note"><b>Sizes</b><br>Lead partner, or a sponsor who paid ₦200,000 or more: largest. Supporting partner, or ₦100,000 or more: large. Community partner and other sponsors: medium. Members' businesses: small.<br><br><b>Logos</b><br>PNG or JPG up to 1MB. Every logo shows in white on the dark screen: the page turns it white as it uploads, dropping a plain background. A logo on a busy or photo background may not come out cleanly.</div>
     </div>
   </div>
 </div>`;
@@ -58,7 +58,41 @@ async function loadScreen(d) {
   $("#scPreview").innerHTML = '<span class="t">With thanks to our partners and sponsors</span><div class="w">' + live.slice(0, 24).map((e) =>
     '<i style="width:' + px[e.size][0] + "px;height:" + px[e.size][1] + "px;font-size:" + (4 + e.size) + 'px">' + (e.logo ? '<img alt="" src="' + esc(e.logo) + '">' : esc(e.name)) + "</i>").join("") + "</div>";
 }
+// Turns a logo white on a transparent background, the way the display
+// shows it: the colour of the edges is taken as the background, and each
+// pixel's distance from it becomes how solid the white is.
+async function scWhiten(file) {
+  const img = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / img.width);
+  const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"); g.drawImage(img, 0, 0, w, h);
+  const px = g.getImageData(0, 0, w, h), d = px.data;
+  const edge = [];
+  for (let x = 0; x < w; x++) edge.push((x) * 4, ((h - 1) * w + x) * 4);
+  for (let y = 0; y < h; y++) edge.push((y * w) * 4, (y * w + w - 1) * 4);
+  const clear = edge.filter((i) => d[i + 3] < 128).length > edge.length / 2;
+  const med = (k) => { const v = edge.map((i) => d[i + k]).sort((a, b) => a - b); return v[v.length >> 1] / 255; };
+  const bg = [med(0), med(1), med(2)];
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+    const al = d[i + 3] / 255;
+    let ink = al;
+    if (!clear) {
+      const dist = Math.sqrt(((d[i] / 255 - bg[0]) ** 2 + (d[i + 1] / 255 - bg[1]) ** 2 + (d[i + 2] / 255 - bg[2]) ** 2) / 3);
+      ink = Math.min(1, Math.max(0, (dist - 0.09) / 0.46)) * al;
+    }
+    d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = Math.round(ink * 255);
+    if (ink > 0.08) { const x = p % w, y = (p / w) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 < 0) throw new Error("Nothing showed up in that logo. Try a version on a plain background.");
+  g.putImageData(px, 0, 0);
+  const out = document.createElement("canvas"); out.width = x1 - x0 + 21; out.height = y1 - y0 + 21;
+  out.getContext("2d").drawImage(c, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 10, 10, x1 - x0 + 1, y1 - y0 + 1);
+  return new Promise((ok) => out.toBlob(ok, "image/png"));
+}
 async function scUpload(key, file) {
+  file = await scWhiten(file);
   const res = await fetch("/admin/logo?key=" + encodeURIComponent(key), { method: "POST", credentials: "same-origin", headers: { "x-admin": "1", "content-type": file.type || "application/octet-stream" }, body: file });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "The logo did not upload.");

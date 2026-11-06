@@ -1170,6 +1170,11 @@ export async function handleAdmin(req, env, ctx, url) {
       }
       return money.getReceipt(env, url.searchParams.get("id"));
     }
+    if (path === "/admin/judges-photo" && req.method === "POST") {
+      if (role !== "admin") return refuse();
+      const { putJudgesPhoto } = await import("./stage.js");
+      return json(await putJudgesPhoto(env, req));
+    }
     if (path === "/admin/logo" && req.method === "POST") {
       if (role !== "admin") return refuse();
       return json(await logos.putLogo(env, req, url.searchParams.get("key"), who));

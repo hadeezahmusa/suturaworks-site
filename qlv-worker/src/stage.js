@@ -14,6 +14,16 @@ export const PHASES = ["arrival", "sprint", "handover", "critique", "response", 
 export const PHASE_LABEL = { arrival: "Arrival", sprint: "Sprint", handover: "Handover", critique: "Critique", response: "Response", lunch: "Lunch", presentations: "Presentations", results: "Results" };
 const HANDOVER_MINUTES = 5;
 
+// Who can be put on screen while they speak, with the logo of who they
+// represent (a row on the On screen tab).
+export const SPEAKERS = [
+  { id: "eha", eyebrow: "Keynote", name: "Abdulkareem Iyamu", role: "Chief Commercial Officer, EHA Clinics", source: "partner", ref: "6" },
+  { id: "miva", eyebrow: "Lead sponsor remarks", name: "MIVA Open University", role: "", source: "sponsor", ref: "QLV26-017" },
+  { id: "dm", eyebrow: "Lead sponsor remarks", name: "Dikko & Mahmoud Solicitors and Advocates", role: "", source: "partner", ref: "4" },
+];
+const JUDGES_KEY = "stage:judges-photo";
+const MAX_PHOTO = 4 * 1024 * 1024;
+
 const BLANK = {
   phase: "arrival",
   clock: { endsAt: null, pausedMs: null, totalMs: 0 },
@@ -21,6 +31,7 @@ const BLANK = {
   presented: [],          // tables that have finished presenting
   toggles: { partners: true, schedule: true, animation: false },
   revealed: false,
+  speaker: null,          // a SPEAKERS id while someone is speaking; cleared at each phase change
   testSound: 0,           // bumped by "Play a test sound"; the display plays a chime when it changes
   flash: 0,               // bumped at each phase start so the display can mark it
   version: 0,
@@ -62,6 +73,7 @@ async function order(env) {
 
 function enterPhase(st, phase, s, tables) {
   st.phase = phase;
+  st.speaker = null;
   st.flash = (st.flash || 0) + 1;
   if (phase === "presentations") {
     if (st.onStage === null || st.onStage === undefined) st.onStage = tables.find((t) => !st.presented.includes(t)) ?? null;
@@ -100,6 +112,9 @@ export async function stageAction(env, b) {
     }
   } else if (a === "toggles") {
     for (const k of ["partners", "schedule", "animation"]) if (k in (b.toggles || {})) st.toggles[k] = !!b.toggles[k];
+  } else if (a === "speaker") {
+    if (b.speaker !== null && !SPEAKERS.some((x) => x.id === b.speaker)) throw new HttpError(400, "Choose who is speaking.");
+    st.speaker = b.speaker;
   } else if (a === "testSound") {
     st.testSound = (st.testSound || 0) + 1;
   } else if (a === "reveal") {
@@ -153,6 +168,8 @@ export async function displayData(env, st) {
     // Partners, named sponsors and members' businesses, biggest first.
     sponsors,
     partners: sponsors.map((x) => x.name),
+    speakers: await speakerList(env),
+    judgesPhoto: await judgesPhotoPath(env),
     sprintCues: { half: Math.round(s.sprint_minutes / 2) },
     onStage: st.onStage === null || st.onStage === undefined ? null : tableName(st.onStage),
     upNext: null, lastScores: null, podium: null,
@@ -188,6 +205,8 @@ export async function stageView(env) {
     queue: presentationOrder(tables, s).map((o) => ({ name: o.name, time: o.time, state: st.presented.includes(o.index) ? "Done" : st.onStage === o.index ? "On stage" : "" })),
     display: connected ? { connected: true, sound: !!seen.sound } : { connected: false },
     scored: { complete: tally.rows.filter((r) => r.complete).length, teams: tally.rows.length, all: tally.allComplete },
+    speakers: (await speakerList(env)).map((x) => ({ id: x.id, label: x.eyebrow + ": " + x.name, logo: !!x.logo })),
+    judgesPhoto: await judgesPhotoPath(env),
     settings: { sprint: s.sprint_minutes, critique: s.critique_minutes, response: s.response_minutes, presentation: s.presentation_minutes },
   };
 }
@@ -214,7 +233,7 @@ export async function displayPoll(env, url) {
   }
   const since = Number(url.searchParams.get("v") || -1);
   // Unchanged state: send only the clock, which is cheap and keeps the display honest.
-  const base = { version: st.version, serverNow: Date.now(), phase: st.phase, clock: st.clock, remainingMs: remainingMs(st.clock), testSound: st.testSound, flash: st.flash, toggles: st.toggles, revealed: st.revealed };
+  const base = { version: st.version, serverNow: Date.now(), phase: st.phase, clock: st.clock, remainingMs: remainingMs(st.clock), testSound: st.testSound, flash: st.flash, toggles: st.toggles, revealed: st.revealed, speaker: st.speaker || null };
   if (since === st.version) return base;
   return { ...base, data: await displayData(env, st) };
 }
@@ -222,4 +241,50 @@ export async function displayPoll(env, url) {
 export async function displayLink(env) {
   const { ensureToken, linkFor } = await import("./briefings.js");
   return { url: linkFor(env, "display", await ensureToken(env, null, "display")) };
+}
+
+// ---------- speakers and the judges' photo ----------
+
+async function speakerList(env) {
+  const { results } = await env.DB.prepare("SELECT id, source, source_ref, logo_at FROM screen_logos WHERE deleted_at IS NULL AND logo_at IS NOT NULL").all();
+  return SPEAKERS.map((x) => {
+    const row = results.find((r) => r.source === x.source && String(r.source_ref) === x.ref);
+    return { ...x, logo: row ? `/api/logo?id=${row.id}&v=${encodeURIComponent(row.logo_at)}` : null };
+  });
+}
+
+async function judgesPhotoPath(env) {
+  const { metadata } = await env.KV.getWithMetadata(JUDGES_KEY, { type: "stream" });
+  return metadata ? `/api/judges-photo?v=${encodeURIComponent(metadata.at)}` : null;
+}
+
+export async function putJudgesPhoto(env, req) {
+  const { sniff, stripMetadata } = await import("./strip.js");
+  const tooBig = "That photo is over 4MB. Export it smaller, about 2000 pixels wide is plenty.";
+  if (Number(req.headers.get("content-length") || 0) > MAX_PHOTO) throw new HttpError(413, tooBig);
+  const bytes = new Uint8Array(await req.arrayBuffer());
+  if (bytes.length > MAX_PHOTO) throw new HttpError(413, tooBig);
+  const type = sniff(bytes);
+  if (type !== "image/png" && type !== "image/jpeg") throw new HttpError(415, "Upload the photo as a JPG or PNG.");
+  const stored = stripMetadata(bytes, type);
+  await env.KV.put(JUDGES_KEY, stored, { metadata: { type, at: now() } });
+  await bump(env);
+  return stageView(env);
+}
+
+export async function removeJudgesPhoto(env) {
+  await env.KV.delete(JUDGES_KEY);
+  await bump(env);
+  return stageView(env);
+}
+
+// The display only refetches its data when the version moves.
+async function bump(env) {
+  await writeStage(env, await readStage(env));
+}
+
+export async function getJudgesPhoto(env) {
+  const { value, metadata } = await env.KV.getWithMetadata(JUDGES_KEY, { type: "arrayBuffer" });
+  if (!value) return new Response("Not found.", { status: 404 });
+  return new Response(value, { headers: { "content-type": metadata.type, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff", "access-control-allow-origin": "*" } });
 }

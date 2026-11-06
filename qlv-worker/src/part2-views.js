@@ -89,7 +89,9 @@ export const P2_HTML = String.raw`
         <p class="small" style="margin:0 0 4px">Sprint: chime at halfway and at 5 minutes, gong at zero.</p>
         <p class="small" style="margin:0 0 10px">Presentations: 5 minutes each, soft chime at 1 minute, gong at zero. No ticking.</p>
         <button class="btn ghost" data-st="testSound" style="width:100%">Play a test sound on the display</button></div>
+      <div class="card" style="margin:0 0 14px;background:#EAF1FB"><h2>Who is speaking</h2><p class="small" style="margin:0 0 10px">Puts the speaker and their logo on the display. It goes off by itself when you move to the next stage.</p><div id="stSpeakers"></div></div>
       <div class="card" style="margin:0 0 14px"><h2>On the display between sessions</h2><div id="stToggles"></div></div>
+      <div class="card" id="stJudgesCard" style="margin:0 0 14px"><h2>Judges’ photo</h2><p class="small" style="margin:0 0 10px">Joins the arrival rotation once uploaded. Any photo from your phone or computer, landscape works best.</p><div id="stJudges"></div><input type="file" id="stJudgesFile" accept="image/png,image/jpeg" hidden></div>
       <div class="card" style="background:#FFF8E2"><h2>Results</h2><p class="small" style="margin:0 0 10px">Opens once every score is in. The display shows the top three and the recognitions only. The full table stays on the Scoring tab.</p><div id="stReveal"></div></div>
       <div class="card" id="stResetCard" style="margin-top:14px"><h2>After a rehearsal</h2><p class="small" style="margin:0 0 10px">Puts the stage back to Arrival with no team presented and the results hidden. It can't be used once any judge has submitted a score.</p><button class="btn ghost" data-streset="1" style="width:100%">Reset the stage</button></div>
     </div>
@@ -343,12 +345,32 @@ async function loadStage() {
   const t = st.toggles;
   $("#stToggles").innerHTML = [["partners", "Thank partners and sponsors"], ["schedule", "Show the day’s schedule"], ["animation", "Play the opening animation"]].map(([k, l]) =>
     '<label style="display:flex;align-items:center;gap:10px;min-height:44px;font-size:13px"><input type="checkbox" data-toggle="' + k + '"' + (t[k] ? " checked" : "") + ' style="width:20px;height:20px">' + l + '</label>').join("");
+  $("#stSpeakers").innerHTML = d.speakers.map((x) => '<button class="btn' + (st.speaker === x.id ? " gold" : " ghost") + '" data-speaker="' + x.id + '" style="width:100%;margin:0 0 8px;text-align:left">' + esc(x.label) + (x.logo ? "" : " (no logo yet)") + (st.speaker === x.id ? " · on screen" : "") + "</button>").join("") +
+    (st.speaker ? '<button class="btn ghost" data-speaker="" style="width:100%">Take the speaker off the display</button>' : "");
+  $("#stJudgesCard").hidden = ROLE !== "admin" && !d.judgesPhoto;
+  $("#stJudges").innerHTML = (d.judgesPhoto ? '<img alt="The judges" src="' + esc(d.judgesPhoto) + '" style="width:100%;border-radius:8px;margin:0 0 8px">' : '<p class="small" style="margin:0 0 8px"><b>No photo yet.</b> The slide appears once you upload one.</p>') +
+    (ROLE === "admin" ? '<div class="actions"><button class="btn ghost" data-judgesup="1">' + (d.judgesPhoto ? "Replace photo" : "Upload photo") + "</button>" + (d.judgesPhoto ? '<button class="link" data-judgesrm="1">Remove</button>' : "") + "</div>" : "");
   $("#stReveal").innerHTML = st.revealed ? '<p class="ok2" style="display:inline-block">Results are showing on the display</p><div class="actions"><button class="btn ghost" data-st="hideResults">Hide results again</button></div>'
     : '<button class="btn gold" data-st="reveal" style="width:100%"' + (d.scored.all ? "" : " disabled") + '>Reveal results · ' + d.scored.complete + ' of ' + d.scored.teams + ' teams scored</button>';
   drawClock();
   clearInterval(stTimer);
   stTimer = setInterval(() => { if ($("#stageView").hidden) return clearInterval(stTimer); drawClock(); }, 250);
 }
+if ($("#stJudgesFile")) $("#stJudgesFile").addEventListener("change", async (e) => {
+  let file = e.target.files[0]; if (!file) return;
+  try {
+    // Any photo the browser can open goes up as a JPG at most 2400 pixels wide.
+    let img;
+    try { img = await createImageBitmap(file); } catch { throw new Error("That file is not a photo this browser can open. Use a JPG or PNG."); }
+    const k = Math.min(1, 2400 / Math.max(img.width, img.height)), c = document.createElement("canvas");
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    file = await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.88));
+    const res = await fetch("/admin/judges-photo", { method: "POST", credentials: "same-origin", headers: { "x-admin": "1", "content-type": file.type || "application/octet-stream" }, body: file });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "The photo did not upload.");
+    msg("Photo uploaded. It joins the arrival rotation.", true); loadStage();
+  } catch (err) { msg(err.message); }
+});
 function stRemaining() {
   const c = stData.state.clock;
   if (c.pausedMs !== null && c.pausedMs !== undefined) return c.pausedMs;
@@ -460,6 +482,15 @@ document.addEventListener("click", async (e) => {
       const p = el("[data-phase]").dataset.phase;
       if (!confirm("Move the display to " + el("[data-phase]").textContent.replace(" ✓", "") + "? A timed stage starts its clock from the beginning.")) return;
       stData = await call("stage", { action: "phase", phase: p }); return loadStage();
+    }
+    if (el("[data-speaker]")) {
+      const v = el("[data-speaker]").dataset.speaker || null;
+      stData = await call("stage", { action: "speaker", speaker: v }); return loadStage();
+    }
+    if (el("[data-judgesup]")) { $("#stJudgesFile").value = ""; $("#stJudgesFile").click(); return; }
+    if (el("[data-judgesrm]")) {
+      if (!confirm("Take the judges' photo off the display?")) return;
+      await call("judges-photo-remove", {}); return loadStage();
     }
     if (el("[data-streset]")) {
       if (!confirm("Reset the stage? It goes back to Arrival, every team is marked as not yet presented and the results are hidden.")) return;
