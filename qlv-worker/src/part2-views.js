@@ -117,6 +117,7 @@ export const P2_JS = String.raw`
 // The projector demo: sample tables and a fast clock, no live data, so
 // everyone who can see the Stage tab may open it (the board included).
 if ($("#stDemo")) $("#stDemo").href = SITE + "stage.html?demo=1";
+let ciFilter = "all";
 let rbOpt = "spread", rbData = null, bfData = null, bfRole = "mentor", bfConfirm = null, tplList = [], tplKey = null, stData = null, stTimer = null, stOffset = 0;
 const pad = (n) => String(n).padStart(2, "0");
 const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return pad(Math.floor(s / 60)) + ":" + pad(s % 60); };
@@ -196,17 +197,36 @@ async function loadCheckin() {
   let h = '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-end;margin:0 0 14px"><div><h1>Check-in</h1><p class="small" style="margin:4px 0 0">Optional. Use it only if there are hands at the desk. Nothing else depends on it.</p></div>' + sw + '</div>';
   if (!d.enabled) { box.innerHTML = h + '<div class="card"><b>Check-in is switched off</b><p class="small" style="margin:6px 0 0;line-height:1.6">Switch it on if you have people at the badge desk on the day. The desk searches a name or reference and taps Arrived, and the Tables page shows how many have arrived at each table. Tables never change because of it.</p></div>'; return; }
   h += '<div id="lateCi"></div><div class="card" style="margin:0 0 14px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end"><label style="flex:1 1 320px;font-size:12px;font-weight:600">Find someone<input type="search" id="ciFind" placeholder="Name or reference, e.g. QLV26-014" style="margin-top:4px;width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;padding:10px 12px;min-height:44px"></label>' +
-    '<div><span class="small">Arrived</span><div style="font-size:26px;font-weight:700" id="ciCount">' + d.arrived + ' of ' + d.seated + '</div></div></div>' +
-    '<div style="margin:0 0 10px">' + d.tables.map((t) => '<span class="tcount"><b>' + esc(t.name) + '</b> ' + t.count + ' of ' + t.of + '</span>').join("") + '</div>' +
-    '<div class="card" id="ciList"></div>';
+    '</div><div id="ciDash" style="margin:0 0 14px"></div>' +
+    '<div class="seg" id="ciFilters" style="margin:0 0 10px;flex-wrap:wrap"></div><div class="card" id="ciList"></div>';
   box.innerHTML = h;
   drawCheckin();
   loadLate("#lateCi").catch(() => {});
 }
+// Who has checked in: everyone, arrived, not yet, or staff, with the time each arrived.
+const CI_FILTERS = { all: ["Everyone", () => true], arrived: ["Arrived", (p) => p.arrived], waiting: ["Not arrived yet", (p) => !p.arrived], participants: ["Participants", (p) => !p.staff], staff: ["Staff", (p) => p.staff] };
+function drawCiDash() {
+  const P = ciData.people, part = P.filter((p) => !p.staff), staff = P.filter((p) => p.staff);
+  const tile = (label, n, of) => '<div class="card" style="margin:0;flex:1 1 200px;padding:14px 16px"><div class="small">' + label + '</div><div style="font-size:30px;font-weight:700;line-height:1.1">' + n + ' <span style="font-size:15px;font-weight:600;color:var(--mute)">of ' + of + '</span></div>' +
+    '<div style="height:8px;background:var(--line);border-radius:4px;margin-top:8px;overflow:hidden"><i style="display:block;height:100%;width:' + (of ? Math.round(n / of * 100) : 0) + '%;background:#1F7D87"></i></div></div>';
+  const bars = ciData.tables.map((t) => '<div style="display:flex;align-items:center;gap:10px;font-size:13px;margin:6px 0"><b style="width:110px">' + esc(t.name) + '</b>' +
+    '<span style="flex:1;height:10px;background:var(--line);border-radius:5px;overflow:hidden"><i style="display:block;height:100%;width:' + (t.of ? Math.round(t.count / t.of * 100) : 0) + '%;background:#0F2B63"></i></span><span style="width:60px;text-align:right">' + t.count + ' of ' + t.of + '</span></div>').join("");
+  $("#ciDash").innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:0 0 12px">' + tile("Participants arrived", part.filter((p) => p.arrived).length, part.length) + tile("Staff arrived", staff.filter((p) => p.arrived).length, staff.length) + tile("Everyone", P.filter((p) => p.arrived).length, P.length) + '</div>' +
+    '<div class="card" style="margin:0;padding:12px 16px"><h2 style="margin:0 0 4px">By table</h2>' + bars + '</div>';
+}
+const ciTime = (iso) => iso ? new Date(Date.parse(iso) + 3600000).toISOString().slice(11, 16) : "";
 function drawCheckin() {
   const q = ($("#ciFind") ? $("#ciFind").value : "").trim().toLowerCase();
-  const rows = ciData.people.filter((p) => !q || (p.name + " " + p.ref).toLowerCase().includes(q)).slice(0, 80);
-  $("#ciList").innerHTML = rows.map((p) => '<div class="person"><div><b>' + esc(p.name) + '</b><span class="small">' + esc(p.ref) + ' · ' + esc(p.where) + '</span></div>' +
+  const P = ciData.people, staff = P.filter((p) => p.staff);
+  drawCiDash();
+  const part = P.filter((p) => !p.staff);
+  const count = { all: P.length, arrived: P.filter((p) => p.arrived).length, waiting: P.filter((p) => !p.arrived).length, participants: part.filter((p) => p.arrived).length + " of " + part.length, staff: staff.filter((p) => p.arrived).length + " of " + staff.length };
+  $("#ciFilters").innerHTML = Object.entries(CI_FILTERS).map(([k, [label]]) => '<button type="button" data-cif="' + k + '"' + (ciFilter === k ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + '>' + label + ' (' + count[k] + ')</button>').join("");
+  const keep = CI_FILTERS[ciFilter][1];
+  let rows = P.filter((p) => keep(p) && (!q || (p.name + " " + p.ref).toLowerCase().includes(q)));
+  if (ciFilter === "arrived") rows = rows.slice().sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  rows = rows.slice(0, 300);
+  $("#ciList").innerHTML = rows.map((p) => '<div class="person"><div><b>' + esc(p.name) + '</b><span class="small">' + esc(p.ref) + ' · ' + esc(p.where) + (p.arrived && p.at ? ' · arrived ' + ciTime(p.at) : '') + '</span></div>' +
     '<button class="arr' + (p.arrived ? " on" : "") + '" data-arr="' + p.id + '" aria-pressed="' + p.arrived + '">' + (p.arrived ? "Arrived ✓" : "Arrived") + '</button></div>').join("") || '<p class="small">Nobody matches that search.</p>';
 }
 
@@ -436,7 +456,8 @@ document.addEventListener("click", async (e) => {
       msg(r.applied + " moves applied. Mentor routes were reassigned; generate the packs again.", true); return loadRebalance();
     }
     if (el("[data-ci=toggle]")) { await call("settings", { settings: { checkin_enabled: !ciData.enabled } }); return loadCheckin(); }
-    if (el("[data-arr]")) { const b = el("[data-arr]"); const p = ciData.people.find((x) => x.id === Number(b.dataset.arr)); ciData = await call("checkin", { id: p.id, arrived: !p.arrived }); $("#ciCount").textContent = ciData.arrived + " of " + ciData.seated; return drawCheckin(); }
+    if (el("[data-arr]")) { const b = el("[data-arr]"); const p = ciData.people.find((x) => x.id === Number(b.dataset.arr)); ciData = await call("checkin", { id: p.id, arrived: !p.arrived }); return drawCheckin(); }
+    if (el("[data-cif]")) { ciFilter = el("[data-cif]").dataset.cif; return drawCheckin(); }
     if (el("[data-gen]")) { const b = el("[data-gen]"); b.disabled = true; bfData.packs = await call("packs-generate", { role: b.dataset.gen }); bfRole = b.dataset.gen; msg("Packs generated. Preview one before sending.", true); drawRoles(); return drawPeople(); }
     if (el("[data-showrole]")) { bfRole = el("[data-showrole]").dataset.showrole; return drawPeople(); }
     if (el("[data-send]")) {

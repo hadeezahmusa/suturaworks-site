@@ -30,7 +30,7 @@ export async function checkinView(env) {
     people: results.map((r) => ({
       id: r.id, name: r.badge_name || r.name, ref: r.ticket_ref,
       where: r.table_index !== null ? tableName(r.table_index) : STAFF[r.kind] || "Staff",
-      arrived: !!r.arrived_at,
+      arrived: !!r.arrived_at, at: r.arrived_at || null, staff: r.table_index === null,
     })),
   };
 }
