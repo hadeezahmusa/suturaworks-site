@@ -10,7 +10,7 @@ export const DEFAULTS = {
   teams_frozen: false,                          // set by "Teams have been announced"
   brief_unlock_at: "2026-11-07T06:00:00Z",      // 7:00am on Saturday 7 November
   event_day: "2026-11-07",                      // judges' links work on this day only
-  arrival_time: { marshal: "8:00am", mentor: "10:15am", judge: "10:15am" },
+  arrival_time: { marshal: "8:00am", mentor: "9:45am", judge: "9:45am" },
   spokesperson: null,                           // a judge's ticket id
   chair_name: "Hadeezah Balarabe Musa",
   chair_phone: "+234 703 390 1986",
@@ -23,14 +23,18 @@ export const DEFAULTS = {
   critique_minutes: 35,
   response_minutes: 15,
   schedule: [
-    { t: "8:30", what: "Arrival" },
+    { t: "8:30", what: "Arrivals and check-in" },
+    { t: "10:00", what: "Opening, welcome and lead sponsor remarks" },
+    { t: "10:15", what: "Keynote" },
+    { t: "10:45", what: "Everyone seated" },
     { t: "10:50", what: "The sprint opens" },
     { t: "11:40", what: "Plans handed over" },
     { t: "11:45", what: "Critique" },
     { t: "12:20", what: "Response" },
     { t: "12:35", what: "Lunch" },
     { t: "13:30", what: "Presentations" },
-    { t: "14:50", what: "Feedback and recognitions" },
+    { t: "14:50", what: "Feedback, recognitions and close" },
+    { t: "16:00", what: "End" },
   ],
   rebalance_dismissed: "",                      // the table counts the flag was dismissed for
 };

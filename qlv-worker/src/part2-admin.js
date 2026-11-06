@@ -10,7 +10,7 @@ import { rebalanceState, rebalanceView, applyRebalance, dismissRebalance, announ
 import { checkinView, markArrival, arrivalsByTable } from "./checkin.js";
 import * as brief from "./briefings.js";
 import { tallyView, unlockScore } from "./scoring.js";
-import { stageView, stageAction, resetStage, displayLink } from "./stage.js";
+import { stageView, stageAction, resetStage, displayLink, removeJudgesPhoto } from "./stage.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -95,6 +95,7 @@ export function part2Routes(env, q, body, who, admins) {
     "GET stage": () => stageView(env),
     "POST stage": () => stageAction(env, body),
     "POST stage-reset": () => resetStage(env),
+    "POST judges-photo-remove": () => removeJudgesPhoto(env),
     "GET display-link": () => displayLink(env),
   };
 }

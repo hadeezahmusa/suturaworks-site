@@ -76,11 +76,21 @@ footer.progress .on span { color: var(--yel); }
 .thanks { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 48px; text-align: center; }
 .thanks .names { display: flex; flex-wrap: wrap; justify-content: center; gap: 22px 28px; max-width: 1600px; }
 .thanks .wall { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 30px; max-width: 1770px; }
-.thanks .wall .tile { display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 20px; box-shadow: 0 18px 40px rgba(3,10,30,.45);
+.thanks .wall .tile { display: flex; align-items: center; justify-content: center; border-radius: 20px;
   opacity: 0; animation-name: pop, bob; animation-timing-function: cubic-bezier(.2,1.4,.4,1), ease-in-out; animation-iteration-count: 1, infinite; animation-direction: normal, alternate; animation-fill-mode: forwards, none; }
 .thanks .wall .tile:nth-child(odd) { --tilt: -1.2deg; } .thanks .wall .tile:nth-child(even) { --tilt: 1.2deg; }
-.thanks .wall img { max-width: 84%; max-height: 74%; object-fit: contain; }
-.thanks .wall b { font-family: var(--display); font-weight: 700; color: #0F2B63; text-align: center; line-height: 1.15; padding: 0 8%; }
+.thanks .wall img { max-width: 90%; max-height: 80%; object-fit: contain; }
+.thanks .wall b { font-family: var(--display); font-weight: 700; color: #fff; text-align: center; line-height: 1.15; padding: 0 8%; }
+.sched.long { gap: 8px; padding: 26px 32px; } .sched.long div { font-size: 22px; padding-top: 8px; } .sched.long b { font-size: 26px; }
+/* who is speaking, and the judges' photo */
+.speaker { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; text-align: center; }
+.speaker .logo { height: 300px; max-width: 1300px; display: flex; align-items: center; justify-content: center; opacity: 0; animation: pop .8s cubic-bezier(.2,1.4,.4,1) .2s forwards; }
+.speaker .logo img { max-height: 100%; max-width: 100%; object-fit: contain; }
+.speaker .who { display: flex; flex-direction: column; gap: 14px; opacity: 0; animation: rise .6s ease-out .7s forwards; }
+.speaker .who .big { font-size: 84px; } .speaker .who .lede { font-size: 36px; }
+.judges { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; text-align: center; }
+.judges .photo { max-width: 1500px; height: 700px; display: flex; align-items: center; justify-content: center; opacity: 0; animation: pop .8s cubic-bezier(.2,1.4,.4,1) .2s forwards; }
+.judges .photo img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 24px; box-shadow: 0 24px 60px rgba(3,10,30,.55); }
 @keyframes bob { from { opacity: 1; transform: translateY(0) rotate(0deg); } to { opacity: 1; transform: translateY(-16px) rotate(var(--tilt, 1deg)); } }
 .thanks .names span { font-family: var(--display); font-weight: 700; font-size: 54px; padding: 18px 34px; border-radius: 18px; background: rgba(255,255,255,.07); border: 1px solid rgba(143,182,232,.35);
   opacity: 0; animation: pop .6s cubic-bezier(.2,1.4,.4,1) forwards; }

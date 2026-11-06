@@ -12,7 +12,7 @@ import { handleAdmin } from "./admin.js";
 import { seatPending } from "./seating.js";
 import { briefFor } from "./briefings.js";
 import { scoringPage, submitScore } from "./scoring.js";
-import { displayPoll } from "./stage.js";
+import { displayPoll, getJudgesPhoto } from "./stage.js";
 import { getLogo } from "./logos.js";
 import * as lobby from "./lobby.js";
 import { codeFor, FREE_REF } from "./partnercodes.js";
@@ -618,6 +618,7 @@ export default {
 
     // Sponsor logos for the projector: images, not JSON.
     if (url.pathname === "/api/logo" && req.method === "GET") return getLogo(env, url);
+    if (url.pathname === "/api/judges-photo" && req.method === "GET") return getJudgesPhoto(env);
     // The "How the sprint works" guide: counted, then the PDF on the site.
     if (url.pathname === "/api/certificate" && req.method === "GET") {
       const { certificateFile } = await import("./certs.js");

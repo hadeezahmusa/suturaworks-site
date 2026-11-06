@@ -72,7 +72,7 @@ function rows(pairs) {
 export function dayLines(t) {
   const d1 = ["D1", "Fri 6 Nov, 4:00pm. Virtual, link sent the day before"];
   const d2 = ["D2", "Sat 7 Nov, 8:30am to 4:00pm. Transcorp Hilton, Abuja"];
-  if (t.kind === "adviser") return [["D2", "Sat 7 Nov, 10:15am to about 3:00pm. Transcorp Hilton, Abuja"]];
+  if (t.kind === "adviser") return [["D2", "Sat 7 Nov, 9:45am to about 4:00pm. Transcorp Hilton, Abuja"]];
   if (t.days === "sat") return [d2];
   if (t.days === "fri") return [d1];
   return [d1, d2];
@@ -397,10 +397,10 @@ export function adviserIcs(t) {
   const lines = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//JCI Aso//QLV 2026//EN", "METHOD:PUBLISH", "BEGIN:VEVENT",
     `UID:${t.ticket_ref}@qlv2026.suturaworks.com`, `DTSTAMP:${stamp}`,
-    "DTSTART:20261107T091500Z", "DTEND:20261107T140000Z",
+    "DTSTART:20261107T084500Z", "DTEND:20261107T150000Z",
     "SUMMARY:QLV 2026, adviser and judge",
     "LOCATION:Transcorp Hilton\\, Abuja",
-    `DESCRIPTION:Reference ${t.ticket_ref}. Arrive 10:15am to collect your badge and roving route at the desk.`,
+    `DESCRIPTION:Reference ${t.ticket_ref}. Arrive 9:45am to collect your badge and roving route at the desk.`,
     "END:VEVENT", "END:VCALENDAR",
   ];
   return lines.join("\r\n") + "\r\n";

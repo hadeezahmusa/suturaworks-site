@@ -172,7 +172,7 @@ export function sparesPack(site, ctx) {
 
 export function judgeGuide(site, ctx, judge, criteriaText) {
   const crit = parseCriteria(criteriaText);
-  const day = [["10:15am", "Arrive, collect your badge and your scoring link"], ["12:35pm", "Lunch. Each table's plan, critique and response sheets reach the judges' table to read"],
+  const day = [["9:45am", "Arrive, collect your badge and your scoring link"], ["12:35pm", "Lunch. Each table's plan, critique and response sheets reach the judges' table to read"],
     ["1:30pm", "Presentations, 3 to 5 minutes each, from the team's A2 board. Score each team straight after it presents"], ["About 2:35pm", "All scores in. The tally is checked"],
     ["2:50pm", "The panel's spokesperson gives feedback and the top three are announced"]];
   const p1 = `<div class="kick">For judges</div><h1>How to judge the sprint</h1>
@@ -215,7 +215,7 @@ export function mentorGuide(site, ctx) {
   const body = `<div class="kick">For mentors and advisors</div><h1>Help them think. Don't write it for them.</h1>
   <p>You look after two tables for the whole sprint, moving between them every ten minutes. Your route card shows which.</p>
   <h2 class="rule">Your day</h2><table class="t"><thead><tr><th style="width:28%">Time</th><th>What happens</th></tr></thead><tbody>${[
-    ["10:15am", "Arrive and collect your badge and route card"], ["10:50 to 11:40am", "The sprint. Ten minutes at each of your tables in turn"],
+    ["9:45am", "Arrive and collect your badge and route card"], ["10:50 to 11:40am", "The sprint. Ten minutes at each of your tables in turn"],
     ["11:40am to 12:35pm", "Handover, critique and response. You're off the floor"], ["12:35pm", "Lunch"],
     ["1:30pm", "Presentations. If you are also a judge, you don't score your two tables"]].map(([a, b]) => `<tr><td class="b">${a}</td><td>${b}</td></tr>`).join("")}</tbody></table>
   <div class="cols"><div><h2 class="rule">Do</h2><ul style="margin-top:2mm"><li>Ask before you suggest. "Who owns that step?" does more than "assign an owner".</li><li>Push them towards the test: could someone outside this table run this tomorrow?</li><li>Check they are using the A2 board, not one person's notebook.</li><li>Ask what they have assumed, and whether it is on the card.</li><li>Watch the quiet ones. Ask someone who hasn't spoken to explain the plan back.</li></ul></div>
