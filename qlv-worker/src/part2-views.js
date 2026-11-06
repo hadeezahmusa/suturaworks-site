@@ -343,7 +343,7 @@ async function loadStage() {
   const st = d.state;
   $("#stQueue").innerHTML = d.queue.map((q) => '<div class="q"><span><span class="small" style="margin-right:10px">' + esc(q.time) + '</span><b>' + esc(q.name) + '</b></span><span class="' + (q.state === "On stage" ? "st awaiting" : q.state ? "st released" : "") + '">' + esc(q.state) + '</span></div>').join("");
   const t = st.toggles;
-  $("#stToggles").innerHTML = [["partners", "Thank partners and sponsors"], ["schedule", "Show the day’s schedule"], ["animation", "Play the opening animation"]].map(([k, l]) =>
+  $("#stToggles").innerHTML = [["partners", "Thank our sponsors"], ["schedule", "Show the day’s schedule"], ["animation", "Play the opening animation"]].map(([k, l]) =>
     '<label style="display:flex;align-items:center;gap:10px;min-height:44px;font-size:13px"><input type="checkbox" data-toggle="' + k + '"' + (t[k] ? " checked" : "") + ' style="width:20px;height:20px">' + l + '</label>').join("");
   $("#stSpeakers").innerHTML = d.speakers.map((x) => '<button class="btn' + (st.speaker === x.id ? " gold" : " ghost") + '" data-speaker="' + x.id + '" style="width:100%;margin:0 0 8px;text-align:left">' + esc(x.label) + (x.logo ? "" : " (no logo yet)") + (st.speaker === x.id ? " · on screen" : "") + "</button>").join("") +
     (st.speaker ? '<button class="btn ghost" data-speaker="" style="width:100%">Take the speaker off the display</button>' : "");

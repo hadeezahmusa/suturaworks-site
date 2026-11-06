@@ -101,9 +101,9 @@ function sponsors() {
 // together, smallest. The level follows the logo size the Worker sends:
 // 4 lead, 3 supporting, 2 or 1 community. A level with nobody gets no slide.
 const LEVELS = [
-  { id: "lead", one: "Lead partner", many: "Lead partners", sizes: [4], secs: 15 },
-  { id: "supporting", one: "Supporting partner", many: "Supporting partners", sizes: [3], secs: 12 },
-  { id: "community", one: "Community partner", many: "Community partners", sizes: [2, 1], secs: 10 },
+  { id: "lead", one: "Lead Sponsor", many: "Lead Sponsors", sizes: [4], secs: 15 },
+  { id: "supporting", one: "Supporting Sponsor", many: "Supporting Sponsors", sizes: [3], secs: 12 },
+  { id: "community", one: "Community Sponsor", many: "Community Sponsors", sizes: [2, 1], secs: 10 },
 ];
 // Tile sizes on the 1920 by 1080 stage. A lone lead partner gets the biggest
 // tile; the gap between levels stays plain to see.
@@ -284,7 +284,7 @@ function sceneLunch() {
   const big = sponsors().filter((x) => x.size > 1).map((x) => esc(x.name));
   const small = sponsors().filter((x) => x.size === 1).length;
   const line = big.concat(small ? [small + " JCI Aso members' business" + (small === 1 ? "" : "es")] : []).join(" · ");
-  const thanks = st.toggles.partners && line ? '<span class="eyebrow" style="margin-top:20px">With thanks to our partners and sponsors</span><span class="lede" style="color:#F2F6FC">' + line + "</span>" : "";
+  const thanks = st.toggles.partners && line ? '<span class="eyebrow" style="margin-top:20px">With thanks to our sponsors</span><span class="lede" style="color:#F2F6FC">' + line + "</span>" : "";
   return '<div class="arrival"><div class="l"><span class="eyebrow">Lunch</span><span class="big" style="font-size:110px">Enjoy your lunch.</span><span class="lede">The judges are reading every plan, critique and response.</span>' + thanks + "</div>" +
     '<div style="display:flex;flex-direction:column;align-items:center;gap:30px">' +
     '<svg class="bowl" width="300" height="240" viewBox="0 0 300 240" aria-hidden="true"><g class="steam"><path d="M110 90 c -20 -30, 20 -40, 0 -70"/><path d="M150 90 c -20 -30, 20 -40, 0 -70"/><path d="M190 90 c -20 -30, 20 -40, 0 -70"/></g>' +
@@ -411,8 +411,8 @@ function runDemo() {
     schedule: [["8:30", "Arrival"], ["10:50", "The sprint opens"], ["11:40", "Plans handed over"], ["11:45", "Critique"], ["12:20", "Response"], ["12:35", "Lunch"], ["13:30", "Presentations"], ["14:50", "Feedback and recognitions"]].map(([t, what]) => ({ t, what })),
     order: names.map((name, i) => ({ name, time: times[i] })),
     chain: names.concat(names[0]),
-    partners: ["Sutura Works Limited", "Your lead partner", "A supporting partner", "A sponsor", "A member's business", "Another member's business"],
-    sponsors: [["Sutura Works Limited", 4], ["Your lead partner", 4], ["A supporting partner", 3], ["A sponsor", 2], ["A member's business", 1], ["Another member's business", 1]].map(([name, size]) => ({ name, size, logo: null })),
+    partners: ["Sutura Works Limited", "Your lead sponsor", "A supporting sponsor", "A sponsor", "A member's business", "Another member's business"],
+    sponsors: [["Sutura Works Limited", 4], ["Your lead sponsor", 4], ["A supporting sponsor", 3], ["A sponsor", 2], ["A member's business", 1], ["Another member's business", 1]].map(([name, size]) => ({ name, size, logo: null })),
     onStage: null, upNext: null, lastScores: null, podium: null,
   };
   st = { phase: "arrival", clock: { endsAt: null, pausedMs: null, totalMs: 0 }, toggles: { partners: true, schedule: true, animation: true }, revealed: false, flash: 0, version: 0 };

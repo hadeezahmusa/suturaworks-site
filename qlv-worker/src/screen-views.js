@@ -34,7 +34,7 @@ export const SCREEN_HTML = String.raw`
         <p class="small" style="margin:8px 0 0">Members' businesses are listed free and show at the small size.</p>
       </form>
       <div class="card"><h2>Preview</h2><div id="scPreview"></div><p class="small" style="margin:8px 0 0">A rough guide. On the day the logos drift gently in place, and a long list splits across two or more slides.</p></div>
-      <div class="note"><b>Sizes</b><br>Lead partner, or a sponsor who paid ₦200,000 or more: largest. Supporting partner, or ₦100,000 or more: large. Community partner and other sponsors: medium. Members' businesses: small.<br><br><b>Logos</b><br>PNG or JPG up to 1MB. Every logo shows in white on the dark screen: the page turns it white as it uploads, dropping a plain background. A logo on a busy or photo background may not come out cleanly.</div>
+      <div class="note"><b>Sizes</b><br>Lead Sponsor, or ₦200,000 or more for sponsored seats: largest. Supporting Sponsor, or ₦100,000 or more: large. Community Sponsor and other sponsored seats: medium. Members' businesses: small, on the Community Sponsors slides.<br><br><b>Logos</b><br>PNG or JPG up to 1MB. Every logo shows in white on the dark screen: the page turns it white as it uploads, dropping a plain background. A logo on a busy or photo background may not come out cleanly.</div>
     </div>
   </div>
 </div>`;
@@ -55,7 +55,7 @@ async function loadScreen(d) {
     '<tr><td colspan="5" class="small">Nobody yet. Partners and sponsors appear here when you add them, and you can add members\' businesses on the right.</td></tr>';
   const live = screenData.entries.filter((e) => e.live).sort((a, b) => b.size - a.size);
   const px = { 4: [64, 34], 3: [52, 28], 2: [42, 22], 1: [32, 18] };
-  $("#scPreview").innerHTML = '<span class="t">With thanks to our partners and sponsors</span><div class="w">' + live.slice(0, 24).map((e) =>
+  $("#scPreview").innerHTML = '<span class="t">With thanks to our sponsors</span><div class="w">' + live.slice(0, 24).map((e) =>
     '<i style="width:' + px[e.size][0] + "px;height:" + px[e.size][1] + "px;font-size:" + (4 + e.size) + 'px">' + (e.logo ? '<img alt="" src="' + esc(e.logo) + '">' : esc(e.name)) + "</i>").join("") + "</div>";
 }
 // Turns a logo white on a transparent background, the way the display
