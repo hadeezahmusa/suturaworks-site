@@ -133,7 +133,8 @@ function thanksPages() {
   const pages = [];
   for (const lv of LEVELS) {
     const list = all.filter((x) => lv.sizes.includes(x.size >= 4 ? 4 : x.size === 3 ? 3 : x.size === 2 ? 2 : 1));
-    for (const page of pack(list)) pages.push({ level: lv, list: page });
+    // Every Lead Sponsor gets a slide of their own.
+    for (const page of lv.id === "lead" ? list.map((x) => [x]) : pack(list)) pages.push({ level: lv, list: page });
   }
   return pages;
 }
@@ -392,6 +393,7 @@ async function poll() {
     if (d.data) { data = d.data; preloadLogos(); }
     lastOk = Date.now();
     $("#recon").hidden = true;
+    updateMusic();
     if (testChanged) { play("chime"); showToast(soundOn ? "Test sound" : "Sound is off: click the display"); }
     render();
   } catch {
@@ -454,9 +456,69 @@ $("#sound").addEventListener("click", async () => {
   // Browsers allow sound only after a click: prime both sounds silently.
   for (const a of Object.values(audio)) { a.muted = true; try { await a.play(); a.pause(); a.currentTime = 0; } catch { /* ignore */ } a.muted = false; }
   soundOn = true;
+  musicCtx();   // made inside the click, so the browser lets it play
   $("#sound").remove();
   showToast("Sound on");
+  updateMusic();
 });
+
+// ---------- arrival music ----------
+// A slow, low chord loop made here in the browser: nothing to license or
+// download over the venue wifi. Soft pads, a quiet bass and a sparse
+// arpeggio at 68 beats a minute. It plays only on Arrival, never while
+// someone is on the speaker slide, and fades in and out.
+const M = { ctx: null, out: null, on: false, next: 0, bar: 0, timer: null, stopAt: 0 };
+const BEAT = 60 / 68, VOLUME = 0.3;
+// Am9, Fmaj7, Cmaj7, Em7: two bars each.
+const CHORDS = [[45, 57, 60, 64, 71], [41, 57, 60, 64, 69], [36, 55, 59, 64, 67], [40, 55, 59, 62, 67]];
+const hz = (m) => 440 * 2 ** ((m - 69) / 12);
+function musicCtx() {
+  if (M.ctx) return M.ctx;
+  const C = window.AudioContext || window.webkitAudioContext;
+  if (!C) return null;
+  M.ctx = new C();
+  const lp = M.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2200;
+  M.out = M.ctx.createGain(); M.out.gain.value = 0;
+  M.out.connect(lp); lp.connect(M.ctx.destination);
+  return M.ctx;
+}
+function voice(type, f, t, len, peak, attack, release, cutoff) {
+  const c = M.ctx, o = c.createOscillator(), g = c.createGain(), fl = c.createBiquadFilter();
+  o.type = type; o.frequency.value = f; fl.type = "lowpass"; fl.frequency.value = cutoff;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + attack);
+  g.gain.setValueAtTime(peak, t + Math.max(attack, len - release)); g.gain.linearRampToValueAtTime(0, t + len);
+  o.connect(fl); fl.connect(g); g.connect(M.out); o.start(t); o.stop(t + len + 0.05);
+}
+function scheduleBar(t, bar) {
+  const ch = CHORDS[Math.floor(bar / 2) % CHORDS.length], barLen = BEAT * 4;
+  if (bar % 2 === 0) for (const m of ch.slice(1)) for (const d of [-4, 4]) {   // the pad, two slightly detuned voices per note
+    voice("triangle", hz(m) * 2 ** (d / 1200), t, barLen * 2 + 0.6, 0.035, 1.6, 2.2, 900);
+  }
+  voice("sine", hz(ch[0]), t, BEAT * 1.8, 0.12, 0.04, 0.8, 400);               // bass on 1 and 3
+  voice("sine", hz(ch[0]), t + BEAT * 2, BEAT * 1.6, 0.09, 0.04, 0.8, 400);
+  const arp = [ch[2] + 12, ch[3] + 12, ch[4] + 12, ch[3] + 12];
+  [0.5, 1.5, 2.5, 3.5].forEach((b, i) => { if ((bar + i) % 3 !== 2) voice("sine", hz(arp[i]), t + BEAT * b, 1.2, 0.03, 0.01, 1.1, 3000); });
+}
+function musicTick() {
+  if (!M.ctx) return;
+  while (M.next < M.ctx.currentTime + 1.5) { scheduleBar(M.next, M.bar); M.next += BEAT * 4; M.bar++; }
+}
+function updateMusic() {
+  const want = !DEMO && soundOn && st && st.phase === "arrival" && !st.speaker && st.toggles.music !== false;
+  if (want === M.on || !musicCtx()) return;
+  M.on = want;
+  const c = M.ctx, now = c.currentTime;
+  M.out.gain.cancelScheduledValues(now); M.out.gain.setValueAtTime(M.out.gain.value, now);
+  if (want) {
+    c.resume();
+    if (!M.timer || now > M.stopAt) { clearInterval(M.timer); M.next = now + 0.1; M.bar = 0; M.timer = setInterval(musicTick, 250); musicTick(); }
+    M.out.gain.linearRampToValueAtTime(VOLUME, now + 3);
+  } else {
+    M.out.gain.linearRampToValueAtTime(0, now + 2.5);
+    M.stopAt = now + 2.6;
+    setTimeout(() => { if (!M.on) { clearInterval(M.timer); M.timer = null; } }, 2700);
+  }
+}
 $("#fs").addEventListener("click", () => document.documentElement.requestFullscreen?.().catch(() => {}));
 document.addEventListener("fullscreenchange", () => document.body.classList.toggle("full", !!document.fullscreenElement));
 let idle;

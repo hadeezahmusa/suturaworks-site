@@ -1014,7 +1014,7 @@ const TICKET = {
   judge: { chip: "Judge or mentor", bg: "#184E9E", fg: "#fff" },
   sponsored: { chip: "Sponsored seat", bg: "#16537A", fg: "#fff" },
   adviser: { chip: "Adviser", bg: "transparent", fg: "#0F2B63", border: "1.5px solid #0F2B63" },
-  partner: { chip: "Partner", bg: "#1F5F5B", fg: "#fff" },
+  partner: { chip: "Sponsor", bg: "#1F5F5B", fg: "#fff" },
   facilitator: { chip: "Facilitator", bg: "#EFC22D", fg: "#0F2B63" },
 };
 

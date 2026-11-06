@@ -13,6 +13,9 @@ import { PARTNER_LEVELS } from "./config.js";
 const MAX_LOGO = 1024 * 1024;
 const SIZE_LABEL = { 4: "Largest", 3: "Large", 2: "Medium", 1: "Small" };
 const LEVEL_SIZE = { lead: 4, supporting: 3, community: 2 };
+// Sponsored-seat bookings the Chair treats as Lead Sponsors: largest logo,
+// their own slide, and on screen whether or not the payment is in yet.
+const LEAD_SPONSORS = new Set(["QLV26-017"]);
 const clean = (v, max = 120) => String(v ?? "").replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, max);
 
 function sponsorSize(amount) {
@@ -42,9 +45,10 @@ async function everyone(env) {
   }
   for (const s of sponsors.results) {
     const row = by[`sponsor:${s.ref}`];
-    const paid = s.status === "verified" || s.status === "confirmed";
+    const lead = LEAD_SPONSORS.has(s.ref);
+    const paid = lead || s.status === "verified" || s.status === "confirmed";
     out.push({
-      key: `sponsor:${s.ref}`, source: "sponsor", registered: s.name, name: (row && row.name) || s.name, size: sponsorSize(s.amount),
+      key: `sponsor:${s.ref}`, source: "sponsor", registered: s.name, name: (row && row.name) || s.name, size: lead ? 4 : sponsorSize(s.amount),
       detail: `${s.ref}, ${s.size} sponsored seats`, row,
       live: paid && !!s.named_publicly,
       why: !s.named_publicly ? "Asked to stay anonymous, so never shown" : paid ? "" : "Shows once the payment is verified",
@@ -85,7 +89,7 @@ async function rowFor(env, key, who) {
     return r;
   }
   if (source === "partner") {
-    if (!(await env.DB.prepare("SELECT id FROM partners WHERE id = ?").bind(Number(ref)).first())) throw new HttpError(404, "That partner is not there. Refresh the page.");
+    if (!(await env.DB.prepare("SELECT id FROM partners WHERE id = ?").bind(Number(ref)).first())) throw new HttpError(404, "That sponsor is not there. Refresh the page.");
   } else if (source === "sponsor") {
     if (!(await env.DB.prepare("SELECT ref FROM registrations WHERE ref = ? AND tier = 'sponsored'").bind(ref).first())) throw new HttpError(404, "That sponsor is not there. Refresh the page.");
   } else throw new HttpError(400, "Unknown entry.");

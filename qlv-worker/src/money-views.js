@@ -27,7 +27,7 @@ export const MONEY_HTML = String.raw`
 <div id="moneyView" hidden>
   <div class="printhead">JCI Aso · QLV 2026 · Money summary · <span id="mPrinted"></span></div>
   <div class="noprint" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;margin:0 0 12px">
-    <p class="small" style="margin:0;max-width:640px">Ticket sales and partnerships are counted automatically once a payment is verified or a partner is confirmed. Record spending, in-kind support and any other income here. Admin and the treasurer can see this page; only admin records entries.</p>
+    <p class="small" style="margin:0;max-width:640px">Ticket sales and sponsorships are counted automatically once a payment is verified or a sponsor is confirmed. Record spending, in-kind support and any other income here. Admin and the treasurer can see this page; only admin records entries.</p>
     <div class="actions" style="margin:0"><a class="btn phone" href="#mForm" style="text-decoration:none;align-items:center">Record an entry</a><a class="btn ghost" href="/admin/export/money.csv" style="text-decoration:none;display:inline-flex;align-items:center">Download money CSV</a><button class="btn ghost" data-mprint="1">Print summary</button></div>
   </div>
   <div class="tiles" id="mTiles"></div>
@@ -35,7 +35,7 @@ export const MONEY_HTML = String.raw`
     <div class="list" style="flex:3 1 600px">
       <div class="card" style="margin:0 0 14px"><h2>Income</h2>
         <h3>Ticket sales</h3><table class="sum"><thead><tr><th>Ticket type</th><th class="n">Bookings</th><th class="n">Seats</th><th class="n">Amount</th></tr></thead><tbody id="mTickets"></tbody></table>
-        <h3>Partnerships</h3><table class="sum"><thead><tr><th>Partner</th><th>Level</th><th class="n">Confirmed</th><th class="n">Amount</th></tr></thead><tbody id="mPartners"></tbody></table>
+        <h3>Sponsorships</h3><table class="sum"><thead><tr><th>Sponsor</th><th>Level</th><th class="n">Confirmed</th><th class="n">Amount</th></tr></thead><tbody id="mPartners"></tbody></table>
         <h3>Other income</h3><table class="sum"><tbody id="mOther"></tbody></table>
       </div>
       <div class="card" style="margin:0 0 14px"><h2>Expected, not yet counted</h2><div class="exp" id="mExpected"></div></div>
@@ -78,7 +78,7 @@ let mKind = "spend", mData = null, mFilter = "all", mReady = false;
 const M_HELP = {
   spend: "Money paid out for the event, or a bill still to pay.",
   in_kind: "Something given instead of money, like printed flyers or hosting the registration. No cash moves, but it counts towards the full cost and the thank-yous in the report.",
-  income: "Cash received that is not a ticket or a partnership, such as a donation. Tickets and partnerships are already counted.",
+  income: "Cash received that is not a ticket or a sponsorship, such as a donation. Tickets and sponsorships are already counted.",
 };
 const M_LABELS = { spend: ["What it was for", "Paid to", "Amount (₦)"], in_kind: ["What was given", "Given by", "Estimated value (₦)"], income: ["What it was", "Received from", "Amount (₦)"] };
 const mNaira = (n) => (n < 0 ? "-" : "") + naira(Math.abs(n));
@@ -115,7 +115,7 @@ async function loadMoney() {
   const inKindCount = d.entries.filter((e) => e.kind === "in_kind").length;
   const tile = (label, value, sub, cls) => '<div class="tile' + (cls ? " " + cls : "") + '"><span>' + label + "</span><b>" + value + "</b>" + (sub ? "<small>" + sub + "</small>" : "") + "</div>";
   $("#mTiles").innerHTML =
-    tile("Cash received", mNaira(t.cashIn), "Tickets " + mNaira(t.tickets) + " · Partnerships " + mNaira(t.partners) + (t.other ? " · Other " + mNaira(t.other) : "")) +
+    tile("Cash received", mNaira(t.cashIn), "Tickets " + mNaira(t.tickets) + " · Sponsorships " + mNaira(t.partners) + (t.other ? " · Other " + mNaira(t.other) : "")) +
     tile("Cash spent", mNaira(t.paid)) +
     tile("Cash in hand", mNaira(t.balance), t.owed ? "After bills still owed: " + mNaira(t.afterOwed) : "Received less spent") +
     tile("Still owed", mNaira(t.owed), plural(d.expected.owed.n, "bill", "bills") + " to pay") +
@@ -127,8 +127,8 @@ async function loadMoney() {
     '<tr><td colspan="4" class="small">No verified ticket payments yet.</td></tr>') +
     '<tr class="tot"><td>Ticket sales</td><td class="n">' + k.bookings + '</td><td class="n">' + k.seats + '</td><td class="n">' + mNaira(k.amount) + "</td></tr>";
   $("#mPartners").innerHTML = (d.partners.map((p) => "<tr><td>" + esc(p.name) + "</td><td>" + esc(p.level) + '</td><td class="n">' + esc(when(p.confirmed_at)) + '</td><td class="n">' + mNaira(p.amount) + "</td></tr>").join("") ||
-    '<tr><td colspan="4" class="small">No confirmed partners yet.</td></tr>') +
-    '<tr class="tot"><td colspan="3">Partnerships</td><td class="n">' + mNaira(t.partners) + "</td></tr>";
+    '<tr><td colspan="4" class="small">No confirmed sponsors yet.</td></tr>') +
+    '<tr class="tot"><td colspan="3">Sponsorships</td><td class="n">' + mNaira(t.partners) + "</td></tr>";
   const other = d.entries.filter((e) => e.kind === "income");
   $("#mOther").innerHTML = (other.map((e) => "<tr><td>" + esc(e.description) + (e.party ? '<div class="small">From ' + esc(e.party) + "</div>" : "") + '</td><td class="n">' + mNaira(e.amount) + "</td></tr>").join("") ||
     '<tr><td colspan="2" class="small">None recorded.</td></tr>') + (other.length ? '<tr class="tot"><td>Other income</td><td class="n">' + mNaira(t.other) + "</td></tr>" : "");
@@ -137,7 +137,7 @@ async function loadMoney() {
   if (x.proofIn.n) lines.push([plural(x.proofIn.n, "booking", "bookings") + " with proof uploaded, waiting to be checked", x.proofIn.amount]);
   if (x.queried.n) lines.push([plural(x.queried.n, "booking", "bookings") + " queried", x.queried.amount]);
   if (x.noProof.n) lines.push([plural(x.noProof.n, "booking", "bookings") + " with no proof of payment yet", x.noProof.amount]);
-  if (x.partners.n) lines.push([plural(x.partners.n, "partner", "partners") + " awaiting payment: " + x.partners.names.join(", "), x.partners.amount]);
+  if (x.partners.n) lines.push([plural(x.partners.n, "sponsor", "sponsors") + " awaiting payment: " + x.partners.names.join(", "), x.partners.amount]);
   if (x.owed.n) lines.push([plural(x.owed.n, "bill", "bills") + " still to pay", -x.owed.amount]);
   $("#mExpected").innerHTML = lines.length ? lines.map(([a, b]) => "<div><span>" + esc(a) + "</span><b>" + mNaira(b) + "</b></div>").join("") : '<p class="small" style="margin:0">Nothing outstanding.</p>';
 

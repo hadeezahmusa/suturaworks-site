@@ -49,7 +49,7 @@ select{width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;pa
 
 export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + CERTS_HTML + OFFICE_HTML + String.raw`
 <div id="tablesView" hidden>
-  <p class="small" style="margin:0 0 12px">A seat fills when a payment is verified, or when a partner or sponsored seat is claimed. Only admin sees this page. Nothing here reaches participants.</p>
+  <p class="small" style="margin:0 0 12px">A seat fills when a payment is verified, or when a sponsor or sponsored seat is claimed. Only admin sees this page. Nothing here reaches participants.</p>
   <div id="lateT"></div>
   <div class="card" id="stkBox" style="margin:0 0 14px" hidden></div>
   ${SPRINT_HTML}
@@ -70,22 +70,22 @@ export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + CERTS_HTML + O
   <p class="small" style="margin:0 0 12px">Partners never register themselves. You add the partner, confirm it, and each person they send claims their own seat with a link.</p>
   <div class="grid">
     <div class="list" style="flex:3 1 560px">
-      <div class="card" style="padding:0;overflow-x:auto;margin:0 0 14px"><div style="padding:14px 16px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><h2>All partners</h2><span class="small" id="pIncome"></span></div>
-        <table><thead><tr><th>Partner</th><th>Level</th><th>Investment</th><th>Status</th><th>Seats claimed</th></tr></thead><tbody id="pRows"></tbody></table></div>
+      <div class="card" style="padding:0;overflow-x:auto;margin:0 0 14px"><div style="padding:14px 16px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><h2>All sponsors</h2><span class="small" id="pIncome"></span></div>
+        <table><thead><tr><th>Sponsor</th><th>Level</th><th>Investment</th><th>Status</th><th>Seats claimed</th></tr></thead><tbody id="pRows"></tbody></table></div>
       <div id="pDetail"></div>
       <div class="card" id="pcBox" style="padding:0;overflow-x:auto;margin:14px 0 0" hidden></div>
     </div>
     <div class="side" style="flex:1 1 320px">
-      <form class="card" id="pForm"><h2>Add a partner</h2>
-        <label class="fl">Partner organisation<input type="text" name="name" placeholder="Organisation name" required></label>
+      <form class="card" id="pForm"><h2>Add a sponsor</h2>
+        <label class="fl">Sponsor organisation<input type="text" name="name" placeholder="Organisation name" required></label>
         <div class="small" style="font-weight:600;margin:0 0 6px">Level</div><div id="pLevels"></div>
         <div class="sumtile"><span>Fills in from the level</span><b id="pSum"></b></div>
         <label class="fl">Contact person<input type="text" name="contactName" placeholder="Who receives the claim links" required></label>
         <label class="fl">Contact email<input type="email" name="contactEmail" placeholder="name@organisation.com" required></label>
-        <button class="btn" style="width:100%">Create partner</button>
-        <p class="small" style="margin:8px 0 0">The partner starts as awaiting payment. Mark it confirmed once you have checked the payment. The claim links go out then.</p>
+        <button class="btn" style="width:100%">Create sponsor</button>
+        <p class="small" style="margin:8px 0 0">The sponsor starts as awaiting payment. Mark it confirmed once you have checked the payment. The claim links go out then.</p>
       </form>
-      <div class="note"><b>What a claimed seat becomes</b><br>A normal ticket with its own reference, linked to the partner. It takes a table when claimed. The badge shows the person's name and table only, never the partner level.</div>
+      <div class="note"><b>What a claimed seat becomes</b><br>A normal ticket with its own reference, linked to the sponsor. It takes a table when claimed. The badge shows the person's name and table only, never the partner level.</div>
     </div>
   </div>
 </div>
@@ -122,10 +122,10 @@ export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + CERTS_HTML + O
     <div class="list card" style="flex:3 1 640px;overflow-x:auto"><h2>What the file contains</h2>
       <table style="min-width:760px"><thead><tr><th>Name</th><th>Badge name</th><th>Table</th><th>Seat</th><th>Ticket</th><th>Type</th><th>Organisation</th><th>Days</th></tr></thead><tbody id="eRows"></tbody></table>
       <ul class="small" style="padding-left:18px"><li>Badge name is filled from the registered name. Correct it here before printing if someone typed a nickname or a typo. It saves when you leave the box.</li>
-      <li>Partner tickets show the type Partner. The partner level is never in the file.</li><li>Facilitators, advisers and judges show their role where the table would be.</li>
+      <li>Sponsor tickets show the type Sponsor. The sponsor level is never in the file.</li><li>Facilitators, advisers and judges show their role where the table would be.</li>
       <li>Anyone verified or claimed after the lock goes under late additions, seated by the same rules.</li></ul></div>
     <div class="side" style="flex:1 1 300px"><div class="small" style="font-weight:600;margin:0 0 8px">Badge, as printed</div><div id="eBadges" style="display:flex;flex-wrap:wrap;gap:14px"></div>
-      <p class="small">Participants show their table. Staff show their role. Nobody shows a partner level or a ticket price.</p></div>
+      <p class="small">Participants show their table. Staff show their role. Nobody shows a sponsor level or a ticket price.</p></div>
   </div>
 </div>`;
 
@@ -157,8 +157,8 @@ async function loadTables() {
     '<div class="tile"><span>Tables in use</span><b>' + d.totals.tables + '</b></div>' +
     '<div class="tile"><span>JCI Aso members seated</span><b>' + d.totals.members + '</b></div>' +
     '<div class="tile gold"><span>Next verified seat goes to</span><b>' + esc(d.totals.next) + '</b></div>' +
-    '<div class="tile"><span>Held for partners, sponsors and group links, not yet claimed</span><b>' + (h.partner + h.sponsored) + '</b><span>' + h.partner + " partner · " + h.sponsored + " sponsored or group</span></div>";
-  $("#tKey").innerHTML = ["J JCI Aso member", "S Standard", "C Corporate", "P Sponsored", "T Partner"].map((x) => "<span>" + dot(x[0]) + x.slice(2) + "</span>").join("") +
+    '<div class="tile"><span>Held for sponsors, sponsored seats and group links, not yet claimed</span><b>' + (h.partner + h.sponsored) + '</b><span>' + h.partner + " sponsor · " + h.sponsored + " sponsored or group</span></div>";
+  $("#tKey").innerHTML = ["J JCI Aso member", "S Standard", "C Corporate", "P Sponsored", "T Sponsor"].map((x) => "<span>" + dot(x[0]) + x.slice(2) + "</span>").join("") +
     '<span><i style="border:1.5px dashed var(--rule);color:var(--mute);font-weight:400">4</i>Empty seat</span>' +
     '<span><i style="border:3px solid #2F6F4E;background:#2C3E58"></i>Coloured ring: same organisation</span>' +
     '<span><i style="border:3px solid #B3402D;background:var(--navy)"></i>Red ring: two from one organisation share a table</span>';
@@ -184,10 +184,10 @@ async function loadTables() {
 async function loadPartners() {
   const d = await call("partners");
   levels = d.levels;
-  $("#pIncome").textContent = "Confirmed partner income " + d.income.confirmedText + ". Kept apart from ticket income.";
-  $("#pRows").innerHTML = d.partners.map((p) => '<tr data-partner="' + p.id + '"' + (curPartner === p.id ? ' class="sel"' : "") + "><td><b>" + esc(p.name) + "</b></td><td>" + esc(p.levelName.replace(" partner", "")) + "</td><td>" + p.amountText + "</td><td>" +
+  $("#pIncome").textContent = "Confirmed sponsor income " + d.income.confirmedText + ". Kept apart from ticket income.";
+  $("#pRows").innerHTML = d.partners.map((p) => '<tr data-partner="' + p.id + '"' + (curPartner === p.id ? ' class="sel"' : "") + "><td><b>" + esc(p.name) + "</b></td><td>" + esc(p.levelName.replace(" Sponsor", "")) + "</td><td>" + p.amountText + "</td><td>" +
     (p.status === "confirmed" ? '<span class="pill ok">Confirmed</span>' : '<span class="pill wait">Awaiting payment</span>') + "</td><td>" + (p.status === "confirmed" ? p.claimed + " of " + p.seats_total : "Not yet") + "</td></tr>").join("") ||
-    '<tr><td colspan="5" class="small">No partners yet. Add one on the right.</td></tr>';
+    '<tr><td colspan="5" class="small">No sponsors yet. Add one on the right.</td></tr>';
   drawLevels();
   if (curPartner) openPartner(curPartner).catch(() => {});
   if (ROLE === "admin") loadPartnerCodes().catch((err) => msg(err.message));
@@ -205,7 +205,7 @@ function drawPartnerCodes(d) {
     '<p class="small" style="margin:4px 0 10px">The JCI Aso members\' businesses on the On screen tab. Each has one code for one free ticket. Their nominee types it at <a href="' + esc(d.link) + '" target="_blank" rel="noopener">' + esc(d.link) + '</a> until registration closes. ' +
     d.redeemed + " of " + d.total + " used.</p></div>" +
     (missing ? '<button class="btn" data-pc="create">Make ' + missing + (missing === 1 ? " code" : " codes") + "</button>" : '<button class="btn ghost" data-pc="copy">Copy the link</button>') + "</div></div>" +
-    '<table><thead><tr><th>Partner</th><th>Logo</th><th>Code</th><th>Nominee</th><th></th></tr></thead><tbody>' +
+    '<table><thead><tr><th>Sponsor</th><th>Logo</th><th>Code</th><th>Nominee</th><th></th></tr></thead><tbody>' +
     d.rows.map((r) => "<tr><td><b>" + esc(r.name) + "</b></td><td>" + (r.hasLogo ? '<span class="pill ok">Yes</span>' : '<span class="pill off">No</span>') + "</td>" +
       '<td class="mono">' + (r.code ? esc(r.code) : '<span class="small">None yet</span>') + "</td><td class=\"small\">" +
       (r.redeemed ? esc(r.redeemed.name) + " · " + esc(r.redeemed.ref) + (r.redeemed.cancelled ? " · cancelled" : "") + "<br>" + esc(when(r.redeemed.at)) : r.code ? "Not used yet" : "") + "</td><td>" +
@@ -217,7 +217,7 @@ document.addEventListener("click", async (e) => {
   const a = e.target.closest("[data-pc]"), n = e.target.closest("[data-pcnew]");
   if (!a && !n) return;
   try {
-    if (a && a.dataset.pc === "create") { drawPartnerCodes(await call("partner-codes-create", {})); msg("Codes made. Send each partner their own code with the link.", true); }
+    if (a && a.dataset.pc === "create") { drawPartnerCodes(await call("partner-codes-create", {})); msg("Codes made. Send each sponsor their own code with the link.", true); }
     if (a && a.dataset.pc === "copy") { await navigator.clipboard.writeText(pcData.link); msg("Link copied.", true); }
     if (n) {
       if (!confirm("Make a new code for " + n.dataset.name + "? The old code stops working straight away.")) return;
@@ -235,7 +235,7 @@ async function openPartner(id) {
   const d = await call("partner?id=" + id);
   const p = d.partner;
   document.querySelectorAll("#pRows tr").forEach((tr) => tr.classList.toggle("sel", Number(tr.dataset.partner) === id));
-  const head = '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><div><h2 style="margin:0">' + esc(p.name) + '</h2><span class="small">' + esc(p.levelName.replace(" partner", "")) + " · " + p.amountText + " · " + p.seats_total + (p.seats_total === 1 ? " seat" : " seats") + ", both days · " + (p.status === "confirmed" ? "confirmed" : "awaiting payment") +
+  const head = '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><div><h2 style="margin:0">' + esc(p.name) + '</h2><span class="small">' + esc(p.levelName.replace(" Sponsor", "")) + " · " + p.amountText + " · " + p.seats_total + (p.seats_total === 1 ? " seat" : " seats") + ", both days · " + (p.status === "confirmed" ? "confirmed" : "awaiting payment") +
     "<br>Contact: " + esc(p.contact_name) + ", " + esc(p.contact_email) + (p.payment_note ? "<br>Payment note: " + esc(p.payment_note) : "") + "</span></div>" +
     (p.status === "confirmed" ? '<button class="btn ghost" data-presend="">Send all unclaimed links again</button>' : "") + "</div>";
   let body;
@@ -263,7 +263,7 @@ async function loadExport() {
   $("#eStrip").innerHTML = "<span><b>Snapshot:</b> " + (d.lock ? when(d.lock.created_at) + " by " + esc(d.lock.created_by) : "not locked yet") + "</span>" +
     "<span><b>People:</b> " + s.participants + " participants, " + s.facilitators + " facilitators, " + s.advisers + " advisers, " + s.judges + " judges</span>" +
     "<span><b>Late additions:</b> " + (s.late || "none yet") + "</span>" +
-    "<span><b>Left out, not yet claimed:</b> " + d.held.partner + " partner and " + d.held.sponsored + " sponsored or group seats</span>";
+    "<span><b>Left out, not yet claimed:</b> " + d.held.partner + " sponsor and " + d.held.sponsored + " sponsored or group seats</span>";
   let lateShown = false;
   $("#eRows").innerHTML = d.rows.map((r) => {
     let pre = "";
@@ -288,7 +288,7 @@ document.addEventListener("click", async (e) => {
     if (el("[data-level]")) { level = el("[data-level]").dataset.level; drawLevels(); return; }
     if (el("tr[data-partner]")) { await openPartner(Number(el("tr[data-partner]").dataset.partner)); return; }
     if (el("[data-pconfirm]") !== null && el("[data-pconfirm]")) {
-      if (!confirm("Mark this partner's payment as confirmed and email the claim links to the contact?")) return;
+      if (!confirm("Mark this sponsor's payment as confirmed and email the claim links to the contact?")) return;
       await call("partner-confirm", { id: curPartner, note: $("#pNote").value }); msg("Confirmed. The claim links have gone to the contact.", true); loadPartners(); return;
     }
     if (el("[data-presend]")) {

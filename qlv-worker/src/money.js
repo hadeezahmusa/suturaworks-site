@@ -190,7 +190,7 @@ export async function moneyRows(env) {
     Reference: r.ref, "Recorded by": r.verified_by || "",
   });
   for (const p of d.partners.filter((x) => x.status === "confirmed")) rows.push({
-    Section: "Income: partnership", Date: day(p.confirmed_at), Category: PARTNER_LEVELS[p.level]?.name || p.level, Description: p.seats_total + (p.seats_total === 1 ? " seat" : " seats") + " included",
+    Section: "Income: sponsorship", Date: day(p.confirmed_at), Category: PARTNER_LEVELS[p.level]?.name || p.level, Description: p.seats_total + (p.seats_total === 1 ? " seat" : " seats") + " included",
     "From or to": p.name, "Amount (NGN)": p.amount, Status: "Received", Reference: p.reg_ref || "", Notes: p.payment_note || "", "Recorded by": p.created_by || "",
   });
   const section = { income: "Income: other", spend: "Spending", in_kind: "In-kind support" };

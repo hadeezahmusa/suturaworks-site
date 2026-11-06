@@ -41,7 +41,7 @@ export const SCREEN_HTML = String.raw`
 
 export const SCREEN_JS = String.raw`
 let screenData = null, screenUploadKey = null;
-const SC_GROUP = { partner: "Partner", sponsor: "Sponsored seats", member: "Member's business" };
+const SC_GROUP = { partner: "Sponsor", sponsor: "Sponsored seats", member: "Member's business" };
 async function loadScreen(d) {
   screenData = d || await call("screen");
   $("#scRows").innerHTML = screenData.entries.map((e) => '<tr class="' + (e.live ? "" : "sc-off") + '" data-sc="' + esc(e.key) + '">' +
@@ -52,7 +52,7 @@ async function loadScreen(d) {
     '<td style="white-space:nowrap"><button class="link" data-scup="1">' + (e.logo ? "Replace logo" : "Upload logo") + "</button>" +
     (e.logo ? ' · <button class="link" data-scnologo="1">Remove logo</button>' : "") +
     (e.source === "member" ? ' · <button class="link" data-scdel="1">Remove</button>' : "") + "</td></tr>").join("") ||
-    '<tr><td colspan="5" class="small">Nobody yet. Partners and sponsors appear here when you add them, and you can add members\' businesses on the right.</td></tr>';
+    '<tr><td colspan="5" class="small">Nobody yet. Sponsors appear here when you add them, and you can add members\' businesses on the right.</td></tr>';
   const live = screenData.entries.filter((e) => e.live).sort((a, b) => b.size - a.size);
   const px = { 4: [64, 34], 3: [52, 28], 2: [42, 22], 1: [32, 18] };
   $("#scPreview").innerHTML = '<span class="t">With thanks to our sponsors</span><div class="w">' + live.slice(0, 24).map((e) =>
