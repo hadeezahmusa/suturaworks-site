@@ -1264,6 +1264,8 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET screen": () => logos.screenList(env),
       "GET board-access": () => boardView(env),
       "GET lobby": () => lobby.lobbyAdmin(env),
+      "GET meet-mail": async () => (await import("./meetmail.js")).meetMailView(env),
+      "POST meet-mail-send": async () => (await import("./meetmail.js")).sendMeetMail(env),
       "GET sprint": async () => ({ ...(await sprint.assignments(env)), print: await sprint.printStatus(env), guideDownloads: await sprint.guideDownloads(env) }),
       "POST sprint-task": () => sprint.saveTask(env, body, who),
       "POST sprint-assign": () => sprint.autoAssign(env, who),

@@ -219,7 +219,9 @@ export async function createFacilitator(env, b, who) {
     env.DB.prepare(`INSERT INTO tickets (token, reg_ref, ticket_ref, kind, name, email, badge_name, days, created_at, sent_at)
       VALUES (?, ?, ?, 'facilitator', ?, ?, ?, ?, ?, ?)`).bind(t.token, ref, ref, name, email, t.badge_name, days, stamp, stamp),
   ]);
-  const ok = await sendMail(env, { to: email, ...mail.ticketIssued(t, {}, ticketLinks(env, t)) }, ref, "ticket_issued");
+  // Friday's speaker gets the Meet link in the ticket when added on the day.
+  const meet = days === "sat" ? null : await (await import("./meetmail.js")).meetToday(env);
+  const ok = await sendMail(env, { to: email, ...mail.ticketIssued(t, {}, { ...ticketLinks(env, t), meet }) }, ref, meet ? "ticket_meet" : "ticket_issued");
   return { ref, emailed: ok, ...(await staffList(env)) };
 }
 
