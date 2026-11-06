@@ -310,19 +310,24 @@ function sceneResults() {
     const stars = Array.from({ length: 40 }, (_, i) => '<i style="left:' + ((i * 211) % 1760) + "px;top:" + ((i * 97) % 760) + "px;animation-delay:" + (i % 7) * 0.4 + 's"></i>').join("");
     return '<div class="results"><div class="stars" aria-hidden="true" style="position:absolute;inset:0">' + stars + '</div><span class="eyebrow">Panel feedback</span><span class="big" style="font-size:110px">Feedback and recognitions</span><span class="lede">From the judges’ panel.</span></div>';
   }
-  const p = data.podium;
-  const order = [p[1], p[0], p[2]].filter(Boolean);
+  // One place at a time: third, then second, then the winner. Places not
+  // yet announced wait as an empty podium; the server doesn't send them.
+  const p = data.podium, step = st.revealStep || 3;
+  const shown = Object.fromEntries(p.map((x) => [x.place, x]));
+  const order = ["Second", "First", "Third"].map((place) => shown[place] || { place, hidden: true });
   const h = { First: 380, Second: 310, Third: 260 };
   const colours = ["#EFC22D", "#4FD2C2", "#8FB6E8", "#F2F6FC"];
-  const confetti = reduced ? "" : '<div class="confetti" aria-hidden="true">' + Array.from({ length: 70 }, (_, i) =>
+  const confetti = reduced || !shown.First ? "" : '<div class="confetti" aria-hidden="true">' + Array.from({ length: 70 }, (_, i) =>
     '<i style="left:' + ((i * 53) % 1776) + "px;background:" + colours[i % 4] + ";animation-duration:" + (5 + (i % 5)) + "s;animation-delay:-" + (i % 9) * 0.6 + "s;transform:rotate(" + i * 23 + 'deg)"></i>').join("") + "</div>";
   return '<div class="results">' + confetti + '<span class="big" style="font-size:96px">Recognitions</span><div class="podium">' +
-    order.map((x, i) => '<div class="p' + (x.place === "First" ? " first" : "") + '" style="min-height:' + h[x.place] + "px;animation-delay:" + (x.place === "Third" ? 0.2 : x.place === "Second" ? 0.6 : 1.1) + 's"><b>' + x.place.toUpperCase() + "</b><strong>" + esc(x.name) + "</strong><span>Average " + esc(x.avg) + " of 25</span></div>").join("") +
-    '</div><span class="lede">Plus the panel’s recognitions.</span></div>';
+    order.map((x) => x.hidden
+      ? '<div class="p wait" style="min-height:' + h[x.place] + 'px"><b>' + x.place.toUpperCase() + '</b><strong>?</strong></div>'
+      : '<div class="p' + (x.place === "First" ? " first" : "") + '" style="min-height:' + h[x.place] + 'px;animation-delay:.2s"><b>' + x.place.toUpperCase() + "</b><strong>" + esc(x.name) + "</strong><span>Average " + esc(x.avg) + " of 25</span></div>").join("") +
+    '</div><span class="lede">' + (shown.First ? "Plus the panel’s recognitions." : step === 1 ? "Second place is next." : "And the winner is…") + '</span></div>';
 }
 
 function render() {
-  const key = [st.speaker, data && data.judgesPhoto, st.phase, st.flash, data && data.onStage, st.revealed, JSON.stringify(st.toggles), slide, data && data.lastScores && data.lastScores.n, data && data.partners.join("/"), data && data.sponsors && data.sponsors.map((x) => x.logo).join("/")].join("|");
+  const key = [st.revealStep, data && data.podium && data.podium.length, st.speaker, data && data.judgesPhoto, st.phase, st.flash, data && data.onStage, st.revealed, JSON.stringify(st.toggles), slide, data && data.lastScores && data.lastScores.n, data && data.partners.join("/"), data && data.sponsors && data.sponsors.map((x) => x.logo).join("/")].join("|");
   if (key === sceneKey) return;
   sceneKey = key;
   clearInterval(hopTimer);
@@ -388,6 +393,8 @@ async function poll() {
     if (!res.ok) { if (!st) document.body.innerHTML = '<div class="err">' + esc(d.error || "This display link is not valid.") + "</div>"; return; }
     offset = d.serverNow - Date.now();
     const testChanged = lastTest !== null && d.testSound !== lastTest;
+    // Each place revealed gets a chime; the winner gets the gong and the flash.
+    if (st && d.revealStep > (st.revealStep || 0)) { if (d.revealStep >= 3) { play("gong"); flash(); } else play("chime"); }
     lastTest = d.testSound;
     st = { ...d, clock: d.clock };
     if (d.data) { data = d.data; preloadLogos(); }
@@ -432,7 +439,7 @@ function runDemo() {
     demoTime.speed = total ? total / ((secs - 2) * 1000) : 1;
     st.phase = phase; st.flash++; slide = 0;
     st.clock = total ? { endsAt: demoTime.v0 + total, pausedMs: null, totalMs: total } : { endsAt: null, pausedMs: null, totalMs: 0 };
-    st.revealed = extra === "revealed";
+    st.revealed = extra === "revealed"; st.revealStep = st.revealed ? 3 : 0;
     if (phase === "presentations") {
       data.onStage = names[extra]; data.upNext = names[extra + 1];
       data.lastScores = extra ? { name: names[extra - 1], n: 4, of: 4 } : null;

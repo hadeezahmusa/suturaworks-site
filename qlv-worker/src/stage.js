@@ -31,6 +31,7 @@ const BLANK = {
   presented: [],          // tables that have finished presenting
   toggles: { partners: true, schedule: true, animation: false, music: true },
   revealed: false,
+  revealStep: 0,          // places shown so far, one press each: third, then second, then the winner
   speaker: null,          // a SPEAKERS id while someone is speaking; cleared at each phase change
   testSound: 0,           // bumped by "Play a test sound"; the display plays a chime when it changes
   flash: 0,               // bumped at each phase start so the display can mark it
@@ -121,10 +122,13 @@ export async function stageAction(env, b) {
     const { computeTally } = await import("./scoring.js");
     const t = await computeTally(env);
     if (!t.allComplete) throw new HttpError(409, "Every team needs its full set of scores before the results can be shown.");
-    st.revealed = true;
+    const places = Math.min(3, t.order.length);
+    if (!st.revealed) { st.revealed = true; st.revealStep = 1; }
+    else st.revealStep = Math.min(places, (st.revealStep || places) + 1);
     if (st.phase !== "results") enterPhase(st, "results", s, tables);
   } else if (a === "hideResults") {
     st.revealed = false;
+    st.revealStep = 0;
   } else {
     throw new HttpError(400, "That is not a stage action.");
   }
@@ -151,6 +155,16 @@ function nextLabel(st, tables) {
     return remaining.length ? `Next team: ${tableName(remaining[0])}` : "Finish presentations";
   }
   return { arrival: "Start the sprint", sprint: "Lock and hand over", handover: "Open the critique", critique: "Return the critiques", response: "Start lunch", lunch: "Start presentations", results: null }[st.phase];
+}
+
+// Places on show: one more with each press of Reveal, lowest first. Only the
+// places already announced ever leave the server, so the winner can't be
+// read from the display page before it is shown. Older state without a step
+// shows all three.
+const revealStepOf = (st) => (st.revealed ? st.revealStep || 3 : 0);
+function podiumSoFar(t, st) {
+  const all = t.order.slice(0, 3).map((r, i) => ({ place: ["First", "Second", "Third"][i], name: r.name, avg: r.avgText }));
+  return all.slice(Math.max(0, all.length - revealStepOf(st)));
 }
 
 // What the display needs: public data only.
@@ -183,10 +197,10 @@ export async function displayData(env, st) {
       const t = await computeTally(env);
       const row = t.rows.find((r) => r.index === prev);
       if (row) out.lastScores = { name: row.name, n: row.scored, of: row.expected };
-      if (st.revealed) out.podium = t.order.slice(0, 3).map((r, i) => ({ place: ["First", "Second", "Third"][i], name: r.name, avg: r.avgText }));
+      if (st.revealed) out.podium = podiumSoFar(t, st);
     } else if (st.revealed) {
       const { computeTally } = await import("./scoring.js");
-      out.podium = (await computeTally(env)).order.slice(0, 3).map((r, i) => ({ place: ["First", "Second", "Third"][i], name: r.name, avg: r.avgText }));
+      out.podium = podiumSoFar(await computeTally(env), st);
     }
   }
   return out;
@@ -233,7 +247,7 @@ export async function displayPoll(env, url) {
   }
   const since = Number(url.searchParams.get("v") || -1);
   // Unchanged state: send only the clock, which is cheap and keeps the display honest.
-  const base = { version: st.version, serverNow: Date.now(), phase: st.phase, clock: st.clock, remainingMs: remainingMs(st.clock), testSound: st.testSound, flash: st.flash, toggles: st.toggles, revealed: st.revealed, speaker: st.speaker || null };
+  const base = { version: st.version, serverNow: Date.now(), phase: st.phase, clock: st.clock, remainingMs: remainingMs(st.clock), testSound: st.testSound, flash: st.flash, toggles: st.toggles, revealed: st.revealed, revealStep: revealStepOf(st), speaker: st.speaker || null };
   if (since === st.version) return base;
   return { ...base, data: await displayData(env, st) };
 }
