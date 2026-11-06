@@ -207,12 +207,12 @@ async function loadCheckin() {
 const CI_FILTERS = { all: ["Everyone", () => true], arrived: ["Arrived", (p) => p.arrived], waiting: ["Not arrived yet", (p) => !p.arrived], participants: ["Participants", (p) => !p.staff], staff: ["Staff", (p) => p.staff] };
 function drawCiDash() {
   const P = ciData.people, part = P.filter((p) => !p.staff), staff = P.filter((p) => p.staff);
-  const tile = (label, n, of) => '<div class="card" style="margin:0;flex:1 1 200px;padding:14px 16px"><div class="small">' + label + '</div><div style="font-size:30px;font-weight:700;line-height:1.1">' + n + ' <span style="font-size:15px;font-weight:600;color:var(--mute)">of ' + of + '</span></div>' +
-    '<div style="height:8px;background:var(--line);border-radius:4px;margin-top:8px;overflow:hidden"><i style="display:block;height:100%;width:' + (of ? Math.round(n / of * 100) : 0) + '%;background:#1F7D87"></i></div></div>';
-  const bars = ciData.tables.map((t) => '<div style="display:flex;align-items:center;gap:10px;font-size:13px;margin:6px 0"><b style="width:110px">' + esc(t.name) + '</b>' +
-    '<span style="flex:1;height:10px;background:var(--line);border-radius:5px;overflow:hidden"><i style="display:block;height:100%;width:' + (t.of ? Math.round(t.count / t.of * 100) : 0) + '%;background:#0F2B63"></i></span><span style="width:60px;text-align:right">' + t.count + ' of ' + t.of + '</span></div>').join("");
-  $("#ciDash").innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:0 0 12px">' + tile("Participants arrived", part.filter((p) => p.arrived).length, part.length) + tile("Staff arrived", staff.filter((p) => p.arrived).length, staff.length) + tile("Everyone", P.filter((p) => p.arrived).length, P.length) + '</div>' +
-    '<div class="card" style="margin:0;padding:12px 16px"><h2 style="margin:0 0 4px">By table</h2>' + bars + '</div>';
+  const tile = (label, n, of, f) => '<button type="button" data-cif="' + f + '" class="card" aria-pressed="' + (ciFilter === f) + '" style="margin:0;flex:1 1 200px;padding:14px 16px;text-align:left;font:inherit;color:inherit;cursor:pointer;' + (ciFilter === f ? "outline:2px solid #0F2B63;" : "") + '"><div class="small">' + label + '</div><div style="font-size:30px;font-weight:700;line-height:1.1">' + n + ' <span style="font-size:15px;font-weight:600;color:var(--mute)">of ' + of + '</span></div>' +
+    '<div style="height:8px;background:var(--line);border-radius:4px;margin-top:8px;overflow:hidden"><i style="display:block;height:100%;width:' + (of ? Math.round(n / of * 100) : 0) + '%;background:#1F7D87"></i></div></button>';
+  const bars = ciData.tables.map((t) => '<button type="button" data-cif="t:' + esc(t.name) + '" aria-pressed="' + (ciFilter === "t:" + t.name) + '" style="display:flex;width:100%;align-items:center;gap:10px;font:inherit;font-size:13px;margin:2px 0;padding:4px 6px;border:0;border-radius:6px;cursor:pointer;color:inherit;background:' + (ciFilter === "t:" + t.name ? "#EAF1FB" : "transparent") + '"><b style="width:110px;text-align:left">' + esc(t.name) + '</b>' +
+    '<span style="flex:1;height:10px;background:var(--line);border-radius:5px;overflow:hidden"><i style="display:block;height:100%;width:' + (t.of ? Math.round(t.count / t.of * 100) : 0) + '%;background:#0F2B63"></i></span><span style="width:60px;text-align:right">' + t.count + ' of ' + t.of + '</span></button>').join("");
+  $("#ciDash").innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:0 0 12px">' + tile("Participants arrived", part.filter((p) => p.arrived).length, part.length, "participants") + tile("Staff arrived", staff.filter((p) => p.arrived).length, staff.length, "staff") + tile("Everyone", P.filter((p) => p.arrived).length, P.length, "all") + '</div>' +
+    '<div class="card" style="margin:0;padding:12px 16px"><h2 style="margin:0 0 4px">By table <span class="small" style="font-weight:400">tap a table to see who</span></h2>' + bars + '</div>';
 }
 const ciTime = (iso) => iso ? new Date(Date.parse(iso) + 3600000).toISOString().slice(11, 16) : "";
 function drawCheckin() {
@@ -221,8 +221,9 @@ function drawCheckin() {
   drawCiDash();
   const part = P.filter((p) => !p.staff);
   const count = { all: P.length, arrived: P.filter((p) => p.arrived).length, waiting: P.filter((p) => !p.arrived).length, participants: part.filter((p) => p.arrived).length + " of " + part.length, staff: staff.filter((p) => p.arrived).length + " of " + staff.length };
-  $("#ciFilters").innerHTML = Object.entries(CI_FILTERS).map(([k, [label]]) => '<button type="button" data-cif="' + k + '"' + (ciFilter === k ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + '>' + label + ' (' + count[k] + ')</button>').join("");
-  const keep = CI_FILTERS[ciFilter][1];
+  const tb = ciFilter.startsWith("t:") ? ciFilter.slice(2) : null;
+  $("#ciFilters").innerHTML = (tb ? '<button type="button" class="on" aria-pressed="true" data-cif="all">' + esc(tb) + ' (' + P.filter((p) => p.where === tb && p.arrived).length + ' of ' + P.filter((p) => p.where === tb).length + ') ✕</button>' : "") + Object.entries(CI_FILTERS).map(([k, [label]]) => '<button type="button" data-cif="' + k + '"' + (ciFilter === k ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + '>' + label + ' (' + count[k] + ')</button>').join("");
+  const keep = tb ? (p) => p.where === tb : CI_FILTERS[ciFilter][1];
   let rows = P.filter((p) => keep(p) && (!q || (p.name + " " + p.ref).toLowerCase().includes(q)));
   if (ciFilter === "arrived") rows = rows.slice().sort((a, b) => String(b.at).localeCompare(String(a.at)));
   rows = rows.slice(0, 300);
@@ -457,7 +458,7 @@ document.addEventListener("click", async (e) => {
     }
     if (el("[data-ci=toggle]")) { await call("settings", { settings: { checkin_enabled: !ciData.enabled } }); return loadCheckin(); }
     if (el("[data-arr]")) { const b = el("[data-arr]"); const p = ciData.people.find((x) => x.id === Number(b.dataset.arr)); ciData = await call("checkin", { id: p.id, arrived: !p.arrived }); return drawCheckin(); }
-    if (el("[data-cif]")) { ciFilter = el("[data-cif]").dataset.cif; return drawCheckin(); }
+    if (el("[data-cif]")) { ciFilter = el("[data-cif]").dataset.cif; drawCheckin(); if (el("#ciDash")) $("#ciFilters").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (el("[data-gen]")) { const b = el("[data-gen]"); b.disabled = true; bfData.packs = await call("packs-generate", { role: b.dataset.gen }); bfRole = b.dataset.gen; msg("Packs generated. Preview one before sending.", true); drawRoles(); return drawPeople(); }
     if (el("[data-showrole]")) { bfRole = el("[data-showrole]").dataset.showrole; return drawPeople(); }
     if (el("[data-send]")) {
