@@ -137,7 +137,7 @@ You advised these during the sprint, so you sit them out to keep the judging ind
 | 12:35 | Lunch. Each table's plan, critique and response reach you to read |
 | 13:30 | Presentations, 3 to 5 minutes each, from the team's A2 board. Score each team straight after it presents |
 | About 14:35 | All scores in. The tally is checked |
-| 14:50 | The panel's spokesperson, {{spokesperson_name}}, gives the feedback |
+| 14:50 | The panel's chosen spokesperson gives the feedback |
 
 **How to score.** Give each criterion a 1, 3 or 5, or a 2 or 4 when the team is in between. A score locks once you submit it. If you make a mistake, tell the Lead Sprint Marshal and admin can unlock that one score. Teams may have made up to two stated assumptions. Judge whether they were reasonable, not whether they existed.
 
