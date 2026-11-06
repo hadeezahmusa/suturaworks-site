@@ -136,12 +136,15 @@ export async function importUpload(env, b, who) {
 }
 
 async function sendTickets(env, r, list) {
+  const { meetToday } = await import("./meetmail.js");
+  const meet = await meetToday(env);
   const msgs = [];
   for (const t of list) {
     const lobbyLink = await lobby.lobbyLinkForTicket(env, { id: t.id, kind: "sponsored" });
-    msgs.push({ ref: t.ticket_ref, to: t.email, ...mail.ticketIssued(t, r, { ...ticketLinks(env, t), lobby: lobbyLink }) });
+    msgs.push({ ref: t.ticket_ref, to: t.email, ...mail.ticketIssued(t, r, { ...ticketLinks(env, t), lobby: lobbyLink, meet }) });
   }
-  for (let i = 0; i < msgs.length; i += 90) await sendBatch(env, msgs.slice(i, i + 90), "ticket_issued");
+  // Logged as ticket_meet when the Meet link went with it, so the Meet link send skips them.
+  for (let i = 0; i < msgs.length; i += 90) await sendBatch(env, msgs.slice(i, i + 90), meet ? "ticket_meet" : "ticket_issued");
 }
 
 // Sends every ticket on this booking that was registered but held back.

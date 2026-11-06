@@ -178,19 +178,24 @@ export function ticketIssued(t, reg, links) {
         ? `Hello ${first(t.name)}, ${reg.organisation} has named you as its judge or mentor for QLV 2026. You are not placed in a team: you rove and score on day two. Your ticket is below.`
         : `Hello ${first(t.name)}, your payment has come through and your seat is held. Your ticket is below. Keep the reference, it is how we find you at the desk.`;
   const heading = adviser ? "You are confirmed for QLV 2026" : "You are registered for QLV 2026";
+  // On day one itself the ticket carries the joining link, so nobody needs a second email.
+  const meet = links.meet ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;border:2px solid ${C.yel};border-radius:10px;"><tr><td style="padding:16px 18px;font-family:${FONT};">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.7px;text-transform:uppercase;color:${C.navy};">Today, online: Friday 6 November at 4:00pm</div>
+      <div style="font-size:12px;color:${C.ink};line-height:1.55;margin:4px 0 10px;">Day one is on Google Meet. You'll hear the theme, see how the sprint works and meet your team. Join a few minutes early.</div>
+      <a href="${esc(links.meet)}" style="font-size:13px;font-weight:700;color:${C.navy};">Join on Google Meet &rarr;</a><div style="font-size:11px;color:${C.body};margin-top:4px;word-break:break-all;">${esc(links.meet)}</div></td></tr></table>` : "";
   const after = adviser
     ? p("Your brief, your tables and the tasks arrive by email. The link opens at 7:00am on Saturday 7 November. Participants do not see the tasks until the sprint opens, so please keep them to yourself. If something changes and you can no longer make it, reply as early as you can, because the roving routes are built around who is coming.", "font-size:12px;")
-    : p("Day one is virtual and the joining link comes the day before. Your team is announced on day one, and its task is handed out as the sprint opens on day two, so there is nothing to prepare.", "font-size:12px;");
+    : p(links.meet ? "Your team is announced on today's call, and its task is handed out as the sprint opens on day two, so there is nothing to prepare." : "Day one is virtual and the joining link comes the day before. Your team is announced on day one, and its task is handed out as the sprint opens on day two, so there is nothing to prepare.", "font-size:12px;");
   const lobby = links.lobby ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;background:${C.navy};border-radius:10px;"><tr><td style="padding:16px 18px;font-family:${FONT};">
       <div style="font-size:10px;font-weight:700;letter-spacing:1.7px;text-transform:uppercase;color:${C.yel};">The QLV lobby is open</div>
       <div style="font-size:12px;color:#CFE0F3;line-height:1.55;margin:4px 0 10px;">Meet the people you'll be building with and get updates from us until Friday. On Friday 6 November at 4:45pm, this same link becomes your team room.</div>
       <a href="${esc(links.lobby)}" style="font-size:12px;font-weight:600;color:#FFFFFF;">Open the QLV lobby &rarr;</a></td></tr></table>` : "";
   const body = h1(heading) + p(esc(intro)) + ticketCard(t) +
-    button(links.ticket, "Open your ticket") + lobby + after + questionsBlock(links.answer, adviser);
+    button(links.ticket, "Open your ticket") + meet + lobby + after + questionsBlock(links.answer, adviser);
   return {
     subject: adviser ? `You are confirmed for QLV 2026, ${t.ticket_ref}` : `Your QLV 2026 ticket, ${t.ticket_ref}`,
     html: shell({ preheader: `${heading}. Reference ${t.ticket_ref}.`, body, foot: `${esc(paidLine(t, reg))} &middot; <span style="font-family:${MONO};">${esc(t.ticket_ref)}</span>` }),
-    text: `${heading}\n\n${intro}\n\n${links.lobby ? `The QLV lobby is open: ${links.lobby}\n\n` : ""}Admit: ${t.name}\nReference: ${t.ticket_ref}\n${dayLines(t).map(([k, v]) => `${k}: ${v}`).join("\n")}${["adviser", "judge", "facilitator"].includes(t.kind) ? "" : "\nTeam: announced on day one"}\n\nOpen your ticket: ${links.ticket}\n${adviser ? "Send a problem" : "Answer the three questions"}: ${links.answer}\n`,
+    text: `${heading}\n\n${intro}\n\n${links.meet ? `Today, Friday 6 November at 4:00pm, online on Google Meet: ${links.meet}\n\n` : ""}${links.lobby ? `The QLV lobby is open: ${links.lobby}\n\n` : ""}Admit: ${t.name}\nReference: ${t.ticket_ref}\n${dayLines(t).map(([k, v]) => `${k}: ${v}`).join("\n")}${["adviser", "judge", "facilitator"].includes(t.kind) ? "" : "\nTeam: announced on day one"}\n\nOpen your ticket: ${links.ticket}\n${adviser ? "Send a problem" : "Answer the three questions"}: ${links.answer}\n`,
   };
 }
 
@@ -476,5 +481,19 @@ export function lateSeated({ first: name, table, no, link }) {
     subject: `Your table at QLV 2026: ${table}`,
     html: shell({ preheader: `You're at table ${no}, ${table}.`, body, bare: true }),
     text: `Hello ${name || "there"},\n\nYou're at table ${no} · ${table} for QLV 2026. Find it by the number on your table when you arrive.\n\n${link ? `Your team room is open, so you can meet your team before the sprint: ${link}\n\n` : ""}See you there,\nThe QLV 2026 team, JCI Aso\n`,
+  };
+}
+
+// Day one's joining link, to everyone who already has their ticket.
+export function meetLinkMail({ first: name, link, staff }) {
+  const body = h1("QLV 2026 starts today at 4:00pm") +
+    p(`Hello ${esc(name)}, day one of QLV 2026 is online today, Friday 6 November, from 4:00pm to about 5:30pm on Google Meet.`) +
+    button(link, "Join on Google Meet") +
+    p(`If the button doesn't work, copy this link: <span style="word-break:break-all;">${esc(link)}</span>`, "font-size:12px;") +
+    p(staff ? "Join a few minutes early. Tomorrow's details are in your ticket and brief." : "Join a few minutes early. You'll hear the theme, see how the sprint works and meet your team. Tomorrow is at the Transcorp Hilton, Abuja, from 8:30am: your name sticker at the desk shows your table.", "font-size:12px;");
+  return {
+    subject: "Today at 4:00pm: your QLV 2026 Google Meet link",
+    html: shell({ preheader: "Day one is online today at 4:00pm. Here is the link.", body, bare: true }),
+    text: `QLV 2026 starts today at 4:00pm\n\nHello ${name}, day one is online today, Friday 6 November, from 4:00pm on Google Meet.\n\nJoin here: ${link}\n\n${staff ? "Tomorrow's details are in your ticket and brief." : "Tomorrow is at the Transcorp Hilton, Abuja, from 8:30am: your name sticker at the desk shows your table."}\n`,
   };
 }

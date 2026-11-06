@@ -33,6 +33,7 @@ export const LOBBY_HTML = String.raw`
         <label class="fl">Post<textarea name="body" maxlength="600" required placeholder="First line: the headline people see in the notification.&#10;Then the rest of the post."></textarea></label>
         <p class="small" style="margin:-6px 0 10px">Use {meet_link}, {explainer_link} or {walkthrough_link} and the link set below is filled in.</p>
         <div class="actions"><button class="btn">Save post</button><button type="button" class="btn ghost" id="lbPostCancel" hidden>Cancel editing</button></div></form>
+      <div class="card" id="lbMeet" style="margin:0 0 14px;background:#FFF8E2"></div>
       <form class="card lp-form" id="lbLinks" style="margin:0 0 14px"><h2>Links and closing</h2>
         <label class="fl">Google Meet link for Friday<input type="url" name="meet_link" placeholder="https://meet.google.com/…"></label>
         <label class="fl">Explainer video link<input type="url" name="explainer_link" placeholder="https://…"></label>
@@ -55,7 +56,27 @@ export const LOBBY_JS = String.raw`
 let lbData = null;
 const LB_ROLE = { participant: "Participant", mentor: "Mentor", marshal: "Lead Sprint Marshal", team: "QLV team" };
 const lbBody = (s) => { const [t, ...r] = String(s).split("\n"); return "<b>" + esc(t) + "</b>" + (r.length ? "\n" + esc(r.join("\n")) : ""); };
+// Day one's Meet link by email to everyone who already has a ticket.
+async function loadMeetMail() {
+  const box = $("#lbMeet"); if (!box) return;
+  const m = await call("meet-mail");
+  box.innerHTML = '<h2>Email today\u2019s Meet link</h2>' + (!m.link
+    ? '<p class="small" style="margin:0">Set the Google Meet link below first.</p>'
+    : '<p class="small" style="margin:0 0 8px">Everyone with a ticket, the judges and mentors, and the Lead Sprint Marshal, one email each. Tickets sent today already carry the link. ' + m.already + ' already have it.</p>' +
+      (m.waiting ? '<p style="margin:0 0 10px"><b>' + m.waiting + (m.waiting === 1 ? " person" : " people") + ' still need it.</b> ' + m.room + ' emails are left in today\u2019s allowance.</p>' +
+        (m.fits ? '<button class="btn gold" data-meetsend="1" style="width:100%">Email the Meet link to ' + m.waiting + '</button>' : '<div class="miss">Not enough emails left today for all ' + m.waiting + '. Nothing will be sent until they all fit.</div>') +
+        '<details style="margin-top:8px"><summary class="small" style="cursor:pointer">Who</summary><div class="small">' + m.names.map(esc).join(", ") + '</div></details>'
+        : '<div class="okbox" style="margin:0">Everyone has the Meet link.</div>'));
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-meetsend]"); if (!b) return;
+  if (!confirm("Email today's Google Meet link to everyone who doesn't have it yet?")) return;
+  b.disabled = true;
+  try { const r = await call("meet-mail-send", {}); msg(r.sent + " emails sent with the Meet link.", true); loadMeetMail(); }
+  catch (err) { msg(err.message); b.disabled = false; }
+});
 async function loadLobby(d) {
+  loadMeetMail().catch((err) => msg(err.message));
   const x = lbData = d || await call("lobby");
   const st = x.state;
   const rooms = st.rooms_open ? '<span class="pill on">Open</span> since ' + esc(when(st.rooms_opened_at))
