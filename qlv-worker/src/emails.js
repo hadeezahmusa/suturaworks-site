@@ -89,7 +89,7 @@ const CHIP = {
   judge: ["Judge or mentor", "#184E9E", "#FFFFFF"],
   sponsored: ["Sponsored seat", "#16537A", "#FFFFFF"],
   adviser: ["Adviser", "#FFFFFF", C.navy],
-  partner: ["Partner", "#1F5F5B", "#FFFFFF"],
+  partner: ["Sponsor", "#1F5F5B", "#FFFFFF"],
   facilitator: ["Facilitator", C.yel, C.navy],
 };
 
@@ -99,7 +99,7 @@ export function paidLine(ticket, reg) {
   if (ticket.kind === "corporate") return `Corporate pack, ${ngn(reg.amount)}`;
   if (ticket.kind === "judge") return "Free with the corporate pack";
   if (ticket.kind === "sponsored") return "Paid by a sponsor";
-  if (ticket.kind === "partner") return "Covered by a QLV partner";
+  if (ticket.kind === "partner") return "Covered by a QLV sponsor";
   if (ticket.kind === "facilitator") return "Facilitator";
   return "By invitation";
 }
@@ -169,7 +169,7 @@ export function ticketIssued(t, reg, links) {
     : t.kind === "sponsored"
       ? `Hello ${first(t.name)}, your seat is claimed and paid for by your sponsor. Your ticket is below. Keep the reference, it is how we find you at the desk.`
       : t.kind === "partner"
-        ? `Hello ${first(t.name)}, your seat is claimed and covered by a QLV 2026 partner. Your ticket is below. Keep the reference, it is how we find you at the desk.`
+        ? `Hello ${first(t.name)}, your seat is claimed and covered by a QLV 2026 sponsor. Your ticket is below. Keep the reference, it is how we find you at the desk.`
       : t.kind === "facilitator"
         ? `Hello ${first(t.name)}, thank you for facilitating QLV 2026. You are registered and your ticket is below. Keep the reference, it is how we find you at the desk.`
       : t.kind === "standard" && reg.size > 1 && reg.email && t.email !== reg.email
@@ -368,14 +368,14 @@ export function partnerLinks(partner, seats) {
     <td style="padding:8px 0;border-top:1px solid ${C.line};font-family:${MONO};font-size:12px;"><a href="${esc(s.url)}" style="color:${C.link};word-break:break-all;">${esc(s.url)}</a></td></tr>`).join("");
   const n = seats.length;
   const body = h1(n === 1 ? "Your QLV 2026 seat link" : "Your QLV 2026 seat links") +
-    p(`Hello ${esc(first(partner.contact_name))}, thank you for partnering with QLV 2026. ${n === 1 ? "Here is the link for the seat" : `Here are the links for the ${word(n).toLowerCase()} seats`} that come with ${esc(partner.name)}'s partnership. Send each link to one person. They fill in their own details and their ticket comes straight to them.`) +
+    p(`Hello ${esc(first(partner.contact_name))}, thank you for sponsoring QLV 2026. ${n === 1 ? "Here is the link for the seat" : `Here are the links for the ${word(n).toLowerCase()} seats`} that come with ${esc(partner.name)}'s sponsorship. Send each link to one person. They fill in their own details and their ticket comes straight to them.`) +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">${list}</table>` +
     p("Each link works once, for one person, so please send it to a named person rather than posting it in a group. If a link goes astray, reply to this email and we will replace it.", "font-size:12px;") +
     p("Every seat covers both days: Friday 6 November, virtual, and Saturday 7 November at the Transcorp Hilton, Abuja.", "font-size:12px;margin:0;");
   return {
-    subject: n === 1 ? "Your QLV 2026 partner seat link" : "Your QLV 2026 partner seat links",
+    subject: n === 1 ? "Your QLV 2026 sponsor seat link" : "Your QLV 2026 sponsor seat links",
     html: shell({ preheader: "Send each link to one person.", body, foot: esc(partner.name) }),
-    text: `Your QLV 2026 seat links\n\nHello ${first(partner.contact_name)}, thank you for partnering with QLV 2026. Send each link to one person; they fill in their own details and their ticket comes straight to them.\n\n${seats.map((s) => `Seat ${s.seat_no}: ${s.url}`).join("\n")}\n\nEach link works once, for one person. If a link goes astray, reply to this email and we will replace it.\n`,
+    text: `Your QLV 2026 seat links\n\nHello ${first(partner.contact_name)}, thank you for sponsoring QLV 2026. Send each link to one person; they fill in their own details and their ticket comes straight to them.\n\n${seats.map((s) => `Seat ${s.seat_no}: ${s.url}`).join("\n")}\n\nEach link works once, for one person. If a link goes astray, reply to this email and we will replace it.\n`,
   };
 }
 

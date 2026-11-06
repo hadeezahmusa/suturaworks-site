@@ -110,7 +110,7 @@ async function loadInvoices() {
   const d = invData = await call("invoices");
   if (!invEdit) invEdit = invBlank();
   const s = d.settings, cat = d.catalogue;
-  const ITEMS = [["sponsored", "Sponsored seats"], ["standard", "Standard seats"], ["member", "JCI Aso member seats"], ["corporate3", "Corporate team, 3 seats"], ["corporate5", "Corporate team, 5 seats"], ["lead", "Lead partner"], ["supporting", "Supporting partner"], ["community", "Community partner"], ["custom", "Custom line"]];
+  const ITEMS = [["sponsored", "Sponsored seats"], ["standard", "Standard seats"], ["member", "JCI Aso member seats"], ["corporate3", "Corporate team, 3 seats"], ["corporate5", "Corporate team, 5 seats"], ["lead", "Lead Sponsor"], ["supporting", "Supporting Sponsor"], ["community", "Community Sponsor"], ["custom", "Custom line"]];
   const lineRow = (l, i) => '<div class="ln" data-ln="' + i + '"><select data-lf="item">' + ITEMS.map(([k, n]) => '<option value="' + k + '"' + (k === l.item ? " selected" : "") + ">" + n + "</option>").join("") + "</select>" +
     '<div><input data-lf="title" value="' + esc(l.title) + '" placeholder="Line title"><input data-lf="description" value="' + esc(l.description || "") + '" placeholder="Description (optional)" style="margin-top:4px;font-size:12px"></div>' +
     '<input data-lf="qty" type="number" min="1" value="' + l.qty + '" aria-label="Quantity"><input data-lf="unit" type="number" min="0" value="' + l.unit + '" aria-label="Unit price">' +

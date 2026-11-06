@@ -20,7 +20,7 @@ import { codeFor, FREE_REF } from "./partnercodes.js";
 const MAX_PROOF = 5 * 1024 * 1024;
 const MAX_JSON = 30000;
 const SITS = new Set(SITUATIONS.map((s) => s.value));
-const INVITERS = ["JCI Aso President", "Chairperson, Quality Leadership Value", "A corporate partner seat", "Someone else"];
+const INVITERS = ["JCI Aso President", "Chairperson, Quality Leadership Value", "A corporate sponsor seat", "Someone else"];
 const MODES = new Set(["both", "judge", "adviser"]);
 const MAX_ANSWER_SETS = 10;
 

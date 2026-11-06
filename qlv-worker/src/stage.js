@@ -29,7 +29,7 @@ const BLANK = {
   clock: { endsAt: null, pausedMs: null, totalMs: 0 },
   onStage: null,          // table index presenting now
   presented: [],          // tables that have finished presenting
-  toggles: { partners: true, schedule: true, animation: false },
+  toggles: { partners: true, schedule: true, animation: false, music: true },
   revealed: false,
   speaker: null,          // a SPEAKERS id while someone is speaking; cleared at each phase change
   testSound: 0,           // bumped by "Play a test sound"; the display plays a chime when it changes
@@ -111,7 +111,7 @@ export async function stageAction(env, b) {
       if (i < PHASES.length - 1) enterPhase(st, PHASES[i + 1], s, tables);
     }
   } else if (a === "toggles") {
-    for (const k of ["partners", "schedule", "animation"]) if (k in (b.toggles || {})) st.toggles[k] = !!b.toggles[k];
+    for (const k of ["partners", "schedule", "animation", "music"]) if (k in (b.toggles || {})) st.toggles[k] = !!b.toggles[k];
   } else if (a === "speaker") {
     if (b.speaker !== null && !SPEAKERS.some((x) => x.id === b.speaker)) throw new HttpError(400, "Choose who is speaking.");
     st.speaker = b.speaker;

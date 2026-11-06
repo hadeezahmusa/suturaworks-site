@@ -108,7 +108,7 @@ export const P2_HTML = String.raw`
         <div id="setAccess"></div>
         <form id="accForm" class="form2" style="margin-top:10px"><label>Email<input type="email" name="email" required placeholder="volunteer@example.com"></label>
           <label>Can see<select name="role"><option value="desk">Check-in desk</option><option value="stage">Stage coordinator</option></select></label><button class="btn" style="width:100%">Add sign-in</button></form></div>
-      <div class="card" style="margin-top:14px"><h2>Board view</h2><p class="small" style="margin:0 0 10px">A read-only look round the admin for the board, opened with one passcode. They see registrations, tables, partners, sponsors, staff, scoring, the stage, check-in, badges and money. Emails, phone numbers, proofs of payment, private links, the tasks, member codes and the three answers stay hidden.</p><div id="setBoard"></div></div>
+      <div class="card" style="margin-top:14px"><h2>Board view</h2><p class="small" style="margin:0 0 10px">A read-only look round the admin for the board, opened with one passcode. They see registrations, tables, sponsors, staff, scoring, the stage, check-in, badges and money. Emails, phone numbers, proofs of payment, private links, the tasks, member codes and the three answers stay hidden.</p><div id="setBoard"></div></div>
     </div>
   </div>
 </div>`;
@@ -343,8 +343,8 @@ async function loadStage() {
   const st = d.state;
   $("#stQueue").innerHTML = d.queue.map((q) => '<div class="q"><span><span class="small" style="margin-right:10px">' + esc(q.time) + '</span><b>' + esc(q.name) + '</b></span><span class="' + (q.state === "On stage" ? "st awaiting" : q.state ? "st released" : "") + '">' + esc(q.state) + '</span></div>').join("");
   const t = st.toggles;
-  $("#stToggles").innerHTML = [["partners", "Thank partners and sponsors"], ["schedule", "Show the day’s schedule"], ["animation", "Play the opening animation"]].map(([k, l]) =>
-    '<label style="display:flex;align-items:center;gap:10px;min-height:44px;font-size:13px"><input type="checkbox" data-toggle="' + k + '"' + (t[k] ? " checked" : "") + ' style="width:20px;height:20px">' + l + '</label>').join("");
+  $("#stToggles").innerHTML = [["partners", "Thank our sponsors"], ["schedule", "Show the day’s schedule"], ["animation", "Play the opening animation"], ["music", "Soft music during arrival (needs sound on at the display)"]].map(([k, l]) =>
+    '<label style="display:flex;align-items:center;gap:10px;min-height:44px;font-size:13px"><input type="checkbox" data-toggle="' + k + '"' + ((k === "music" ? t[k] !== false : t[k]) ? " checked" : "") + ' style="width:20px;height:20px">' + l + '</label>').join("");
   $("#stSpeakers").innerHTML = d.speakers.map((x) => '<button class="btn' + (st.speaker === x.id ? " gold" : " ghost") + '" data-speaker="' + x.id + '" style="width:100%;margin:0 0 8px;text-align:left">' + esc(x.label) + (x.logo ? "" : " (no logo yet)") + (st.speaker === x.id ? " · on screen" : "") + "</button>").join("") +
     (st.speaker ? '<button class="btn ghost" data-speaker="" style="width:100%">Take the speaker off the display</button>' : "");
   $("#stJudgesCard").hidden = ROLE !== "admin" && !d.judgesPhoto;
@@ -380,7 +380,7 @@ function stRemaining() {
 function drawClock() {
   const d = stData, st = d.state, rem = stRemaining(), paused = st.clock.pausedMs !== null && st.clock.pausedMs !== undefined;
   const lab = { arrival: "Arrival", sprint: "Planning round", handover: "Handover", critique: "Critique", response: "Response", lunch: "Lunch", presentations: "Presentations" + (d.queue.find((q) => q.state === "On stage") ? " · " + d.queue.find((q) => q.state === "On stage").name + " on stage" : ""), results: "Panel feedback and recognitions" }[st.phase];
-  const cue = { sprint: "Chime at halfway and at five minutes, gong at zero", handover: "Plans moving round the chain", critique: "Gap, question, strength", response: "Each team answers its critique", presentations: "Amber at 1:00, gong at zero", arrival: "Schedule and partner thanks on the display", lunch: "Judges are reading", results: st.revealed ? "Top three on the display" : "Waiting for every score" }[st.phase];
+  const cue = { sprint: "Chime at halfway and at five minutes, gong at zero", handover: "Plans moving round the chain", critique: "Gap, question, strength", response: "Each team answers its critique", presentations: "Amber at 1:00, gong at zero", arrival: "Schedule and sponsor thanks on the display", lunch: "Judges are reading", results: st.revealed ? "Top three on the display" : "Waiting for every score" }[st.phase];
   const timed = rem !== null;
   $("#stClock").innerHTML = '<div><div class="l">' + esc(lab) + (paused ? " · paused" : "") + '</div><div class="t"' + (timed ? "" : ' style="font-size:28px;padding:14px 0"') + '>' + (timed ? mmss(rem) : "No clock running") + '</div><div class="c">' + esc(cue) + '</div></div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:8px">' + (timed ? '<button class="btn ghost" data-st="' + (paused ? "resume" : "pause") + '">' + (paused ? "Resume" : "Pause") + '</button><button class="btn ghost" data-st="addMinute">Add 1 minute</button>' : "") +

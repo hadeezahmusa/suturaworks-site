@@ -21,9 +21,9 @@ export const CATALOGUE = {
   member: { title: "JCI Aso member seats, QLV 2026", unit: 8000, description: SAME, seatsEach: 1 },
   corporate3: { title: "Corporate team, 3 seats", unit: 40000, description: "Three seats for one organisation, both days", seatsEach: 3 },
   corporate5: { title: "Corporate team, 5 seats", unit: 60000, description: "Five seats for one organisation, both days", seatsEach: 5 },
-  lead: { title: "Lead partner, QLV 2026", unit: 200000, description: "Lead partnership of QLV 2026, including 4 seats", seatsEach: 4 },
-  supporting: { title: "Supporting partner, QLV 2026", unit: 100000, description: "Supporting partnership of QLV 2026, including 2 seats", seatsEach: 2 },
-  community: { title: "Community partner, QLV 2026", unit: 50000, description: "Community partnership of QLV 2026, including 1 seat", seatsEach: 1 },
+  lead: { title: "Lead Sponsor, QLV 2026", unit: 200000, description: "Lead sponsorship of QLV 2026, including 4 seats", seatsEach: 4 },
+  supporting: { title: "Supporting Sponsor, QLV 2026", unit: 100000, description: "Supporting sponsorship of QLV 2026, including 2 seats", seatsEach: 2 },
+  community: { title: "Community Sponsor, QLV 2026", unit: 50000, description: "Community sponsorship of QLV 2026, including 1 seat", seatsEach: 1 },
   custom: { title: "", unit: 0, description: "", seatsEach: 0 },
 };
 const clean = (v, max = 160) => String(v ?? "").replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, "").trim().slice(0, max);

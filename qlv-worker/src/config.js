@@ -17,9 +17,9 @@ export function tableName(i) {
 // level. The amount is copied onto the partner when it is created, so a later
 // change here never rewrites an existing partnership.
 export const PARTNER_LEVELS = {
-  lead: { name: "Lead partner", amount: 200000, seats: 4 },
-  supporting: { name: "Supporting partner", amount: 100000, seats: 2 },
-  community: { name: "Community partner", amount: 50000, seats: 1 },
+  lead: { name: "Lead Sponsor", amount: 200000, seats: 4 },
+  supporting: { name: "Supporting Sponsor", amount: 100000, seats: 2 },
+  community: { name: "Community Sponsor", amount: 50000, seats: 1 },
 };
 
 // Organisation answers that say nothing about where someone works, so they

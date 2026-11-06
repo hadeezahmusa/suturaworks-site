@@ -101,9 +101,9 @@ function sponsors() {
 // together, smallest. The level follows the logo size the Worker sends:
 // 4 lead, 3 supporting, 2 or 1 community. A level with nobody gets no slide.
 const LEVELS = [
-  { id: "lead", one: "Lead partner", many: "Lead partners", sizes: [4], secs: 15 },
-  { id: "supporting", one: "Supporting partner", many: "Supporting partners", sizes: [3], secs: 12 },
-  { id: "community", one: "Community partner", many: "Community partners", sizes: [2, 1], secs: 10 },
+  { id: "lead", one: "Lead Sponsor", many: "Lead Sponsors", sizes: [4], secs: 15 },
+  { id: "supporting", one: "Supporting Sponsor", many: "Supporting Sponsors", sizes: [3], secs: 12 },
+  { id: "community", one: "Community Sponsor", many: "Community Sponsors", sizes: [2, 1], secs: 10 },
 ];
 // Tile sizes on the 1920 by 1080 stage. A lone lead partner gets the biggest
 // tile; the gap between levels stays plain to see.
@@ -133,7 +133,8 @@ function thanksPages() {
   const pages = [];
   for (const lv of LEVELS) {
     const list = all.filter((x) => lv.sizes.includes(x.size >= 4 ? 4 : x.size === 3 ? 3 : x.size === 2 ? 2 : 1));
-    for (const page of pack(list)) pages.push({ level: lv, list: page });
+    // Every Lead Sponsor gets a slide of their own.
+    for (const page of lv.id === "lead" ? list.map((x) => [x]) : pack(list)) pages.push({ level: lv, list: page });
   }
   return pages;
 }
@@ -284,7 +285,7 @@ function sceneLunch() {
   const big = sponsors().filter((x) => x.size > 1).map((x) => esc(x.name));
   const small = sponsors().filter((x) => x.size === 1).length;
   const line = big.concat(small ? [small + " JCI Aso members' business" + (small === 1 ? "" : "es")] : []).join(" · ");
-  const thanks = st.toggles.partners && line ? '<span class="eyebrow" style="margin-top:20px">With thanks to our partners and sponsors</span><span class="lede" style="color:#F2F6FC">' + line + "</span>" : "";
+  const thanks = st.toggles.partners && line ? '<span class="eyebrow" style="margin-top:20px">With thanks to our sponsors</span><span class="lede" style="color:#F2F6FC">' + line + "</span>" : "";
   return '<div class="arrival"><div class="l"><span class="eyebrow">Lunch</span><span class="big" style="font-size:110px">Enjoy your lunch.</span><span class="lede">The judges are reading every plan, critique and response.</span>' + thanks + "</div>" +
     '<div style="display:flex;flex-direction:column;align-items:center;gap:30px">' +
     '<svg class="bowl" width="300" height="240" viewBox="0 0 300 240" aria-hidden="true"><g class="steam"><path d="M110 90 c -20 -30, 20 -40, 0 -70"/><path d="M150 90 c -20 -30, 20 -40, 0 -70"/><path d="M190 90 c -20 -30, 20 -40, 0 -70"/></g>' +
@@ -392,6 +393,7 @@ async function poll() {
     if (d.data) { data = d.data; preloadLogos(); }
     lastOk = Date.now();
     $("#recon").hidden = true;
+    updateMusic();
     if (testChanged) { play("chime"); showToast(soundOn ? "Test sound" : "Sound is off: click the display"); }
     render();
   } catch {
@@ -411,8 +413,8 @@ function runDemo() {
     schedule: [["8:30", "Arrival"], ["10:50", "The sprint opens"], ["11:40", "Plans handed over"], ["11:45", "Critique"], ["12:20", "Response"], ["12:35", "Lunch"], ["13:30", "Presentations"], ["14:50", "Feedback and recognitions"]].map(([t, what]) => ({ t, what })),
     order: names.map((name, i) => ({ name, time: times[i] })),
     chain: names.concat(names[0]),
-    partners: ["Sutura Works Limited", "Your lead partner", "A supporting partner", "A sponsor", "A member's business", "Another member's business"],
-    sponsors: [["Sutura Works Limited", 4], ["Your lead partner", 4], ["A supporting partner", 3], ["A sponsor", 2], ["A member's business", 1], ["Another member's business", 1]].map(([name, size]) => ({ name, size, logo: null })),
+    partners: ["Sutura Works Limited", "Your lead sponsor", "A supporting sponsor", "A sponsor", "A member's business", "Another member's business"],
+    sponsors: [["Sutura Works Limited", 4], ["Your lead sponsor", 4], ["A supporting sponsor", 3], ["A sponsor", 2], ["A member's business", 1], ["Another member's business", 1]].map(([name, size]) => ({ name, size, logo: null })),
     onStage: null, upNext: null, lastScores: null, podium: null,
   };
   st = { phase: "arrival", clock: { endsAt: null, pausedMs: null, totalMs: 0 }, toggles: { partners: true, schedule: true, animation: true }, revealed: false, flash: 0, version: 0 };
@@ -454,9 +456,69 @@ $("#sound").addEventListener("click", async () => {
   // Browsers allow sound only after a click: prime both sounds silently.
   for (const a of Object.values(audio)) { a.muted = true; try { await a.play(); a.pause(); a.currentTime = 0; } catch { /* ignore */ } a.muted = false; }
   soundOn = true;
+  musicCtx();   // made inside the click, so the browser lets it play
   $("#sound").remove();
   showToast("Sound on");
+  updateMusic();
 });
+
+// ---------- arrival music ----------
+// A slow, low chord loop made here in the browser: nothing to license or
+// download over the venue wifi. Soft pads, a quiet bass and a sparse
+// arpeggio at 68 beats a minute. It plays only on Arrival, never while
+// someone is on the speaker slide, and fades in and out.
+const M = { ctx: null, out: null, on: false, next: 0, bar: 0, timer: null, stopAt: 0 };
+const BEAT = 60 / 68, VOLUME = 0.3;
+// Am9, Fmaj7, Cmaj7, Em7: two bars each.
+const CHORDS = [[45, 57, 60, 64, 71], [41, 57, 60, 64, 69], [36, 55, 59, 64, 67], [40, 55, 59, 62, 67]];
+const hz = (m) => 440 * 2 ** ((m - 69) / 12);
+function musicCtx() {
+  if (M.ctx) return M.ctx;
+  const C = window.AudioContext || window.webkitAudioContext;
+  if (!C) return null;
+  M.ctx = new C();
+  const lp = M.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2200;
+  M.out = M.ctx.createGain(); M.out.gain.value = 0;
+  M.out.connect(lp); lp.connect(M.ctx.destination);
+  return M.ctx;
+}
+function voice(type, f, t, len, peak, attack, release, cutoff) {
+  const c = M.ctx, o = c.createOscillator(), g = c.createGain(), fl = c.createBiquadFilter();
+  o.type = type; o.frequency.value = f; fl.type = "lowpass"; fl.frequency.value = cutoff;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + attack);
+  g.gain.setValueAtTime(peak, t + Math.max(attack, len - release)); g.gain.linearRampToValueAtTime(0, t + len);
+  o.connect(fl); fl.connect(g); g.connect(M.out); o.start(t); o.stop(t + len + 0.05);
+}
+function scheduleBar(t, bar) {
+  const ch = CHORDS[Math.floor(bar / 2) % CHORDS.length], barLen = BEAT * 4;
+  if (bar % 2 === 0) for (const m of ch.slice(1)) for (const d of [-4, 4]) {   // the pad, two slightly detuned voices per note
+    voice("triangle", hz(m) * 2 ** (d / 1200), t, barLen * 2 + 0.6, 0.035, 1.6, 2.2, 900);
+  }
+  voice("sine", hz(ch[0]), t, BEAT * 1.8, 0.12, 0.04, 0.8, 400);               // bass on 1 and 3
+  voice("sine", hz(ch[0]), t + BEAT * 2, BEAT * 1.6, 0.09, 0.04, 0.8, 400);
+  const arp = [ch[2] + 12, ch[3] + 12, ch[4] + 12, ch[3] + 12];
+  [0.5, 1.5, 2.5, 3.5].forEach((b, i) => { if ((bar + i) % 3 !== 2) voice("sine", hz(arp[i]), t + BEAT * b, 1.2, 0.03, 0.01, 1.1, 3000); });
+}
+function musicTick() {
+  if (!M.ctx) return;
+  while (M.next < M.ctx.currentTime + 1.5) { scheduleBar(M.next, M.bar); M.next += BEAT * 4; M.bar++; }
+}
+function updateMusic() {
+  const want = !DEMO && soundOn && st && st.phase === "arrival" && !st.speaker && st.toggles.music !== false;
+  if (want === M.on || !musicCtx()) return;
+  M.on = want;
+  const c = M.ctx, now = c.currentTime;
+  M.out.gain.cancelScheduledValues(now); M.out.gain.setValueAtTime(M.out.gain.value, now);
+  if (want) {
+    c.resume();
+    if (!M.timer || now > M.stopAt) { clearInterval(M.timer); M.next = now + 0.1; M.bar = 0; M.timer = setInterval(musicTick, 250); musicTick(); }
+    M.out.gain.linearRampToValueAtTime(VOLUME, now + 3);
+  } else {
+    M.out.gain.linearRampToValueAtTime(0, now + 2.5);
+    M.stopAt = now + 2.6;
+    setTimeout(() => { if (!M.on) { clearInterval(M.timer); M.timer = null; } }, 2700);
+  }
+}
 $("#fs").addEventListener("click", () => document.documentElement.requestFullscreen?.().catch(() => {}));
 document.addEventListener("fullscreenchange", () => document.body.classList.toggle("full", !!document.fullscreenElement));
 let idle;

@@ -10,7 +10,7 @@ import { HttpError, now, token, nextRef, ticketLinks, sendMail } from "./index.j
 import { ngn } from "../../qlv2026/event.js";
 
 const LETTER = { member: "J", standard: "S", corporate: "C", sponsored: "P", partner: "T" };
-const TIER = { member: "JCI Aso member", standard: "Standard", corporate: "Corporate", sponsored: "Sponsored", partner: "Partner" };
+const TIER = { member: "JCI Aso member", standard: "Standard", corporate: "Corporate", sponsored: "Sponsored", partner: "Sponsor" };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const clean = (v, max = 160) => String(v ?? "").replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, max);
 const title = (k) => (k || "").replace(/\b[a-z]/g, (c) => c.toUpperCase());
@@ -64,7 +64,7 @@ export async function tablesView(env) {
     out.push({
       index: i, name: tableName(i), count: here.length, seats, added: i >= INITIAL_TABLES,
       next: i === probe.table && here.length < TABLE_CAPACITY,
-      mix: `JCI Aso ${tierCount("member")} · Standard ${tierCount("standard")} · Corporate ${tierCount("corporate")} · Sponsored ${tierCount("sponsored")} · Partner ${tierCount("partner")}`,
+      mix: `JCI Aso ${tierCount("member")} · Standard ${tierCount("standard")} · Corporate ${tierCount("corporate")} · Sponsored ${tierCount("sponsored")} · Sponsor ${tierCount("partner")}`,
     });
   }
   if (count > INITIAL_TABLES) {
@@ -128,7 +128,7 @@ export async function createPartner(env, b, who) {
   const name = clean(b.name);
   const contact = clean(b.contactName, 120);
   const email = clean(b.contactEmail).toLowerCase();
-  if (!name) throw new HttpError(400, "Enter the partner organisation.");
+  if (!name) throw new HttpError(400, "Enter the sponsor organisation.");
   if (!contact) throw new HttpError(400, "Enter the contact person.");
   if (!EMAIL_RE.test(email)) throw new HttpError(400, "The contact email does not look complete.");
   const stamp = now();
@@ -155,7 +155,7 @@ async function emailSeats(env, p, seats, kind) {
 // them all to the contact in one message.
 export async function confirmPartner(env, b, who) {
   const p = await partnerRow(env, b.id);
-  if (p.status === "confirmed") throw new HttpError(409, "This partner is already confirmed.");
+  if (p.status === "confirmed") throw new HttpError(409, "This sponsor is already confirmed.");
   const note = clean(b.note, 300);
   const stamp = now();
   const stmts = [
@@ -225,7 +225,7 @@ export async function createFacilitator(env, b, who) {
 
 // ---------- Export ----------
 
-const TYPE = { standard: "Standard", member: "JCI Aso member", corporate: "Corporate", sponsored: "Sponsored", partner: "Partner", facilitator: "Facilitator" };
+const TYPE = { standard: "Standard", member: "JCI Aso member", corporate: "Corporate", sponsored: "Sponsored", partner: "Sponsor", facilitator: "Facilitator" };
 const DAYS = { both: "Both", sat: "Saturday", fri: "Friday" };
 
 export async function exportRows(env) {

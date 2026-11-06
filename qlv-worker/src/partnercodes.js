@@ -65,7 +65,7 @@ export async function createMissing(env, who) {
 export async function replaceCode(env, b, who) {
   const id = Number(b.logoId);
   const cur = await env.DB.prepare("SELECT * FROM partner_codes WHERE logo_id = ? AND voided_at IS NULL").bind(id).first();
-  if (!cur) throw new HttpError(404, "That partner has no code yet.");
+  if (!cur) throw new HttpError(404, "That sponsor has no code yet.");
   if (cur.ticket_id) throw new HttpError(409, "This code has already been used for a ticket, so it can't be replaced.");
   const code = await freshCode(env, cur.name);
   await env.DB.batch([
