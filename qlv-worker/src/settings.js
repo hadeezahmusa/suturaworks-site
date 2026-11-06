@@ -10,7 +10,7 @@ export const DEFAULTS = {
   teams_frozen: false,                          // set by "Teams have been announced"
   brief_unlock_at: "2026-11-07T06:00:00Z",      // 7:00am on Saturday 7 November
   event_day: "2026-11-07",                      // judges' links work on this day only
-  arrival_time: { marshal: "8:00am", mentor: "10:15am", judge: "10:15am" },
+  arrival_time: { marshal: "8:00am", mentor: "9:45am", judge: "9:45am" },
   spokesperson: null,                           // a judge's ticket id
   chair_name: "Hadeezah Balarabe Musa",
   chair_phone: "+234 703 390 1986",

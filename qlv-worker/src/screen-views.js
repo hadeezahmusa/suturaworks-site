@@ -18,7 +18,7 @@ export const SCREEN_STYLE = String.raw`
 
 export const SCREEN_HTML = String.raw`
 <div id="screenView" hidden>
-  <p class="small" style="margin:0 0 12px">Everyone listed here is thanked on the projector during arrival, with their logo if you add one. Bigger support gets a bigger logo. Anyone without a logo shows as their name.</p>
+  <p class="small" style="margin:0 0 12px">Everyone listed here with a logo is thanked on the projector during arrival. Names without a logo stay off the display until you upload one. Bigger support gets a bigger logo.</p>
   <div class="grid">
     <div class="list" style="flex:3 1 600px">
       <div class="card" style="padding:0;overflow-x:auto;margin:0 0 14px"><div style="padding:14px 16px 0"><h2>On the thank-you slide</h2></div>

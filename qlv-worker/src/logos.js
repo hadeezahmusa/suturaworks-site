@@ -56,8 +56,14 @@ async function everyone(env) {
   return out;
 }
 
+// Only names with a logo go on the display.
+function noLogo(list) {
+  for (const e of list) if (e.live && !(e.row && e.row.logo_at)) { e.live = false; e.why = "No logo, so not shown on the display"; }
+  return list;
+}
+
 export async function screenList(env) {
-  const list = await everyone(env);
+  const list = noLogo(await everyone(env));
   return {
     entries: list.map(({ row, ...e }) => ({ ...e, owner: row ? row.owner : null, sizeLabel: SIZE_LABEL[e.size], logo: logoPath(row) })),
   };
@@ -65,7 +71,7 @@ export async function screenList(env) {
 
 // For the display: shown entries only, biggest first, then in the order they came.
 export async function screenSponsors(env) {
-  const list = (await everyone(env)).filter((e) => e.live);
+  const list = noLogo(await everyone(env)).filter((e) => e.live);
   return list.map((e, i) => ({ name: e.name, size: e.size, logo: logoPath(e.row), i }))
     .sort((a, b) => b.size - a.size || a.i - b.i).map(({ i, ...e }) => e);
 }
