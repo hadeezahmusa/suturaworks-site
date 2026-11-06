@@ -371,14 +371,13 @@ async function loadStage() {
   $("#stJudgesCard").hidden = ROLE !== "admin" && !d.judgesPhoto;
   $("#stJudges").innerHTML = (d.judgesPhoto ? '<img alt="The judges" src="' + esc(d.judgesPhoto) + '" style="width:100%;border-radius:8px;margin:0 0 8px">' : '<p class="small" style="margin:0 0 8px"><b>No photo yet.</b> The slide appears once you upload one.</p>') +
     (ROLE === "admin" ? '<div class="actions"><button class="btn ghost" data-judgesup="1">' + (d.judgesPhoto ? "Replace photo" : "Upload photo") + "</button>" + (d.judgesPhoto ? '<button class="link" data-judgesrm="1">Remove</button>' : "") + "</div>" : "");
-  // One press per place: third, then second, then the winner.
-  const step = st.revealed ? (st.revealStep || 3) : 0, places = Math.min(3, d.scored.teams);
-  const nextPlace = ["third place", "second place", "the winner"][step + (3 - places)] || "";
+  // Two presses: "And the winner is…", then the winner. Only the winner is shown.
+  const step = st.revealed ? (st.revealStep || 2) : 0;
   $("#stReveal").innerHTML = !st.revealed
-    ? '<button class="btn gold" data-st="reveal" style="width:100%"' + (d.scored.all ? "" : " disabled") + '>Reveal third place · ' + d.scored.complete + ' of ' + d.scored.teams + ' teams scored</button><p class="small" style="margin:8px 0 0">Then press again for second place, and once more for the winner.</p>'
-    : (step < places
-      ? '<p class="ok2" style="display:inline-block">' + (step === 1 ? "Third place" : "Third and second place") + ' showing</p><button class="btn gold" data-st="reveal" style="width:100%;margin-top:8px">Reveal ' + nextPlace + '</button>'
-      : '<p class="ok2" style="display:inline-block">The top three are showing on the display</p>') +
+    ? '<button class="btn gold" data-st="reveal" style="width:100%"' + (d.scored.all ? "" : " disabled") + '>Start the winner reveal · ' + d.scored.complete + ' of ' + d.scored.teams + ' teams scored</button><p class="small" style="margin:8px 0 0">The display shows "And the winner is…". Press again to show the winning team. Only the winner is shown, with no scores.</p>'
+    : (step < 2
+      ? '<p class="ok2" style="display:inline-block">"And the winner is…" showing</p><button class="btn gold" data-st="reveal" style="width:100%;margin-top:8px">Reveal the winner</button>'
+      : '<p class="ok2" style="display:inline-block">The winner is showing on the display</p>') +
       '<div class="actions"><button class="btn ghost" data-st="hideResults">Hide results again</button></div>';
   drawClock();
   clearInterval(stTimer);
@@ -408,7 +407,7 @@ function stRemaining() {
 function drawClock() {
   const d = stData, st = d.state, rem = stRemaining(), paused = st.clock.pausedMs !== null && st.clock.pausedMs !== undefined;
   const lab = { arrival: "Arrival", sprint: "Planning round", handover: "Handover", critique: "Critique", response: "Response", lunch: "Lunch", presentations: "Presentations" + (d.queue.find((q) => q.state === "On stage") ? " · " + d.queue.find((q) => q.state === "On stage").name + " on stage" : ""), results: "Panel feedback and recognitions" }[st.phase];
-  const cue = { sprint: "Chime at halfway and at five minutes, gong at zero", handover: "Plans moving round the chain", critique: "Gap, question, strength", response: "Each team answers its critique", presentations: "Amber at 1:00, gong at zero", arrival: "Schedule and sponsor thanks on the display", lunch: "Judges are reading", results: st.revealed ? ((st.revealStep || 3) >= 3 ? "Top three on the display" : "Building up to the winner") : "Waiting for every score" }[st.phase];
+  const cue = { sprint: "Chime at halfway and at five minutes, gong at zero", handover: "Plans moving round the chain", critique: "Gap, question, strength", response: "Each team answers its critique", presentations: "Amber at 1:00, gong at zero", arrival: "Schedule and sponsor thanks on the display", lunch: "Judges are reading", results: st.revealed ? ((st.revealStep || 2) >= 2 ? "The winner on the display" : "And the winner is…") : "Waiting for every score" }[st.phase];
   const timed = rem !== null;
   $("#stClock").innerHTML = '<div><div class="l">' + esc(lab) + (paused ? " · paused" : "") + '</div><div class="t"' + (timed ? "" : ' style="font-size:28px;padding:14px 0"') + '>' + (timed ? mmss(rem) : "No clock running") + '</div><div class="c">' + esc(cue) + '</div></div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:8px">' + (timed ? '<button class="btn ghost" data-st="' + (paused ? "resume" : "pause") + '">' + (paused ? "Resume" : "Pause") + '</button><button class="btn ghost" data-st="addMinute">Add 1 minute</button>' : "") +
@@ -528,7 +527,7 @@ document.addEventListener("click", async (e) => {
     if (el("[data-st]")) {
       const a = el("[data-st]").dataset.st;
       if (a === "open") { const w = window.open("", "_blank"); const r = await call("display-link"); w.location = r.url; return; }
-      if (a === "reveal" && !stData.state.revealed && !confirm("Show third place on the display now? Press again for second place, then for the winner. This cannot be taken back from the people in the room.")) return;
+      if (a === "reveal" && !stData.state.revealed && !confirm("Start the winner reveal? The display shows \"And the winner is…\". Press again to show the winning team.")) return;
       // The gold button acts on one press. Ask only when it would cut a clock short.
       if (a === "next") {
         const rem = stRemaining();

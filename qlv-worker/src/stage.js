@@ -31,7 +31,7 @@ const BLANK = {
   presented: [],          // tables that have finished presenting
   toggles: { partners: true, schedule: true, animation: false, music: true },
   revealed: false,
-  revealStep: 0,          // places shown so far, one press each: third, then second, then the winner
+  revealStep: 0,          // 1 = "And the winner is…", 2 = the winner. Only the winner is ever shown.
   speaker: null,          // a SPEAKERS id while someone is speaking; cleared at each phase change
   testSound: 0,           // bumped by "Play a test sound"; the display plays a chime when it changes
   flash: 0,               // bumped at each phase start so the display can mark it
@@ -122,9 +122,8 @@ export async function stageAction(env, b) {
     const { computeTally } = await import("./scoring.js");
     const t = await computeTally(env);
     if (!t.allComplete) throw new HttpError(409, "Every team needs its full set of scores before the results can be shown.");
-    const places = Math.min(3, t.order.length);
     if (!st.revealed) { st.revealed = true; st.revealStep = 1; }
-    else st.revealStep = Math.min(places, (st.revealStep || places) + 1);
+    else st.revealStep = 2;
     if (st.phase !== "results") enterPhase(st, "results", s, tables);
   } else if (a === "hideResults") {
     st.revealed = false;
@@ -161,10 +160,12 @@ function nextLabel(st, tables) {
 // places already announced ever leave the server, so the winner can't be
 // read from the display page before it is shown. Older state without a step
 // shows all three.
-const revealStepOf = (st) => (st.revealed ? st.revealStep || 3 : 0);
+const revealStepOf = (st) => (st.revealed ? st.revealStep || 2 : 0);
+// Only the winning team goes on the display, and never its score. Nothing
+// is sent while the display is still on "And the winner is…".
 function podiumSoFar(t, st) {
-  const all = t.order.slice(0, 3).map((r, i) => ({ place: ["First", "Second", "Third"][i], name: r.name, avg: r.avgText }));
-  return all.slice(Math.max(0, all.length - revealStepOf(st)));
+  if (!st.revealed || (st.revealStep || 2) < 2 || !t.order.length) return [];
+  return [{ place: "First", name: t.order[0].name }];
 }
 
 // What the display needs: public data only.

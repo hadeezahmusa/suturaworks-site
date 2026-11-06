@@ -310,20 +310,17 @@ function sceneResults() {
     const stars = Array.from({ length: 40 }, (_, i) => '<i style="left:' + ((i * 211) % 1760) + "px;top:" + ((i * 97) % 760) + "px;animation-delay:" + (i % 7) * 0.4 + 's"></i>').join("");
     return '<div class="results"><div class="stars" aria-hidden="true" style="position:absolute;inset:0">' + stars + '</div><span class="eyebrow">Panel feedback</span><span class="big" style="font-size:110px">Feedback and recognitions</span><span class="lede">From the judges’ panel.</span></div>';
   }
-  // One place at a time: third, then second, then the winner. Places not
-  // yet announced wait as an empty podium; the server doesn't send them.
-  const p = data.podium, step = st.revealStep || 3;
-  const shown = Object.fromEntries(p.map((x) => [x.place, x]));
-  const order = ["Second", "First", "Third"].map((place) => shown[place] || { place, hidden: true });
-  const h = { First: 380, Second: 310, Third: 260 };
+  // Two steps: "And the winner is…", then the winning team alone. No
+  // runners-up and no scores; the server doesn't send them.
+  const win = data.podium.find((x) => x.place === "First");
   const colours = ["#EFC22D", "#4FD2C2", "#8FB6E8", "#F2F6FC"];
-  const confetti = reduced || !shown.First ? "" : '<div class="confetti" aria-hidden="true">' + Array.from({ length: 70 }, (_, i) =>
+  if (!win) {
+    const stars = Array.from({ length: 40 }, (_, i) => '<i style="left:' + ((i * 211) % 1760) + "px;top:" + ((i * 97) % 760) + "px;animation-delay:" + (i % 7) * 0.4 + 's"></i>').join("");
+    return '<div class="results"><div class="stars" aria-hidden="true" style="position:absolute;inset:0">' + stars + '</div><span class="eyebrow">QLV 2026</span><span class="big" style="font-size:130px">And the winner is…</span></div>';
+  }
+  const confetti = reduced ? "" : '<div class="confetti" aria-hidden="true">' + Array.from({ length: 70 }, (_, i) =>
     '<i style="left:' + ((i * 53) % 1776) + "px;background:" + colours[i % 4] + ";animation-duration:" + (5 + (i % 5)) + "s;animation-delay:-" + (i % 9) * 0.6 + "s;transform:rotate(" + i * 23 + 'deg)"></i>').join("") + "</div>";
-  return '<div class="results">' + confetti + '<span class="big" style="font-size:96px">Recognitions</span><div class="podium">' +
-    order.map((x) => x.hidden
-      ? '<div class="p wait" style="min-height:' + h[x.place] + 'px"><b>' + x.place.toUpperCase() + '</b><strong>?</strong></div>'
-      : '<div class="p' + (x.place === "First" ? " first" : "") + '" style="min-height:' + h[x.place] + 'px;animation-delay:.2s"><b>' + x.place.toUpperCase() + "</b><strong>" + esc(x.name) + "</strong><span>Average " + esc(x.avg) + " of 25</span></div>").join("") +
-    '</div><span class="lede">' + (shown.First ? "Plus the panel’s recognitions." : step === 1 ? "Second place is next." : "And the winner is…") + '</span></div>';
+  return '<div class="results">' + confetti + '<span class="eyebrow">The winner of QLV 2026</span><div class="winner"><strong>' + esc(win.name) + '</strong></div><span class="lede">Congratulations, team ' + esc(win.name) + '.</span></div>';
 }
 
 function render() {
@@ -393,8 +390,8 @@ async function poll() {
     if (!res.ok) { if (!st) document.body.innerHTML = '<div class="err">' + esc(d.error || "This display link is not valid.") + "</div>"; return; }
     offset = d.serverNow - Date.now();
     const testChanged = lastTest !== null && d.testSound !== lastTest;
-    // Each place revealed gets a chime; the winner gets the gong and the flash.
-    if (st && d.revealStep > (st.revealStep || 0)) { if (d.revealStep >= 3) { play("gong"); flash(); } else play("chime"); }
+    // "And the winner is…" gets a chime; the winner gets the gong and the flash.
+    if (st && d.revealStep > (st.revealStep || 0)) { if (d.revealStep >= 2) { play("gong"); flash(); } else play("chime"); }
     lastTest = d.testSound;
     st = { ...d, clock: d.clock };
     if (d.data) { data = d.data; preloadLogos(); }
@@ -428,7 +425,7 @@ function runDemo() {
   // [phase, real seconds on screen, clock minutes or 0, extra]
   const steps = [
     ["arrival", 20, 0], ["sprint", 64, 50], ["handover", 14, 5], ["critique", 32, 35], ["response", 22, 15], ["lunch", 10, 0],
-    ["presentations", 16, 10, 0], ["presentations", 16, 10, 1], ["presentations", 16, 10, 2], ["results", 6, 0, "hidden"], ["results", 16, 0, "revealed"],
+    ["presentations", 16, 10, 0], ["presentations", 16, 10, 1], ["presentations", 16, 10, 2], ["results", 6, 0, "hidden"], ["results", 6, 0, "drumroll"], ["results", 16, 0, "revealed"],
   ];
   let i = 0;
   const go = () => {
@@ -439,12 +436,12 @@ function runDemo() {
     demoTime.speed = total ? total / ((secs - 2) * 1000) : 1;
     st.phase = phase; st.flash++; slide = 0;
     st.clock = total ? { endsAt: demoTime.v0 + total, pausedMs: null, totalMs: total } : { endsAt: null, pausedMs: null, totalMs: 0 };
-    st.revealed = extra === "revealed"; st.revealStep = st.revealed ? 3 : 0;
+    st.revealed = extra === "revealed" || extra === "drumroll"; st.revealStep = extra === "drumroll" ? 1 : st.revealed ? 2 : 0;
     if (phase === "presentations") {
       data.onStage = names[extra]; data.upNext = names[extra + 1];
       data.lastScores = extra ? { name: names[extra - 1], n: 4, of: 4 } : null;
     }
-    if (phase === "results") data.podium = st.revealed ? [{ place: "First", name: "Keystone", avg: "21.5" }, { place: "Second", name: "Blueprint", avg: "20.0" }, { place: "Third", name: "Legacy", avg: "18.8" }] : null;
+    if (phase === "results") data.podium = st.revealed ? ((st.revealStep || 2) >= 2 ? [{ place: "First", name: "Keystone" }] : []) : null;
     render();
     i++;
     setTimeout(go, secs * 1000);
