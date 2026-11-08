@@ -15,7 +15,7 @@ import * as mail from "./emails.js";
 const SPRINTERS = ["standard", "member", "corporate", "sponsored", "partner"];
 const ATTEND = ["yes", "maybe", "no"];
 const SOCIALS = ["instagram", "linkedin", "x", "facebook", "tiktok"];
-const ROLE_LABEL = { participant: "Participant", judge: "Judge", mentor: "Mentor/Advisor", both: "Judge and Mentor/Advisor", marshal: "Lead Sprint Marshal", desk: "Check-in desk", stage: "Stage Coordinator", facilitator: "Facilitator" };
+const ROLE_LABEL = { participant: "Participant", judge: "Judge", mentor: "Mentor/Advisor", both: "Judge and Mentor/Advisor", marshal: "Lead Sprint Marshal", desk: "Check-in desk", stage: "Stage Coordinator", chair: "Chairperson", president: "President", facilitator: "Facilitator" };
 const clean = (v, max) => String(v ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").replace(/\r\n?/g, "\n").trim().slice(0, max);
 
 export const feedbackUrl = (env, tok) => `${env.SITE_URL}feedback.html?t=${tok}`;
