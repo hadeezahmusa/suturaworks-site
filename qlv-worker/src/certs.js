@@ -16,6 +16,7 @@ import { getSettings } from "./settings.js";
 import { dailyRoom } from "./mailer.js";
 import { staffPeople } from "./briefings.js";
 import * as mail from "./emails.js";
+import { ensureFeedback, feedbackUrl, markEmailed, certificateGate } from "./feedback.js";
 
 const SPRINTERS = ["standard", "member", "corporate", "sponsored", "partner"];
 const PLACE = ["First", "Second", "Third"];
@@ -191,13 +192,14 @@ export async function sendCertificate(env, b, who) {
   const bytes = Uint8Array.from(atob(b.pdf), (x) => x.charCodeAt(0));
   if (bytes.length < 1000 || bytes.length > 4000000 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") throw new HttpError(400, "That is not a certificate PDF.");
   if (!(await dailyRoom(env)).room) throw new HttpError(409, "The day's email allowance on the free plan is used up. Send the rest tomorrow.");
-  const row = await env.DB.prepare("SELECT token FROM certificates WHERE ticket_id = ?").bind(c.ticketId).first();
   await env.KV.put(`cert:pdf:${c.n}`, bytes, { metadata: { hash: c.hash, at: now() } });
-  const link = `${env.WORKER_URL || "https://qlv2026.suturaworks.workers.dev"}/api/certificate?t=${row.token}`;
-  const msg = mail.certificateEmail({ first: c.printedName.split(" ")[0], link });
-  msg.attachments = [{ filename: `QLV-2026-Certificate-${c.certId}.pdf`, content: b.pdf, content_type: "application/pdf" }];
+  // The email carries the feedback link, not the PDF: the certificate
+  // downloads once their feedback is in (feedback.js).
+  const fb = await ensureFeedback(env, { key: `c:${c.ticketId}`, name: c.name, email: c.email, role: "participant", certTicketId: c.ticketId });
+  const msg = mail.certificateEmail({ first: c.printedName.split(" ")[0], link: feedbackUrl(env, fb.token), done: !!fb.submitted_at });
   const ok = await sendMail(env, { to: c.email, ...msg }, c.ref, "certificate");
   if (!ok) throw new HttpError(502, `The email to ${c.name} did not go. Try again in a minute.`);
+  await markEmailed(env, `c:${c.ticketId}`);
   await env.DB.prepare("UPDATE certificates SET sent_at = ?, sent_hash = ?, sent_by = ? WHERE ticket_id = ?").bind(now(), c.hash, who, c.ticketId).run();
   return { sent: c.ticketId, certId: c.certId };
 }
@@ -205,7 +207,10 @@ export async function sendCertificate(env, b, who) {
 // The download link in the email: the PDF as it was last sent.
 export async function certificateFile(env, url) {
   const t = String(url.searchParams.get("t") || "");
-  const row = t.length >= 20 ? await env.DB.prepare("SELECT id FROM certificates WHERE token = ? AND sent_at IS NOT NULL").bind(t).first() : null;
+  const row = t.length >= 20 ? await env.DB.prepare("SELECT id, ticket_id FROM certificates WHERE token = ? AND sent_at IS NOT NULL").bind(t).first() : null;
+  // Feedback first, then the certificate.
+  const gate = row ? await certificateGate(env, row.ticket_id) : null;
+  if (gate) return Response.redirect(gate, 302);
   const pdf = row ? await env.KV.get(`cert:pdf:${row.id}`, "arrayBuffer") : null;
   if (!pdf) return new Response("This certificate link is not valid.", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
   return new Response(pdf, { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="QLV-2026-Certificate-${certId(row.id)}.pdf"`, "cache-control": "private, max-age=300" } });
@@ -215,6 +220,7 @@ export async function certificateFile(env, url) {
 
 const ROLE_PHRASE = { judge: "a judge", mentor: "a mentor/advisor", both: "a judge and mentor/advisor", marshal: "our Lead Sprint Marshal", desk: "a check-in desk volunteer" };
 
+export const thanksPeopleFor = (env) => thanksPeople(env);
 async function thanksPeople(env) {
   const [staff, checked, team, desk, sent] = await Promise.all([
     staffPeople(env),
@@ -269,9 +275,11 @@ export async function sendThanks(env, b, who) {
   let sent = 0;
   for (const p of pick) {
     const m = thanksMessage(message, p);
-    const ok = await sendMail(env, { to: p.email, ...mail.thankYou(m) }, p.key, "thank_you");
+    const fb = await ensureFeedback(env, { key: p.key, name: p.name, email: p.email, role: p.role });
+    const ok = await sendMail(env, { to: p.email, ...mail.thankYou({ ...m, feedback: fb.submitted_at ? null : feedbackUrl(env, fb.token) }) }, p.key, "thank_you");
     if (ok) {
       sent++;
+      if (!fb.submitted_at) await markEmailed(env, p.key);
       await env.DB.prepare("INSERT INTO thanks_sent (key, name, email, sent_at, sent_by) VALUES (?, ?, ?, ?, ?) ON CONFLICT (key) DO UPDATE SET sent_at = excluded.sent_at, sent_by = excluded.sent_by, email = excluded.email")
         .bind(p.key, p.name, p.email, now(), who).run();
     }
@@ -282,7 +290,7 @@ export async function sendThanks(env, b, who) {
 export async function thanksPreview(env) {
   const { message } = await thanksView(env);
   const m = thanksMessage(message, { name: "Amina Bello", role: "judge" });
-  const e = mail.thankYou(m);
+  const e = mail.thankYou({ ...m, feedback: `${env.SITE_URL}feedback.html?t=example` });
   return { subject: e.subject, html: e.html };
 }
 
