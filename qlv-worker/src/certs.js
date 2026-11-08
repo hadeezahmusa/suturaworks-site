@@ -22,6 +22,10 @@ const SPRINTERS = ["standard", "member", "corporate", "sponsored", "partner"];
 const PLACE = ["First", "Second", "Third"];
 const RESULTS_KEY = "cert:results";
 const THANKS_KEY = "cert:thanks_message";
+// People thanked who are on no other list: [{ email, name, role }], role
+// "stage" or "desk". Set by hand for the stage coordinator and the person
+// who ran check-in on the admin login.
+const THANKS_EXTRA = "cert:thanks_extra";
 const SIG = { president: "cert:sig:president", chair: "cert:sig:chair" };
 const certId = (n) => "QLV26-C-" + String(n).padStart(3, "0");
 const clean = (v, max = 160) => String(v ?? "").replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -66,8 +70,8 @@ async function signatures(env) {
 // Checked-in sprinters get a row (and so an ID) the first time this runs.
 async function sprinters(env) {
   const q = () => env.DB.prepare(`SELECT t.id, t.name, t.email, t.kind, t.ticket_ref, t.table_index, t.late_after_freeze,
-      c.arrived_at, ce.id AS cert, ce.printed_name, ce.token, ce.sent_at, ce.sent_hash, ce.name_edited_at
-    FROM tickets t LEFT JOIN checkins c ON c.ticket_id = t.id LEFT JOIN certificates ce ON ce.ticket_id = t.id
+      r.tier, r.status AS reg_status, c.arrived_at, ce.id AS cert, ce.printed_name, ce.token, ce.sent_at, ce.sent_hash, ce.name_edited_at
+    FROM tickets t JOIN registrations r ON r.ref = t.reg_ref LEFT JOIN checkins c ON c.ticket_id = t.id LEFT JOIN certificates ce ON ce.ticket_id = t.id
     WHERE t.kind IN ('standard', 'member', 'corporate', 'sponsored', 'partner') AND t.cancelled_at IS NULL
       AND t.ticket_ref != 'pending' AND t.sent_at IS NOT NULL
     ORDER BY t.table_index IS NULL, t.table_index, t.name COLLATE NOCASE`).all();
@@ -94,6 +98,8 @@ async function certRows(env) {
     const c = {
       ticketId: r.id, ref: r.ticket_ref, name: r.name, email: r.email, checkedIn: !!r.arrived_at,
       tableName: r.table_index === null || r.table_index === undefined ? null : tableName(r.table_index),
+      // A sponsor's seats wait for the sponsor's payment (MIVA, for one).
+      held: r.tier === "sponsored" && !["verified", "confirmed"].includes(r.reg_status),
       certId: r.cert ? certId(r.cert) : null, n: r.cert || null, printedName: r.printed_name || r.name,
       version: v.version, place: v.place, sentAt: r.sent_at || null, nameEdited: !!r.name_edited_at,
     };
@@ -182,6 +188,7 @@ export async function sendCertificate(env, b, who) {
   const c = rows.find((r) => r.ticketId === Number(b.ticketId));
   if (!c) throw new HttpError(404, "That person is not on the certificate list.");
   if (!c.checkedIn || !c.certId) throw new HttpError(409, `${c.name} was not checked in, so gets no certificate.`);
+  if (c.held) throw new HttpError(409, `${c.name}'s certificate waits until their sponsor's payment is confirmed.`);
   // Nothing goes before the top three are confirmed, so nobody in a winning
   // team is sent a Participation certificate first: one certificate each.
   if (!(await results(env))) throw new HttpError(409, "Confirm the top three first.");
@@ -218,7 +225,7 @@ export async function certificateFile(env, url) {
 
 // ---------- thank-you emails ----------
 
-const ROLE_PHRASE = { judge: "a judge", mentor: "a mentor/advisor", both: "a judge and mentor/advisor", marshal: "our Lead Sprint Marshal", desk: "a check-in desk volunteer" };
+const ROLE_PHRASE = { judge: "a judge", mentor: "a mentor/advisor", both: "a judge and mentor/advisor", marshal: "our Lead Sprint Marshal", desk: "a check-in desk volunteer", stage: "our Stage Coordinator" };
 
 export const thanksPeopleFor = (env) => thanksPeople(env);
 async function thanksPeople(env) {
@@ -229,6 +236,7 @@ async function thanksPeople(env) {
     env.DB.prepare("SELECT email, name FROM access WHERE role = 'desk' ORDER BY email").all().then((r) => r.results),
     env.DB.prepare("SELECT key, sent_at FROM thanks_sent").all().then((r) => Object.fromEntries(r.results.map((x) => [x.key, x.sent_at]))),
   ]);
+  const extra = (await env.KV.get(THANKS_EXTRA, "json")) || [];
   const out = [];
   for (const p of staff) {
     if (p.kind === "facilitator" || (!p.judge && !p.mentor)) continue;
@@ -237,6 +245,11 @@ async function thanksPeople(env) {
   }
   for (const m of team) out.push({ key: `team:${m.id}`, name: m.name, email: m.email, role: "marshal", roleLabel: "Lead Sprint Marshal", eligible: true, why: "", sentAt: sent[`team:${m.id}`] || null });
   for (const d of desk) out.push({ key: `desk:${d.email}`, name: d.name || "", email: d.email, role: "desk", roleLabel: "Check-in desk", eligible: !!d.name, why: d.name ? "" : "Add their name", sentAt: sent[`desk:${d.email}`] || null, needsName: true });
+  for (const x of extra) {
+    const key = `${x.role === "desk" ? "desk" : "stage"}:${String(x.email).toLowerCase()}`;
+    if (out.some((p) => p.key === key)) continue;
+    out.push({ key, name: x.name, email: x.email, role: x.role === "desk" ? "desk" : "stage", roleLabel: x.role === "desk" ? "Check-in desk" : "Stage Coordinator", eligible: true, why: "", sentAt: sent[key] || null });
+  }
   return out;
 }
 

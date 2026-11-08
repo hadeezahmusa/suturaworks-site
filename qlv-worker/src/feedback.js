@@ -15,7 +15,7 @@ import * as mail from "./emails.js";
 const SPRINTERS = ["standard", "member", "corporate", "sponsored", "partner"];
 const ATTEND = ["yes", "maybe", "no"];
 const SOCIALS = ["instagram", "linkedin", "x", "facebook", "tiktok"];
-const ROLE_LABEL = { participant: "Participant", judge: "Judge", mentor: "Mentor/Advisor", both: "Judge and Mentor/Advisor", marshal: "Lead Sprint Marshal", desk: "Check-in desk", facilitator: "Facilitator" };
+const ROLE_LABEL = { participant: "Participant", judge: "Judge", mentor: "Mentor/Advisor", both: "Judge and Mentor/Advisor", marshal: "Lead Sprint Marshal", desk: "Check-in desk", stage: "Stage Coordinator", facilitator: "Facilitator" };
 const clean = (v, max) => String(v ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").replace(/\r\n?/g, "\n").trim().slice(0, max);
 
 export const feedbackUrl = (env, tok) => `${env.SITE_URL}feedback.html?t=${tok}`;
@@ -96,8 +96,9 @@ export async function submitFeedback(env, b) {
 async function everyone(env) {
   const { thanksPeopleFor } = await import("./certs.js");
   const [spr, thanks, staff, checked] = await Promise.all([
-    env.DB.prepare(`SELECT t.id, t.name, t.email, t.table_index FROM tickets t JOIN checkins c ON c.ticket_id = t.id
-      WHERE t.kind IN (${SPRINTERS.map(() => "?").join(", ")}) AND t.cancelled_at IS NULL AND t.ticket_ref != 'pending' AND t.sent_at IS NOT NULL
+    // Sponsored seats wait for the sponsor's payment, like their certificates.
+    env.DB.prepare(`SELECT t.id, t.name, t.email, t.table_index FROM tickets t JOIN checkins c ON c.ticket_id = t.id JOIN registrations r ON r.ref = t.reg_ref
+      WHERE NOT (r.tier = 'sponsored' AND r.status NOT IN ('verified', 'confirmed')) AND t.kind IN (${SPRINTERS.map(() => "?").join(", ")}) AND t.cancelled_at IS NULL AND t.ticket_ref != 'pending' AND t.sent_at IS NOT NULL
       ORDER BY t.name COLLATE NOCASE`).bind(...SPRINTERS).all().then((r) => r.results),
     thanksPeopleFor(env),
     staffPeople(env),
