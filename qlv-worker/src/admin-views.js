@@ -9,6 +9,7 @@ import { LOBBY_STYLE, LOBBY_HTML, LOBBY_JS } from "./lobby-views.js";
 import { SPRINT_STYLE, SPRINT_HTML, SPRINT_JS } from "./sprint-views.js";
 import { CERTS_STYLE, CERTS_HTML, CERTS_JS } from "./certs-views.js";
 import { FEEDBACK_STYLE, FEEDBACK_HTML, FEEDBACK_JS } from "./feedback-views.js";
+import { REPORT_JS } from "./report-views.js";
 import { OFFICE_STYLE, OFFICE_HTML, OFFICE_JS } from "./office-views.js";
 
 export const VIEWS_STYLE = MONEY_STYLE + SCREEN_STYLE + LOBBY_STYLE + SPRINT_STYLE + CERTS_STYLE + FEEDBACK_STYLE + OFFICE_STYLE + String.raw`
@@ -130,7 +131,7 @@ export const VIEWS_HTML = MONEY_HTML + SCREEN_HTML + LOBBY_HTML + CERTS_HTML + F
   </div>
 </div>`;
 
-export const VIEWS_JS = MONEY_JS + SCREEN_JS + LOBBY_JS + SPRINT_JS + CERTS_JS + FEEDBACK_JS + OFFICE_JS + String.raw`
+export const VIEWS_JS = MONEY_JS + SCREEN_JS + LOBBY_JS + SPRINT_JS + CERTS_JS + FEEDBACK_JS + REPORT_JS + OFFICE_JS + String.raw`
 const VIEWS = { tables: "tablesView", partners: "partnersView", screen: "screenView", lobby: "lobbyView", staff: "staffView", export: "exportView", money: "moneyView",
   rebalance: "rebalanceView", checkin: "checkinView", briefings: "briefingsView", scoring: "scoringView", stage: "stageView", settings: "settingsView", certs: "certsView", feedback: "feedbackView", mail: "mailView", invoices: "invView" };
 const TIER_BG = { J: ["var(--yel)", "var(--ink)"], S: ["var(--navy)", "#fff"], C: ["#2C3E58", "#fff"], P: ["#E8E9EC", "var(--ink)"], T: ["#1F5F5B", "#fff"] };

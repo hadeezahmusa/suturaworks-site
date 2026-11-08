@@ -1049,7 +1049,7 @@ function appPage(email, role, site) {
   const boardTabs = `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Sponsors</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button></div>
     <div class="note" style="margin:0 0 14px">Board view, read only. Emails, phone numbers, proofs of payment and private links are hidden. Nothing here can be changed.</div>`;
   return page("QLV 2026 admin", `<div class="top"><b>QLV 2026 ${board ? "board view" : admin ? "admin" : "payment verification"}</b><span class="who">${board ? "Read only" : `Signed in as ${e(email)}`}
-    ${board ? "" : `&middot; <a href="/admin/export/registrations.csv">Registrations CSV</a>`}${role === "admin" ? ` &middot; <a href="/admin/export/tickets.csv">Tickets CSV</a> &middot; <a href="/admin/export/answers.csv">Answers CSV</a>` : ""}
+    ${board ? "" : `&middot; <a href="/admin/export/registrations.csv">Registrations CSV</a>`}${role === "admin" ? ` &middot; <a href="/admin/export/tickets.csv">Tickets CSV</a> &middot; <a href="/admin/export/answers.csv">Answers CSV</a> &middot; <a href="#" data-report="1"><b>Master report (Excel)</b></a>` : ""}
     &middot; <form method="post" action="/admin/logout" style="display:inline"><button class="link" style="color:#fff">Sign out</button></form></span></div>
   <div class="wrap">
     ${!admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="money">Money</button></div>` : ""}
@@ -1225,6 +1225,7 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET partner-codes": () => pcodes.codesView(env),
       "GET certs": () => certs.certView(env),
       "GET feedback": async () => (await import("./feedback.js")).feedbackAdmin(env),
+      "GET report": async () => (await import("./report.js")).reportData(env),
       "POST feedback-send": async () => (await import("./feedback.js")).sendFeedbackEmails(env, body, who),
       "POST feedback-link": async () => (await import("./feedback.js")).feedbackLink(env, body),
       "GET mail": () => mailtab.mailView(env),
