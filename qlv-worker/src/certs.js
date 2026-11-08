@@ -23,7 +23,7 @@ const PLACE = ["First", "Second", "Third"];
 const RESULTS_KEY = "cert:results";
 const THANKS_KEY = "cert:thanks_message";
 // People thanked who are on no other list: [{ email, name, role }], role
-// "stage" or "desk". Set by hand for the stage coordinator and the person
+// "stage", "desk", "chair" or "president". Set by hand for the stage coordinator and the person
 // who ran check-in on the admin login.
 const THANKS_EXTRA = "cert:thanks_extra";
 const SIG = { president: "cert:sig:president", chair: "cert:sig:chair" };
@@ -225,7 +225,7 @@ export async function certificateFile(env, url) {
 
 // ---------- thank-you emails ----------
 
-const ROLE_PHRASE = { judge: "a judge", mentor: "a mentor/advisor", both: "a judge and mentor/advisor", marshal: "our Lead Sprint Marshal", desk: "a check-in desk volunteer", stage: "our Stage Coordinator" };
+const ROLE_PHRASE = { judge: "a judge", mentor: "a mentor/advisor", both: "a judge and mentor/advisor", marshal: "our Lead Sprint Marshal", desk: "a check-in desk volunteer", stage: "our Stage Coordinator", chair: "our Chairperson", president: "our President" };
 
 export const thanksPeopleFor = (env) => thanksPeople(env);
 async function thanksPeople(env) {
@@ -245,10 +245,12 @@ async function thanksPeople(env) {
   }
   for (const m of team) out.push({ key: `team:${m.id}`, name: m.name, email: m.email, role: "marshal", roleLabel: "Lead Sprint Marshal", eligible: true, why: "", sentAt: sent[`team:${m.id}`] || null });
   for (const d of desk) out.push({ key: `desk:${d.email}`, name: d.name || "", email: d.email, role: "desk", roleLabel: "Check-in desk", eligible: !!d.name, why: d.name ? "" : "Add their name", sentAt: sent[`desk:${d.email}`] || null, needsName: true });
+  const EXTRA_LABEL = { stage: "Stage Coordinator", desk: "Check-in desk", chair: "Chairperson", president: "President" };
   for (const x of extra) {
-    const key = `${x.role === "desk" ? "desk" : "stage"}:${String(x.email).toLowerCase()}`;
+    const role = EXTRA_LABEL[x.role] ? x.role : "stage";
+    const key = `${role}:${String(x.email).toLowerCase()}`;
     if (out.some((p) => p.key === key)) continue;
-    out.push({ key, name: x.name, email: x.email, role: x.role === "desk" ? "desk" : "stage", roleLabel: x.role === "desk" ? "Check-in desk" : "Stage Coordinator", eligible: true, why: "", sentAt: sent[key] || null });
+    out.push({ key, name: x.name, email: x.email, role, roleLabel: EXTRA_LABEL[role], eligible: true, why: "", sentAt: sent[key] || null });
   }
   return out;
 }
