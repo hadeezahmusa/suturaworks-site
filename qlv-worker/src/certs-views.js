@@ -72,7 +72,8 @@ async function loadCerts() {
     (r.sentAt ? ' · <button class="link" data-ctsend="' + r.ticketId + '">Resend</button>' : "") + "</td></tr>";
   const head = '<table><thead><tr><th>ID</th><th>Name on the certificate</th><th>Team</th><th class="hide-s">Email</th><th>Status</th><th></th></tr></thead><tbody>';
   const issue = (list, kind, label) => {
-    const n = list.filter((r) => !r.sentAt).length, ch = list.filter((r) => r.changed).length;
+    // People with no email are skipped, so one gap never stops the batch.
+    const n = list.filter((r) => !r.sentAt && r.email).length, ch = list.filter((r) => r.changed && r.email).length, noMail = list.filter((r) => !r.sentAt && !r.email).length;
     const why = !sigOk ? "Upload both signatures first." : !res ? "Confirm the results first, so the winning team gets both certificates." : "";
     return '<div class="actions" style="margin:0 0 10px">' + (why ? '<span class="small" style="align-self:center">' + why + "</span>" : "") +
       '<button class="btn gold" data-ctissue="' + kind + '"' + (n && !why ? "" : " disabled") + ">Issue " + n + " " + label + (n === 1 ? " certificate" : " certificates") + "</button>" +
@@ -179,11 +180,11 @@ document.addEventListener("click", async (e) => {
     }
     if (el("[data-ctissue]")) {
       const kind = el("[data-ctissue]").dataset.ctissue;
-      return ctIssue(ctData.rows.filter((r) => r.checkedIn && !r.held && r.version === kind && !r.sentAt), kind === "achievement" ? "Achievement" : "Participation");
+      return ctIssue(ctData.rows.filter((r) => r.checkedIn && !r.held && r.email && r.version === kind && !r.sentAt), kind === "achievement" ? "Achievement" : "Participation");
     }
     if (el("[data-ctresend]")) {
       const kind = el("[data-ctresend]").dataset.ctresend;
-      return ctIssue(ctData.rows.filter((r) => r.checkedIn && !r.held && r.version === kind && r.changed), "changed " + (kind === "achievement" ? "Achievement" : "Participation"));
+      return ctIssue(ctData.rows.filter((r) => r.checkedIn && !r.held && r.email && r.version === kind && r.changed), "changed " + (kind === "achievement" ? "Achievement" : "Participation"));
     }
     if (el("[data-ct=zip]")) {
       const list = ctData.rows.filter((r) => r.checkedIn && !r.held && r.certId);
