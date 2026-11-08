@@ -31,6 +31,8 @@ async function ctLibs() {
 }
 const ctCert = (r) => ({ id: r.certId, version: r.version, place: r.place, name: r.printedName, table: r.tableName });
 async function ctPdf(r) { await ctLibs(); return QLVCert.build(ctCert(r), ctSigs); }
+// The winning team's second certificate: Participation, numbered with -P.
+const ctPart = (r) => ({ ...r, version: "participation", place: null, certId: r.partId });
 function ctB64(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
 const PLACE_WORD = ["", "First", "Second", "Third"];
 
@@ -64,14 +66,14 @@ async function loadCerts() {
       '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0">' + [0, 1, 2].map((i) => '<label class="small">' + PLACE_WORD[i + 1] + "<br>" + pick(i, prop.order[i] && prop.order[i].index) + "</label>").join("") + "</div>" +
       '<button class="btn gold" data-ct="confirm">Confirm results</button>';
   const status = (r) => r.changed ? '<span class="st queried">Changed since sent</span>' : r.sentAt ? '<span class="st confirmed">Sent ' + esc(when(r.sentAt)) + "</span>" : '<span class="st awaiting">Not sent</span>';
-  const row = (r) => '<tr><td class="ctid">' + esc(r.certId) + "</td><td><b>" + esc(r.printedName) + "</b>" + (r.nameEdited ? '<div class="small">Name corrected</div>' : "") + "</td><td class=\"small\">" +
+  const row = (r) => '<tr><td class="ctid">' + esc(r.certId) + (r.partId ? "<br>" + esc(r.partId) : "") + "</td><td><b>" + esc(r.printedName) + "</b>" + (r.nameEdited ? '<div class="small">Name corrected</div>' : "") + "</td><td class=\"small\">" +
     (r.version === "achievement" ? PLACE_WORD[r.place] + " place · " : "") + esc(r.tableName || "No team") + '</td><td class="small hide-s">' + esc(r.email || "") + "</td><td>" + status(r) + '</td><td class="small" style="white-space:nowrap">' +
-    '<button class="link" data-ctpv="' + r.ticketId + '">Preview</button> · <button class="link" data-ctname="' + r.ticketId + '">Edit name</button>' +
+    '<button class="link" data-ctpv="' + r.ticketId + '">Preview' + (r.partId ? " Achievement" : "") + "</button> · " + (r.partId ? '<button class="link" data-ctpv="' + r.ticketId + '" data-part="1">Preview Participation</button> · ' : "") + '<button class="link" data-ctname="' + r.ticketId + '">Edit name</button>' +
     (r.sentAt ? ' · <button class="link" data-ctsend="' + r.ticketId + '">Resend</button>' : "") + "</td></tr>";
   const head = '<table><thead><tr><th>ID</th><th>Name on the certificate</th><th>Team</th><th class="hide-s">Email</th><th>Status</th><th></th></tr></thead><tbody>';
   const issue = (list, kind, label) => {
     const n = list.filter((r) => !r.sentAt).length, ch = list.filter((r) => r.changed).length;
-    const why = !sigOk ? "Upload both signatures first." : !res ? "Confirm the top three first, so nobody in a winning team gets Participation by mistake." : "";
+    const why = !sigOk ? "Upload both signatures first." : !res ? "Confirm the results first, so the winning team gets both certificates." : "";
     return '<div class="actions" style="margin:0 0 10px">' + (why ? '<span class="small" style="align-self:center">' + why + "</span>" : "") +
       '<button class="btn gold" data-ctissue="' + kind + '"' + (n && !why ? "" : " disabled") + ">Issue " + n + " " + label + (n === 1 ? " certificate" : " certificates") + "</button>" +
       (ch ? '<button class="btn ghost" data-ctresend="' + kind + '"' + (why ? " disabled" : "") + ">Resend " + ch + " changed</button>" : "") + "</div>";
@@ -84,9 +86,9 @@ async function loadCerts() {
     '<div class="card" style="flex:1 1 360px"><h2>Top three teams</h2>' + resultsCard + "</div></div>" +
     (flagged.length ? '<div class="card" style="margin-top:14px"><h2>Names to check</h2><p class="small" style="margin:-4px 0 8px">These print exactly as shown. Correcting one here changes only the certificate, not the ticket.</p>' +
       flagged.map((r) => '<div class="sig"><span><b>' + esc(r.printedName) + "</b> " + r.flags.map((f) => '<span class="flag">' + esc(f) + "</span>").join("") + '</span><button class="link" data-ctname="' + r.ticketId + '">Edit name</button></div>').join("") + "</div>" : "") +
-    '<div class="card" style="margin-top:14px;padding:0;overflow-x:auto"><div style="padding:14px 16px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><div><h2 style="margin:0">Certificates</h2><p class="small" style="margin:4px 0 10px">Only sprinters checked in on Saturday. The top three teams get Achievement instead of Participation, never both. The email carries their feedback link and the certificate downloads once they answer. Nothing goes until you press Issue.</p></div>' +
+    '<div class="card" style="margin-top:14px;padding:0;overflow-x:auto"><div style="padding:14px 16px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><div><h2 style="margin:0">Certificates</h2><p class="small" style="margin:4px 0 10px">Only sprinters checked in on Saturday. The winning team gets two certificates, Achievement and Participation (numbered with -P). Everyone else, second and third included, gets Participation. The email carries their feedback link and the certificate downloads once they answer. Nothing goes until you press Issue.</p></div>' +
       '<button class="btn ghost" data-ct="zip"' + (ach.length + par.length ? "" : " disabled") + ">Download all</button></div>" +
-      (res ? '<div style="padding:0 16px"><h2 style="font-size:14px">Achievement · ' + ach.length + "</h2>" + issue(ach, "achievement", "Achievement") + "</div>" + head + ach.map(row).join("") + "</tbody></table>" : "") +
+      (res ? '<div style="padding:0 16px"><h2 style="font-size:14px">Winning team: Achievement and Participation · ' + ach.length + "</h2>" + issue(ach, "achievement", "Achievement") + "</div>" + head + ach.map(row).join("") + "</tbody></table>" : "") +
       '<div style="padding:12px 16px 0"><h2 style="font-size:14px">Participation · ' + par.length + "</h2>" + issue(par, "participation", "Participation") + "</div>" + head + (par.map(row).join("") || '<tr><td colspan="6" class="small">Nobody checked in yet.</td></tr>') + "</tbody></table>" +
       (held.length ? '<div style="padding:12px 16px 0"><h2 style="font-size:14px">Waiting for the sponsor\'s payment · ' + held.length + '</h2><p class="small" style="margin:0 0 8px">Checked in on sponsored seats. Their certificates and feedback links unlock here once the sponsor\'s payment is verified on the Registrations tab.</p></div><table class="grey"><tbody>' + held.map((r) => "<tr><td>" + esc(r.printedName) + '</td><td class="small">' + (r.version === "achievement" ? PLACE_WORD[r.place] + " place · " : "") + esc(r.tableName || "No team") + '</td><td class="small hide-s">' + esc(r.email || "") + '</td><td class="small">Payment not confirmed</td></tr>').join("") + "</tbody></table>" : "") +
       (out.length ? '<div style="padding:12px 16px 0"><h2 style="font-size:14px">Not checked in, no certificate · ' + out.length + '</h2></div><table class="grey"><tbody>' + out.map((r) => "<tr><td>" + esc(r.name) + '</td><td class="small">' + esc(r.tableName || "No team") + '</td><td class="small hide-s">' + esc(r.email || "") + '</td><td class="small">Not checked in</td></tr>').join("") + "</tbody></table>" : "") + "</div>" +
@@ -103,7 +105,8 @@ async function loadCerts() {
 
 async function ctSendOne(r) {
   const pdf = await ctPdf(r);
-  return call("cert-send", { ticketId: r.ticketId, hash: r.hash, pdf: ctB64(pdf) });
+  const pdf2 = r.partId ? ctB64(await ctPdf(ctPart(r))) : undefined;
+  return call("cert-send", { ticketId: r.ticketId, hash: r.hash, pdf: ctB64(pdf), pdf2 });
 }
 async function ctIssue(list, label) {
   if (!list.length) return;
@@ -155,7 +158,8 @@ document.addEventListener("click", async (e) => {
     }
     if (el("[data-ctsigrm]")) { if (!confirm("Remove this signature?")) return; await call("cert-signature", { who: el("[data-ctsigrm]").dataset.ctsigrm, remove: true }); ctSigs = null; await ctLibs().catch(() => {}); return loadCerts(); }
     if (el("[data-ctpv]")) {
-      const r = ctData.rows.find((x) => x.ticketId === Number(el("[data-ctpv]").dataset.ctpv));
+      const r0 = ctData.rows.find((x) => x.ticketId === Number(el("[data-ctpv]").dataset.ctpv));
+      const r = el("[data-ctpv]").dataset.part ? ctPart(r0) : r0;
       const w = window.open("", "_blank");
       const pdf = await ctPdf(r);
       const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
@@ -184,7 +188,11 @@ document.addEventListener("click", async (e) => {
     if (el("[data-ct=zip]")) {
       const list = ctData.rows.filter((r) => r.checkedIn && !r.held && r.certId);
       const files = [];
-      for (const r of list) { msg("Making " + (files.length + 1) + " of " + list.length + "…", true); files.push({ name: r.certId + " " + r.printedName.replace(/[^A-Za-z0-9 .'-]/g, "") + ".pdf", data: await ctPdf(r) }); }
+      for (const r of list) {
+        msg("Making " + (files.length + 1) + "…", true);
+        files.push({ name: r.certId + " " + r.printedName.replace(/[^A-Za-z0-9 .'-]/g, "") + ".pdf", data: await ctPdf(r) });
+        if (r.partId) files.push({ name: r.partId + " " + r.printedName.replace(/[^A-Za-z0-9 .'-]/g, "") + ".pdf", data: await ctPdf(ctPart(r)) });
+      }
       const a = document.createElement("a"); a.href = URL.createObjectURL(ctZip(files)); a.download = "QLV-2026-Certificates.zip"; a.click();
       msg(files.length + " certificates in the download.", true); return;
     }

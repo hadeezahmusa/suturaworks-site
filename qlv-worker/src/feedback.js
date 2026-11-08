@@ -46,11 +46,17 @@ async function rowByToken(env, t) {
   return row;
 }
 
-async function certificateLink(env, row) {
-  if (!row.cert_ticket_id) return null;
-  const c = await env.DB.prepare("SELECT token FROM certificates WHERE ticket_id = ? AND sent_at IS NOT NULL").bind(row.cert_ticket_id).first();
-  return c ? `${env.WORKER_URL || "https://qlv2026.suturaworks.workers.dev"}/api/certificate?t=${c.token}` : null;
+// The person's certificates once sent: one, or two for the top three teams
+// (Achievement, then Participation).
+async function certificateLinks(env, row) {
+  if (!row.cert_ticket_id) return [];
+  const c = await env.DB.prepare("SELECT id, token FROM certificates WHERE ticket_id = ? AND sent_at IS NOT NULL").bind(row.cert_ticket_id).first();
+  if (!c) return [];
+  const base = `${env.WORKER_URL || "https://qlv2026.suturaworks.workers.dev"}/api/certificate?t=${c.token}`;
+  const two = (await env.KV.list({ prefix: `cert:pdf:${c.id}:p`, limit: 1 })).keys.length > 0;
+  return two ? [{ label: "Certificate of Achievement", url: base }, { label: "Certificate of Participation", url: base + "&v=p" }] : [{ label: "Your certificate", url: base }];
 }
+const certificateLink = async (env, row) => (await certificateLinks(env, row))[0]?.url || null;
 
 // ---------- the public page ----------
 
@@ -63,12 +69,13 @@ export async function feedbackPage(env, url) {
     hasCertificate: !!row.cert_ticket_id,
     submitted: !!row.submitted_at,
     certificate: row.submitted_at ? await certificateLink(env, row) : null,
+    certificates: row.submitted_at ? await certificateLinks(env, row) : [],
   };
 }
 
 export async function submitFeedback(env, b) {
   const row = await rowByToken(env, b.t);
-  if (row.submitted_at) return { ok: true, already: true, certificate: await certificateLink(env, row) };
+  if (row.submitted_at) return { ok: true, already: true, certificate: await certificateLink(env, row), certificates: await certificateLinks(env, row) };
   const a = b.answers || {};
   const overall = Number(a.overall), recommend = Number(a.recommend);
   if (!Number.isInteger(overall) || overall < 1 || overall > 5) throw new HttpError(400, "Choose how your overall experience was, from 1 to 5.");
@@ -86,7 +93,7 @@ export async function submitFeedback(env, b) {
       membership_info = ?, event_emails = ?, socials = ? WHERE id = ? AND submitted_at IS NULL`)
     .bind(now(), overall, expected, experienced, nextTime, recommend, a.attend_again, a.membership_info ? 1 : 0, a.event_emails ? 1 : 0,
       Object.keys(socials).length ? JSON.stringify(socials) : null, row.id).run();
-  return { ok: true, certificate: await certificateLink(env, row) };
+  return { ok: true, certificate: await certificateLink(env, row), certificates: await certificateLinks(env, row) };
 }
 
 // ---------- the Feedback tab ----------

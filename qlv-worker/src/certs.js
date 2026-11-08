@@ -53,8 +53,10 @@ async function sha(text) {
 }
 
 // What the certificate says: the hash of this is how "changed since sent" works.
+// The top three teams get two certificates: Achievement, and Participation
+// with the same number and "-P" after it.
 export function certContent(c) {
-  return { name: c.printedName, version: c.version, place: c.place, table: c.tableName, id: c.certId };
+  return { name: c.printedName, version: c.version, place: c.place, table: c.tableName, id: c.certId, also: c.version === "achievement" && c.certId ? c.certId + "-P" : null };
 }
 
 async function results(env) {
@@ -87,7 +89,9 @@ async function sprinters(env) {
 
 function versionOf(r, res) {
   const place = res && r.table_index !== null && r.table_index !== undefined ? res.top.indexOf(r.table_index) : -1;
-  return place >= 0 ? { version: "achievement", place: place + 1 } : { version: "participation", place: null };
+  // Only the winning team gets Achievement (as well as Participation).
+  // Second and third get Participation, like everyone else.
+  return place === 0 ? { version: "achievement", place: 1 } : { version: "participation", place: null };
 }
 
 async function certRows(env) {
@@ -100,7 +104,8 @@ async function certRows(env) {
       tableName: r.table_index === null || r.table_index === undefined ? null : tableName(r.table_index),
       // A sponsor's seats wait for the sponsor's payment (MIVA, for one).
       held: r.tier === "sponsored" && !["verified", "confirmed"].includes(r.reg_status),
-      certId: r.cert ? certId(r.cert) : null, n: r.cert || null, printedName: r.printed_name || r.name,
+      certId: r.cert ? certId(r.cert) : null,
+      partId: r.cert && v.version === "achievement" ? certId(r.cert) + "-P" : null, n: r.cert || null, printedName: r.printed_name || r.name,
       version: v.version, place: v.place, sentAt: r.sent_at || null, nameEdited: !!r.name_edited_at,
     };
     c.hash = await sha(JSON.stringify(certContent(c)));
@@ -190,16 +195,21 @@ export async function sendCertificate(env, b, who) {
   if (!c.checkedIn || !c.certId) throw new HttpError(409, `${c.name} was not checked in, so gets no certificate.`);
   if (c.held) throw new HttpError(409, `${c.name}'s certificate waits until their sponsor's payment is confirmed.`);
   // Nothing goes before the top three are confirmed, so nobody in a winning
-  // team is sent a Participation certificate first: one certificate each.
+  // team is sent Participation alone by mistake.
   if (!(await results(env))) throw new HttpError(409, "Confirm the top three first.");
   if (b.hash !== c.hash) throw new HttpError(409, "Something changed on this certificate since the page loaded. Refresh and send again.");
   if (!c.email) throw new HttpError(409, `${c.name} has no email address.`);
-  const m = /^[A-Za-z0-9+/=]+$/.exec(String(b.pdf || ""));
-  if (!m) throw new HttpError(400, "The certificate did not come through. Try again.");
-  const bytes = Uint8Array.from(atob(b.pdf), (x) => x.charCodeAt(0));
-  if (bytes.length < 1000 || bytes.length > 4000000 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") throw new HttpError(400, "That is not a certificate PDF.");
+  const pdfOf = (b64) => {
+    if (!/^[A-Za-z0-9+/=]+$/.test(String(b64 || ""))) throw new HttpError(400, "The certificate did not come through. Try again.");
+    const bytes = Uint8Array.from(atob(b64), (x) => x.charCodeAt(0));
+    if (bytes.length < 1000 || bytes.length > 4000000 || String.fromCharCode(...bytes.subarray(0, 5)) !== "%PDF-") throw new HttpError(400, "That is not a certificate PDF.");
+    return bytes;
+  };
+  const bytes = pdfOf(b.pdf);
+  const part = c.partId ? pdfOf(b.pdf2) : null;
   if (!(await dailyRoom(env)).room) throw new HttpError(409, "The day's email allowance on the free plan is used up. Send the rest tomorrow.");
   await env.KV.put(`cert:pdf:${c.n}`, bytes, { metadata: { hash: c.hash, at: now() } });
+  if (part) await env.KV.put(`cert:pdf:${c.n}:p`, part, { metadata: { hash: c.hash, at: now() } });
   // The email carries the feedback link, not the PDF: the certificate
   // downloads once their feedback is in (feedback.js).
   const fb = await ensureFeedback(env, { key: `c:${c.ticketId}`, name: c.name, email: c.email, role: "participant", certTicketId: c.ticketId });
@@ -218,9 +228,10 @@ export async function certificateFile(env, url) {
   // Feedback first, then the certificate.
   const gate = row ? await certificateGate(env, row.ticket_id) : null;
   if (gate) return Response.redirect(gate, 302);
-  const pdf = row ? await env.KV.get(`cert:pdf:${row.id}`, "arrayBuffer") : null;
+  const p = url.searchParams.get("v") === "p";
+  const pdf = row ? await env.KV.get(`cert:pdf:${row.id}${p ? ":p" : ""}`, "arrayBuffer") : null;
   if (!pdf) return new Response("This certificate link is not valid.", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
-  return new Response(pdf, { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="QLV-2026-Certificate-${certId(row.id)}.pdf"`, "cache-control": "private, max-age=300" } });
+  return new Response(pdf, { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="QLV-2026-Certificate-${certId(row.id)}${p ? "-P" : ""}.pdf"`, "cache-control": "private, max-age=300" } });
 }
 
 // ---------- thank-you emails ----------
