@@ -11,6 +11,7 @@ import { tableName } from "./config.js";
 import { staffPeople } from "./briefings.js";
 import { dailyRoom } from "./mailer.js";
 import * as mail from "./emails.js";
+import { greetName } from "./names.js";
 
 const SPRINTERS = ["standard", "member", "corporate", "sponsored", "partner"];
 const ATTEND = ["yes", "maybe", "no"];
@@ -64,7 +65,7 @@ export async function feedbackPage(env, url) {
   const row = await rowByToken(env, url.searchParams.get("t"));
   if (!row.opened_at) await env.DB.prepare("UPDATE feedback SET opened_at = ? WHERE id = ?").bind(now(), row.id).run();
   return {
-    first: String(row.name || "").trim().split(/\s+/)[0] || "",
+    first: greetName(row.name),
     role: row.role, roleLabel: ROLE_LABEL[row.role] || "",
     hasCertificate: !!row.cert_ticket_id,
     submitted: !!row.submitted_at,
@@ -165,7 +166,7 @@ export async function sendFeedbackEmails(env, b, who) {
     const row = await ensureFeedback(env, person);
     const reminder = !!p.emailedAt;
     const certificate = !!(await certificateLink(env, row));
-    const ok = await sendMail(env, { to: p.email, ...mail.feedbackRequest({ first: String(p.name || "").split(" ")[0], link: feedbackUrl(env, row.token), reminder, certificate }) }, p.key, reminder ? "feedback_reminder" : "feedback_request");
+    const ok = await sendMail(env, { to: p.email, ...mail.feedbackRequest({ first: greetName(p.name), link: feedbackUrl(env, row.token), reminder, certificate }) }, p.key, reminder ? "feedback_reminder" : "feedback_request");
     if (ok) { sent++; await markEmailed(env, p.key); }
   }
   return { sent, failed: pick.length - sent, ...(await feedbackAdmin(env)) };

@@ -16,6 +16,7 @@ import { getSettings } from "./settings.js";
 import { dailyRoom } from "./mailer.js";
 import { staffPeople } from "./briefings.js";
 import * as mail from "./emails.js";
+import { greetName } from "./names.js";
 import { ensureFeedback, feedbackUrl, markEmailed, certificateGate } from "./feedback.js";
 
 const SPRINTERS = ["standard", "member", "corporate", "sponsored", "partner"];
@@ -213,7 +214,7 @@ export async function sendCertificate(env, b, who) {
   // The email carries the feedback link, not the PDF: the certificate
   // downloads once their feedback is in (feedback.js).
   const fb = await ensureFeedback(env, { key: `c:${c.ticketId}`, name: c.name, email: c.email, role: "participant", certTicketId: c.ticketId });
-  const msg = mail.certificateEmail({ first: c.printedName.split(" ")[0], link: feedbackUrl(env, fb.token), done: !!fb.submitted_at });
+  const msg = mail.certificateEmail({ first: greetName(c.printedName), link: feedbackUrl(env, fb.token), done: !!fb.submitted_at });
   const ok = await sendMail(env, { to: c.email, ...msg }, c.ref, "certificate");
   if (!ok) throw new HttpError(502, `The email to ${c.name} did not go. Try again in a minute.`);
   await markEmailed(env, `c:${c.ticketId}`);
@@ -287,7 +288,7 @@ export async function saveDeskName(env, b) {
 }
 
 export function thanksMessage(msg, p) {
-  const fill = (t) => t.replace(/\{first_name\}/g, p.name.split(" ")[0] || "there").replace(/\{role\}/g, ROLE_PHRASE[p.role] || "part of the team");
+  const fill = (t) => t.replace(/\{first_name\}/g, greetName(p.name) || "there").replace(/\{role\}/g, ROLE_PHRASE[p.role] || "part of the team");
   return { subject: fill(msg.subject), paragraphs: fill(msg.body).split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean) };
 }
 
