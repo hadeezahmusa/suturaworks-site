@@ -47,12 +47,13 @@ function form() {
     '<div id="err" class="err" hidden style="margin:0 0 12px"></div><button type="button" class="send" id="send">Send my feedback</button>';
 }
 
-function done(certificate) {
+function done(certificate, list) {
+  const certs = list && list.length ? list : certificate ? [{ label: "Your certificate", url: certificate }] : [];
   store.clear();
   $("#title").textContent = "Thank you";
   $("#main").innerHTML = '<div class="card hold"><div class="lock" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
     "<h2>Thank you" + (info && info.first ? ", " + esc(info.first) : "") + "</h2><p>Your feedback is in. It helps us make the next JCI Aso programme better.</p>" +
-    (certificate ? '<a class="dl" href="' + esc(certificate) + '">Download your certificate</a><p class="small" style="margin-top:10px;font-size:13px">You can come back to this link any time to download it again.</p>'
+    (certs.length ? certs.map((c) => '<a class="dl" href="' + esc(c.url) + '">Download ' + (certs.length > 1 ? "your " + esc(c.label) : "your certificate") + "</a>").join("<br>") + '<p class="small" style="margin-top:10px;font-size:13px">You can come back to this link any time to download ' + (certs.length > 1 ? "them" : "it") + " again.</p>"
       : info && info.hasCertificate ? "<p style=\"margin-top:10px\">Your certificate will be emailed to you shortly.</p>" : "") + "</div>";
 }
 
@@ -86,7 +87,7 @@ document.addEventListener("click", async (e) => {
       const res = await fetch(API + "/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: T, answers: a }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || "That did not go through. Please try again.");
-      done(d.certificate);
+      done(d.certificate, d.certificates);
     } catch (err) {
       $("#err").textContent = (err.message === "Failed to fetch" ? "No connection. Your answers are saved on this phone: try again in a moment." : err.message); $("#err").hidden = false;
       btn.disabled = false; btn.textContent = "Send my feedback";
@@ -106,7 +107,7 @@ document.addEventListener("input", (e) => {
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(d.error || "This feedback link is not valid.");
     info = d;
-    if (d.submitted) done(d.certificate); else form();
+    if (d.submitted) done(d.certificate, d.certificates); else form();
   } catch (err) {
     $("#main").innerHTML = '<div class="err">' + esc(err.message === "Failed to fetch" ? "No connection. Check your internet and refresh this page." : err.message) + "</div>";
   }
