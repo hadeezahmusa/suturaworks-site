@@ -601,6 +601,9 @@ const ROUTES = {
   "GET /api/score": (req, env, ctx, url) => scoringPage(env, url),
   "POST /api/score": async (req, env) => submitScore(env, await readJson(req)),
   "GET /api/stage": (req, env, ctx, url) => displayPoll(env, url),
+  // Feedback after the event, behind each person's own link.
+  "GET /api/feedback": async (req, env, ctx, url) => (await import("./feedback.js")).feedbackPage(env, url),
+  "POST /api/feedback": async (req, env) => (await import("./feedback.js")).submitFeedback(env, await readJson(req)),
   // The lobby and team rooms, behind each person's own link.
   "GET /api/my": (req, env, ctx, url) => lobby.myView(env, url),
   "GET /api/my-wall": (req, env, ctx, url) => lobby.myWall(env, url),

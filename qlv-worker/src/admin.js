@@ -578,6 +578,9 @@ async function exportCsv(env, name) {
     // No names, no references: the promise on the questions screen.
     const { results } = await env.DB.prepare("SELECT branch, a1, a2, a3, created_at FROM answers ORDER BY created_at").all();
     body = csv(results.map((r) => ({ ...r, created_on: r.created_at.slice(0, 10) })), ["branch", "a1", "a2", "a3", "created_on"]);
+  } else if (name === "feedback.csv") {
+    const fb = await import("./feedback.js");
+    body = csv(await fb.feedbackRows(env), fb.FEEDBACK_COLS);
   } else throw new HttpError(404, "No such export.");
   return new Response(body, {
     headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="qlv2026-${name}"`, ...SECURITY },
@@ -1051,7 +1054,7 @@ function appPage(email, role, site) {
   <div class="wrap">
     ${!admin ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="money">Money</button></div>` : ""}
     ${board ? boardTabs : ""}
-    ${role === "admin" ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Sponsors</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="lobby">Team rooms</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="certs">E-certificates</button><button data-tab="invoices">Invoices</button><button data-tab="mail">Email</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
+    ${role === "admin" ? `<div class="tabs"><button data-tab="regs" class="on">Registrations</button><button data-tab="tables">Tables</button><button data-tab="partners">Sponsors</button><button data-tab="screen">On screen</button><button data-tab="staff">Staff</button><button data-tab="briefings">Briefings</button><button data-tab="scoring">Scoring</button><button data-tab="stage">Stage</button><button data-tab="lobby">Team rooms</button><button data-tab="checkin">Check-in</button><button data-tab="export">Badge export</button><button data-tab="money">Money</button><button data-tab="certs">E-certificates</button><button data-tab="feedback">Feedback</button><button data-tab="invoices">Invoices</button><button data-tab="mail">Email</button><button data-tab="answers">Answers</button><button data-tab="codes">Member codes</button><button data-tab="settings">Settings</button><button data-tab="rebalance" hidden>Rebalance</button></div>` : ""}
     <div id="msg" class="msg" hidden role="status"></div>
     ${role === "admin" ? `<div class="card" style="padding:12px 16px;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="closeDate" style="font-weight:600">Registration closes at the end of</label>
@@ -1221,6 +1224,9 @@ export async function handleAdmin(req, env, ctx, url) {
       "GET partners": () => ops.partnersList(env),
       "GET partner-codes": () => pcodes.codesView(env),
       "GET certs": () => certs.certView(env),
+      "GET feedback": async () => (await import("./feedback.js")).feedbackAdmin(env),
+      "POST feedback-send": async () => (await import("./feedback.js")).sendFeedbackEmails(env, body, who),
+      "POST feedback-link": async () => (await import("./feedback.js")).feedbackLink(env, body),
       "GET mail": () => mailtab.mailView(env),
       "POST mail-send": () => mailtab.sendCompose(env, body, who),
       "GET invoices": () => invoices.invoicesView(env),

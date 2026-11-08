@@ -431,23 +431,43 @@ export function briefCover({ subject, paragraphs, link, ref }) {
 
 // The certificate email: the PDF is attached, and the link fetches it again.
 // No footer, as on the certificate itself.
-export function certificateEmail({ first: name, link }) {
+export function certificateEmail({ first: name, link, done = false }) {
   const body = p(`Dear ${esc(name)},`) +
-    p("Thank you for being part of Quality Leadership Value 2026. Your certificate is attached.") +
-    p("You can also download it here:") + button(link, "Download your certificate") +
+    p("Thank you for being part of Quality Leadership Value 2026. Your certificate is ready.") +
+    (done
+      ? p("Thank you for your feedback. Your certificate is here:") + button(link, "Download your certificate")
+      : p("Before you download it, please tell us about your experience. It takes about three minutes, and your certificate download appears as soon as you send your answers.") + button(link, "Give feedback and get your certificate", true)) +
     p("Warm regards,<br>The QLV 2026 team, JCI Aso", "margin:0;");
-  return {
-    subject: "Your QLV 2026 certificate",
-    html: shell({ preheader: "Your certificate is attached.", body, bare: true }),
-    text: `Dear ${name},\n\nThank you for being part of Quality Leadership Value 2026. Your certificate is attached.\n\nYou can also download it here: ${link}\n\nWarm regards,\nThe QLV 2026 team, JCI Aso\n`,
-  };
+  const text = done
+    ? `Dear ${name},\n\nThank you for being part of Quality Leadership Value 2026. Your certificate is ready.\n\nDownload it here: ${link}\n\nWarm regards,\nThe QLV 2026 team, JCI Aso\n`
+    : `Dear ${name},\n\nThank you for being part of Quality Leadership Value 2026. Your certificate is ready.\n\nBefore you download it, please tell us about your experience. It takes about three minutes, and your certificate download appears as soon as you send your answers:\n${link}\n\nWarm regards,\nThe QLV 2026 team, JCI Aso\n`;
+  return { subject: "Your QLV 2026 certificate", html: shell({ preheader: "Tell us about your experience, then download your certificate.", body, bare: true }), text };
 }
 
 // A thank-you to a judge, mentor, the marshal or a desk volunteer. The words
-// are set on the E-certificates tab. No footer.
-export function thankYou({ subject, paragraphs }) {
-  const body = paragraphs.map((x, i) => p(esc(x).replace(/\n/g, "<br>"), i === paragraphs.length - 1 ? "margin:0;" : "")).join("");
-  return { subject, html: shell({ preheader: paragraphs[1] || subject, body, bare: true }), text: paragraphs.join("\n\n") + "\n" };
+// are set on the E-certificates tab. The feedback link goes in before the
+// sign-off. No footer.
+export function thankYou({ subject, paragraphs, feedback = null }) {
+  const last = paragraphs.length - 1;
+  const ask = "We would love to hear how QLV 2026 was for you. It takes about three minutes:";
+  const body = paragraphs.map((x, i) => (feedback && i === last && last > 0 ? p(ask) + button(feedback, "Share your feedback", true) : "") + p(esc(x).replace(/\n/g, "<br>"), i === last ? "margin:0;" : "")).join("");
+  const parts = feedback && last > 0 ? [...paragraphs.slice(0, last), `${ask}\n${feedback}`, paragraphs[last]] : paragraphs;
+  return { subject, html: shell({ preheader: paragraphs[1] || subject, body, bare: true }), text: parts.join("\n\n") + "\n" };
+}
+
+// The feedback link on its own: facilitators, or a reminder to anyone.
+export function feedbackRequest({ first: name, link, reminder = false, certificate = false }) {
+  const lead = reminder
+    ? "A gentle reminder: we would still love to hear how Quality Leadership Value 2026 was for you."
+    : "Thank you for being part of Quality Leadership Value 2026. We would love to hear how it was for you.";
+  const extra = certificate ? " Your certificate download appears as soon as you send your answers." : "";
+  const body = p(`Dear ${esc(name || "there")},`) + p(lead + " It takes about three minutes." + extra) +
+    button(link, certificate ? "Give feedback and get your certificate" : "Share your feedback", true) + p("Warm regards,<br>The QLV 2026 team, JCI Aso", "margin:0;");
+  return {
+    subject: reminder ? "A reminder: your QLV 2026 feedback" : "How was QLV 2026 for you?",
+    html: shell({ preheader: "Three minutes to tell us how it went.", body, bare: true }),
+    text: `Dear ${name || "there"},\n\n${lead} It takes about three minutes.${extra}\n\n${link}\n\nWarm regards,\nThe QLV 2026 team, JCI Aso\n`,
+  };
 }
 
 // An email written on the Email tab: the admin's own words in the QLV look,

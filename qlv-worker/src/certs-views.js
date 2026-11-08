@@ -40,8 +40,9 @@ async function loadCerts() {
   if (d.enabled && !ctSigs && (d.signatures.president || d.signatures.chair)) ctSigs = await call("cert-signatures");
   if (!d.enabled) { box.innerHTML = '<div class="card"><h2>E-certificates</h2><p class="small" style="margin:0">Certificates go only to people checked in on the day. Turn on check-in to use this.</p></div>'; return; }
   const sigOk = d.signatures.president && d.signatures.chair;
-  const ach = d.rows.filter((r) => r.checkedIn && r.version === "achievement");
-  const par = d.rows.filter((r) => r.checkedIn && r.version === "participation");
+  const ach = d.rows.filter((r) => r.checkedIn && !r.held && r.version === "achievement");
+  const par = d.rows.filter((r) => r.checkedIn && !r.held && r.version === "participation");
+  const held = d.rows.filter((r) => r.checkedIn && r.held);
   const out = d.rows.filter((r) => !r.checkedIn);
   const flagged = d.rows.filter((r) => r.checkedIn && r.flags.length);
   const sigRow = (who, label) => {
@@ -59,7 +60,7 @@ async function loadCerts() {
       '<button class="btn ghost" data-ct="unconfirm">Change the results</button>'
     : '<p class="small" style="margin:0 0 8px">From Scoring: highest average of the five criteria, a tie going to the higher "Outlives the team" average, then to the judges. ' +
       (prop.allComplete ? "Every team is fully scored." : "Not every team is fully scored yet.") + (prop.tieAtThree ? " Third place is tied: choose the order the judges decided." : "") + "</p>" +
-      prop.order.map((o, i) => '<div class="small" style="margin:0 0 4px">' + PLACE_WORD[i + 1] + ": " + esc(o.name) + ", average " + esc(o.avg) + ', Outlives the team ' + esc(o.outlives) + (o.tied ? " (tied)" : "") + "</div>").join("") +
+      prop.order.map((o, i) => '<div class="small" style="margin:0 0 4px">' + PLACE_WORD[i + 1] + ": " + esc(o.name) + ", average " + esc(o.avg) + ' / 25, Outlives the team ' + esc(o.outlives) + ' / 5' + (o.tied ? " (tied)" : "") + "</div>").join("") +
       '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0">' + [0, 1, 2].map((i) => '<label class="small">' + PLACE_WORD[i + 1] + "<br>" + pick(i, prop.order[i] && prop.order[i].index) + "</label>").join("") + "</div>" +
       '<button class="btn gold" data-ct="confirm">Confirm results</button>';
   const status = (r) => r.changed ? '<span class="st queried">Changed since sent</span>' : r.sentAt ? '<span class="st confirmed">Sent ' + esc(when(r.sentAt)) + "</span>" : '<span class="st awaiting">Not sent</span>';
@@ -83,12 +84,13 @@ async function loadCerts() {
     '<div class="card" style="flex:1 1 360px"><h2>Top three teams</h2>' + resultsCard + "</div></div>" +
     (flagged.length ? '<div class="card" style="margin-top:14px"><h2>Names to check</h2><p class="small" style="margin:-4px 0 8px">These print exactly as shown. Correcting one here changes only the certificate, not the ticket.</p>' +
       flagged.map((r) => '<div class="sig"><span><b>' + esc(r.printedName) + "</b> " + r.flags.map((f) => '<span class="flag">' + esc(f) + "</span>").join("") + '</span><button class="link" data-ctname="' + r.ticketId + '">Edit name</button></div>').join("") + "</div>" : "") +
-    '<div class="card" style="margin-top:14px;padding:0;overflow-x:auto"><div style="padding:14px 16px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><div><h2 style="margin:0">Certificates</h2><p class="small" style="margin:4px 0 10px">Only sprinters checked in on Saturday. The top three teams get Achievement instead of Participation, never both. Nothing goes until you press Issue.</p></div>' +
+    '<div class="card" style="margin-top:14px;padding:0;overflow-x:auto"><div style="padding:14px 16px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><div><h2 style="margin:0">Certificates</h2><p class="small" style="margin:4px 0 10px">Only sprinters checked in on Saturday. The top three teams get Achievement instead of Participation, never both. The email carries their feedback link and the certificate downloads once they answer. Nothing goes until you press Issue.</p></div>' +
       '<button class="btn ghost" data-ct="zip"' + (ach.length + par.length ? "" : " disabled") + ">Download all</button></div>" +
       (res ? '<div style="padding:0 16px"><h2 style="font-size:14px">Achievement · ' + ach.length + "</h2>" + issue(ach, "achievement", "Achievement") + "</div>" + head + ach.map(row).join("") + "</tbody></table>" : "") +
       '<div style="padding:12px 16px 0"><h2 style="font-size:14px">Participation · ' + par.length + "</h2>" + issue(par, "participation", "Participation") + "</div>" + head + (par.map(row).join("") || '<tr><td colspan="6" class="small">Nobody checked in yet.</td></tr>') + "</tbody></table>" +
+      (held.length ? '<div style="padding:12px 16px 0"><h2 style="font-size:14px">Waiting for the sponsor\'s payment · ' + held.length + '</h2><p class="small" style="margin:0 0 8px">Checked in on sponsored seats. Their certificates and feedback links unlock here once the sponsor\'s payment is verified on the Registrations tab.</p></div><table class="grey"><tbody>' + held.map((r) => "<tr><td>" + esc(r.printedName) + '</td><td class="small">' + (r.version === "achievement" ? PLACE_WORD[r.place] + " place · " : "") + esc(r.tableName || "No team") + '</td><td class="small hide-s">' + esc(r.email || "") + '</td><td class="small">Payment not confirmed</td></tr>').join("") + "</tbody></table>" : "") +
       (out.length ? '<div style="padding:12px 16px 0"><h2 style="font-size:14px">Not checked in, no certificate · ' + out.length + '</h2></div><table class="grey"><tbody>' + out.map((r) => "<tr><td>" + esc(r.name) + '</td><td class="small">' + esc(r.tableName || "No team") + '</td><td class="small hide-s">' + esc(r.email || "") + '</td><td class="small">Not checked in</td></tr>').join("") + "</tbody></table>" : "") + "</div>" +
-    '<div class="grid" style="margin-top:14px"><div class="card" style="flex:2 1 520px;padding:0;overflow-x:auto"><div style="padding:14px 16px 0"><h2 style="margin:0">Thank-you emails</h2><p class="small" style="margin:4px 0 10px">Judges and mentors/advisers who were checked in, the Lead Sprint Marshal and the check-in desk. No certificate, just the email. Facilitators get nothing from here: JCI Aso writes to them.</p></div>' +
+    '<div class="grid" style="margin-top:14px"><div class="card" style="flex:2 1 520px;padding:0;overflow-x:auto"><div style="padding:14px 16px 0"><h2 style="margin:0">Thank-you emails</h2><p class="small" style="margin:4px 0 10px">Judges and mentors/advisers who were checked in, the Lead Sprint Marshal and the check-in desk. No certificate: the email thanks them and carries their feedback link. Facilitators get their feedback link from the Feedback tab.</p></div>' +
       "<table><thead><tr><th></th><th>Name</th><th>Role</th><th class=\"hide-s\">Email</th><th>Status</th></tr></thead><tbody>" +
       th.people.map((p) => '<tr class="' + (p.eligible ? "" : "grey") + '"><td><input type="checkbox" data-ctthx="' + esc(p.key) + '"' + (p.eligible && !p.sentAt ? " checked" : "") + (p.eligible ? "" : " disabled") + ' style="width:18px;height:18px"></td><td>' +
         (p.needsName ? '<input type="text" value="' + esc(p.name) + '" placeholder="Their name" data-ctdesk="' + esc(p.email) + '" style="font:inherit;border:1px solid var(--rule);border-radius:6px;padding:5px 8px;width:160px">' : "<b>" + esc(p.name) + "</b>") +
@@ -173,14 +175,14 @@ document.addEventListener("click", async (e) => {
     }
     if (el("[data-ctissue]")) {
       const kind = el("[data-ctissue]").dataset.ctissue;
-      return ctIssue(ctData.rows.filter((r) => r.checkedIn && r.version === kind && !r.sentAt), kind === "achievement" ? "Achievement" : "Participation");
+      return ctIssue(ctData.rows.filter((r) => r.checkedIn && !r.held && r.version === kind && !r.sentAt), kind === "achievement" ? "Achievement" : "Participation");
     }
     if (el("[data-ctresend]")) {
       const kind = el("[data-ctresend]").dataset.ctresend;
-      return ctIssue(ctData.rows.filter((r) => r.checkedIn && r.version === kind && r.changed), "changed " + (kind === "achievement" ? "Achievement" : "Participation"));
+      return ctIssue(ctData.rows.filter((r) => r.checkedIn && !r.held && r.version === kind && r.changed), "changed " + (kind === "achievement" ? "Achievement" : "Participation"));
     }
     if (el("[data-ct=zip]")) {
-      const list = ctData.rows.filter((r) => r.checkedIn && r.certId);
+      const list = ctData.rows.filter((r) => r.checkedIn && !r.held && r.certId);
       const files = [];
       for (const r of list) { msg("Making " + (files.length + 1) + " of " + list.length + "…", true); files.push({ name: r.certId + " " + r.printedName.replace(/[^A-Za-z0-9 .'-]/g, "") + ".pdf", data: await ctPdf(r) }); }
       const a = document.createElement("a"); a.href = URL.createObjectURL(ctZip(files)); a.download = "QLV-2026-Certificates.zip"; a.click();

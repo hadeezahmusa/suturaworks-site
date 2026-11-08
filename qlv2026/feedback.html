@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0F2B63">
+<title>QLV 2026 feedback</title>
+<link rel="icon" href="assets/favicon.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Poppins:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="p2.css">
+<style>
+.q { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 0 0 12px; }
+.q h2 { font-family: var(--display); font-size: 16px; line-height: 1.35; color: var(--navy); margin: 0 0 4px; }
+.q .sub { font-size: 14px; color: var(--body); margin: 0 0 10px; }
+.q .n { font-family: var(--mono); font-size: 12px; color: var(--teal); margin: 0 0 4px; display: block; }
+.opts { display: grid; gap: 6px; }
+.o5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.o11 { grid-template-columns: repeat(11, minmax(0, 1fr)); }
+.o3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.o2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.opts button { font-family: var(--display); font-size: 15px; font-weight: 600; min-height: 48px; padding: 6px 2px; border-radius: 10px; cursor: pointer; background: #fff; color: var(--navy); border: 1px solid #8FA3BF; line-height: 1.15; }
+.opts button small { display: block; font-family: var(--text); font-size: 11px; font-weight: 600; color: var(--body); margin-top: 2px; }
+.opts button[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.opts button[aria-pressed="true"] small { color: #CFE0F3; }
+.o11 button { font-size: 14px; min-height: 44px; padding: 4px 0; }
+.ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--body); margin: 6px 0 0; }
+textarea, input[type=text] { width: 100%; font: inherit; font-size: 16px; color: var(--ink); border: 1px solid #8FA3BF; border-radius: 10px; padding: 10px 12px; background: #fff; }
+textarea { min-height: 96px; resize: vertical; }
+textarea:focus, input:focus, .opts button:focus-visible, .send:focus-visible { outline: 3px solid var(--yel); outline-offset: 1px; }
+.soc { display: grid; grid-template-columns: 96px 1fr; gap: 8px 10px; align-items: center; font-size: 14px; color: var(--body); }
+.send { font-family: var(--display); font-size: 16px; font-weight: 600; width: 100%; min-height: 54px; border-radius: 10px; border: 0; background: var(--yel); color: var(--navy); cursor: pointer; }
+.send:disabled { background: #E3EBF4; color: var(--body); cursor: default; }
+.miss { outline: 2px solid #C0563F; outline-offset: 2px; }
+.dl { display: inline-block; font-family: var(--display); font-size: 16px; font-weight: 600; padding: 14px 22px; border-radius: 10px; background: var(--yel); color: var(--navy); text-decoration: none; margin: 14px 0 0; }
+@media (max-width: 420px) { .o11 button { font-size: 13px; } .opts button small { font-size: 10px; } .soc { grid-template-columns: 80px 1fr; } }
+</style>
+</head>
+<body>
+<header class="band"><div class="band-in">
+  <div class="logos"><div class="l"><img src="assets/jci-aso-white.png" alt="JCI Aso"><span class="rule"></span><img src="assets/qlv-white.png" alt="Quality Leadership Value"></div></div>
+  <div><div class="who" id="who">Quality Leadership Value 2026</div><h1 id="title">Your feedback</h1></div>
+</div></header>
+<main id="main"><div class="card">Loading…</div></main>
+<script type="module" src="feedback.js"></script>
+</body>
+</html>
