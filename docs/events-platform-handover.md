@@ -20,7 +20,10 @@ A self-service platform where an organisation (the **client**) can:
 
 ### Who it is for first
 
-Workshops and bootcamps (the owner's chosen first use case). The competition style "sprint" features (teams, mentors, task packs, judging, stage display, winner reveal) are **optional modules** that a workshop can switch on.
+Two use cases first:
+
+- **Workshops and bootcamps** (the owner's chosen first use case). The competition style "sprint" features (teams, mentors, task packs, judging, stage display, winner reveal) are **optional modules** that a workshop can switch on.
+- **Performances and shows** (drama productions, concerts, recitals, comedy nights). One of the first clients runs a drama production. Shows need performances on several dates, theatre seating with a seat map, ticket tiers, online payment, rich media (poster, gallery, trailer, sound) and a digital programme. See section 6.17 onwards.
 
 ### The non-negotiable principle
 
@@ -49,7 +52,7 @@ Every client-side record belongs to an **organisation** and an **event**. A clie
 ## 3. The client journey
 
 1. **Sign up.** Email and organisation name. Magic link to confirm.
-2. **Choose a use case.** Cards: "Workshop", "Bootcamp", "Workshop with team challenge", "Something else". Each shows its recommended bundle (section 5).
+2. **Choose a use case.** Cards: "Workshop", "Bootcamp", "Workshop with team challenge", "Show or performance", "Something else". Each shows its recommended bundle (section 5).
 3. **Adjust features.** Toggles with one-line explanations and the price change shown live.
 4. **Choose how to pay.** Per event or subscription (section 4). Pick the attendee band and email credits.
 5. **Pay** through Paystack checkout on Sutura's account.
@@ -86,14 +89,24 @@ Only Sutura's own Paystack account is used. Clients do not connect Paystack at a
 
 ### Attendee ticket fees (client's income)
 
-The owner chose **manual bank transfer only** for now, exactly as the original system worked:
+Two ways, chosen per event:
+
+**1. Manual bank transfer** (the default for workshops), exactly as the original system worked:
 
 - the client enters their own bank details;
 - the attendee transfers and uploads proof (image or PDF);
 - the client's verifier approves, queries or releases each booking;
 - the ticket is sent on approval.
 
-**Later option, not now:** online ticket payments through **Paystack subaccounts**. A subaccount is a child of Sutura's Paystack account that points at the client's bank account. Paystack then splits each payment automatically, for example most to the client and a small fee to Sutura. The client only fills in their bank details; the platform creates the subaccount in the background. Leave room for this in the data model (a `payout_account` per organisation) but do not build it in phase 1.
+**2. Online payment through Paystack subaccounts** (required for shows; available to other use cases only if the owner decides so, see section 14). Selling to hundreds of members of the public cannot rely on checking proofs by hand, and buyers expect to pay and get a ticket at once.
+
+- **What a subaccount is:** a child of Sutura's Paystack account that points at the client's bank account. Paystack splits each payment automatically, for example most to the client and a set percentage or flat fee to Sutura, and settles both directly.
+- **What the client does:** fills in a short form with their bank, account number and business name. The platform checks the account name with Paystack's account resolve call, shows it back for confirmation, then creates the subaccount in the background. No Paystack account, keys or code for the client.
+- **Checkout:** the buyer picks a performance, tier and seats, pays on Paystack checkout with the split applied. The ticket is issued only after the server verifies the transaction or receives the signed webhook.
+- **Seat holds:** seats chosen on the map are held for a short time (for example 10 minutes) while the buyer pays, then released if payment does not complete. Never sell the same seat twice: hold and confirm in one database transaction with a unique constraint on performance plus seat.
+- **Who pays the Paystack fee:** a setting per event. Either the client absorbs it, or it is added to the buyer's total and shown clearly.
+- **Refunds and cancellations:** if a performance is cancelled, the client can refund through the platform (Paystack refunds) or move buyers to another performance. Log every refund.
+- **Data model:** a `payout_accounts` table per organisation (bank, account name, subaccount code, verified date), and per-order records of the split.
 
 ---
 
@@ -106,6 +119,10 @@ Each feature is a **module** that can be on or off per event. Suggested bundles 
 | **Workshop Basic** | Registration and tickets, transfer payments, emails, check-in, certificates, feedback, master report |
 | **Workshop Plus** | Basic, plus seating with table shapes, name badges and stickers, team rooms, sponsors and logo wall, virtual link sending, invoices, money tracking |
 | **Bootcamp with Challenge** | Plus, plus teams and mentors, briefs and task packs, judging and scoring, stage display with timers and winner reveal, achievement certificates |
+| **Show Basic** | Performances and showings, ticket tiers, online payment, tickets with QR, door check-in, media page (poster, gallery, cast and crew, synopsis), emails, feedback, master report |
+| **Show Plus** | Show Basic, plus theatre seating with seat map and seat choice, trailer and audio player, digital programme, poster-based ticket designs, sponsors and logo wall, interval and countdown screen, promo codes, group bookings |
+
+Modules that do not apply to shows (teams, mentors, task packs, judging, certificates) are hidden for that use case unless the client switches them on.
 
 Price each module and let the bundle show a discount against buying modules one by one.
 
@@ -232,6 +249,59 @@ The client sets up tables when the seating module is on:
 - One passcode per event, changeable, signs everyone out when changed.
 - Shows the admin read-only with emails, phones, codes, proofs and action links removed.
 
+### 6.17 Performances and showings (shows)
+
+- A show has one or more **performances**, each with its own date, start time, doors-open time, running time, venue (default the show's venue), capacity and status (on sale, sold out, cancelled, past).
+- Buyers pick a performance first. Each performance page shows seats left as "Few seats left" or "Sold out" rather than exact numbers, if the client prefers.
+- Sales close at a set time before each performance (configurable), with an option for door sales at check-in.
+- Cancel or reschedule a performance: email every buyer with the choice of moving to another performance or a refund.
+- Reports and check-in split by performance.
+
+### 6.18 Theatre seating and seat map (shows)
+
+- A **venue layout builder** alongside the table shapes in 6.4:
+  - **sections** (for example Stalls, Front, Middle, Balcony), each with a price tier;
+  - **rows** labelled A, B, C… (or custom), with seats numbered left to right, right to left or odd and even from the centre;
+  - **gaps and aisles**, seats removed for pillars, wheelchair spaces and companion seats;
+  - **curved rows** as a visual option.
+- Save a layout and reuse it for every performance at the same venue. Layouts are per organisation and can be copied.
+- **Seat map for buyers:** tap seats on a phone-sized map, colour by tier, see the price before choosing, with "Best available" as a one-tap option for people who do not want to choose.
+- **Blocked seats:** the client can hold seats for sponsors, cast families or press, and release them later.
+- **General admission** is also allowed: a performance can sell tiers with a capacity and no seat numbers.
+- Tickets, door lists and reports show section, row and seat.
+
+### 6.19 Ticket tiers, promo codes and group bookings (shows)
+
+- **Tiers** per performance: name (for example VIP, Regular, Student, Child), price, quantity limit, sale window, what is included and whether a tier needs a check at the door (student ID).
+- **Promo codes:** percentage or fixed discount, limited uses, valid dates, specific tiers or performances.
+- **Group bookings:** one buyer, several tickets, each ticket with its own QR so the group can arrive separately; names optional.
+- **Complimentary tickets** issued by the client (cast families, press, sponsors), never counted as income.
+- Order limits per buyer to stop bulk buying for resale.
+
+### 6.20 Media page (registration and sales page)
+
+- **Poster or banner** at the top, with a crop tool for phone and desktop.
+- **Logo**, plus a **photo gallery** (cast, rehearsals, past productions) with captions.
+- **Synopsis**, **cast and crew list** (name, role, optional photo), running time, age guidance and content notes.
+- **Trailer:** a video link (YouTube or Vimeo embed) or an uploaded short clip.
+- **Sound:** an audio player for a theme song or teaser. **Browsers block sound that plays by itself**, so it always starts with a tap. Uploads limited to MP3 or M4A and a set size; files stored in R2 and streamed.
+- Images are resized and compressed on upload, with metadata stripped. Each image needs a short description for screen readers.
+- Social sharing preview (title, image, description) so links look good on WhatsApp, Instagram and X.
+
+### 6.21 Branded tickets and digital programme (shows)
+
+- **Ticket designs** built from the show's artwork: the poster as a background or header, logo, colours, show title, performance date and time, section, row and seat, tier, holder name, QR code and venue directions.
+- Delivered as an email, a PDF and an "Add to phone" page; optionally Apple Wallet and Google Wallet passes in a later phase.
+- **Sound and video on tickets:** email apps and PDFs cannot play sound. Put a **"Listen" or "Watch the trailer" button in the email** and a **second QR code on the PDF** that opens the show's media page. Do not promise sound inside a ticket.
+- **Digital programme:** a phone-friendly page and printable PDF with cast and crew, scenes or acts, director's note, sponsors, thank-yous and photos. Sent before the show or after, and linked from every ticket.
+- Reminder email before each performance with time, venue map link, parking notes and the ticket again.
+
+### 6.22 Show night screen and door
+
+- The stage display (6.11) gains a **show mode**: doors-open countdown, "Please take your seats", interval countdown with sponsor logos and a closing thank-you slide. No judging or winner screens.
+- **Door check-in** by performance: scan QR, show section, row and seat, warn on the wrong performance date and handle door sales when online payment is on.
+- After the show: feedback request (with the programme and photos link) and the master report split by performance.
+
 ---
 
 ## 7. Email without abuse: credits
@@ -328,8 +398,12 @@ The original system ran on Cloudflare and worked well. Keep the same family, siz
 1. **Foundation:** accounts and organisations, roles, events, theme settings, Sutura super admin with pricing screen, Paystack checkout, webhook and receipts, email credits and the sending queue.
 2. **Workshop Basic:** registration form builder, ticket types, transfer proofs and verification, tickets with QR, check-in with offline mode, certificates gated by feedback, feedback screen, master report.
 3. **Workshop Plus:** seating with table shapes and floor plan, badges and stickers, sponsors and logo wall, team rooms with push, invoices, money ledger, WhatsApp click-to-send, own-domain email.
-4. **Bootcamp with Challenge:** staff roles, briefs, task packs, judging and scoring, stage display and winner reveal, achievement rules.
-5. **Later:** subscriptions polish, Paystack subaccounts for online ticket fees, WhatsApp automatic sending through Embedded Signup.
+4. **Show Basic:** Paystack subaccounts and online payment with signed webhooks, performances, tiers, promo codes, group bookings, media page with gallery, trailer and audio player, branded tickets, door check-in by performance.
+5. **Show Plus:** theatre layout builder and seat map with holds, digital programme, show mode on the stage display.
+6. **Bootcamp with Challenge:** staff roles, briefs, task packs, judging and scoring, stage display and winner reveal, achievement rules.
+7. **Later:** subscriptions polish, wallet passes, WhatsApp automatic sending through Embedded Signup.
+
+If the drama client needs to go live before phase 4 is finished, build the minimum show set first: performances, tiers, online payment, media page and branded tickets, with general admission instead of a seat map.
 
 Each phase ships with unit tests for pure logic, an end-to-end test on a seeded demo organisation and a phone-width check of every attendee page.
 
@@ -346,6 +420,10 @@ Each phase ships with unit tests for pure logic, an end-to-end test on a seeded 
 7. Which font pairings and colour limits to offer in the theme picker.
 8. Whether the own-domain email option is included in a bundle or charged separately.
 9. Support channel for clients (email, WhatsApp, help pages) and response times.
+10. Online payment through Paystack subaccounts: shows only, or offered to every use case?
+11. Sutura's cut of online ticket sales (percentage, flat fee per ticket, or both) and who pays the Paystack fee by default.
+12. Refund rules for show tickets, and whether the client or Sutura decides them.
+13. Limits on media uploads (number of photos, audio and video sizes) per plan.
 
 ---
 
