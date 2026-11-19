@@ -24,7 +24,7 @@ const WORDS = ["amber", "anchor", "apple", "arch", "atlas", "bamboo", "banner", 
 
 // GET routes a board account may read. Everything else is refused.
 export const BOARD_CAN = new Set(["GET list", "GET reg", "GET tables", "GET partners", "GET partner", "GET screen", "GET staff", "GET roles",
-  "GET export", "GET money", "GET scoring", "GET stage", "GET checkin"]);
+  "GET export", "GET money", "GET scoring", "GET stage", "GET checkin", "GET dashboard"]);
 
 function randomWords(n) {
   const bytes = crypto.getRandomValues(new Uint32Array(n));
