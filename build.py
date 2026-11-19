@@ -24,7 +24,7 @@ GUIDES_DIR = ROOT / "guides"
 TEMPLATES = ROOT / "templates"
 SITE_URL = "https://suturaworks.com"
 CALENDLY = "https://calendly.com/hadeezahmusa/free-20-minute-consultation"
-STATIC = ["index.html", "thanks.html", "styles.css", "assets", "research", "qlv2026", "card", "CNAME"]
+STATIC = ["index.html", "thanks.html", "styles.css", "assets", "research", "qlv2026", "card", "sutura-foundry", "CNAME"]
 HOME_GUIDE_COUNT = 3
 REQUIRED = ["title", "description", "slug", "last_updated"]
 
@@ -182,7 +182,7 @@ def build():
     (OUT / "index.html").write_text(home.replace("<!--GUIDES-->", latest), encoding="utf-8")
 
     # Sitemap so search engines find each guide
-    urls = [f"{SITE_URL}/", f"{SITE_URL}/guides/"] + [f'{SITE_URL}/guides/{g["slug"]}/' for g in guides]
+    urls = [f"{SITE_URL}/", f"{SITE_URL}/guides/", f"{SITE_URL}/sutura-foundry/"] + [f'{SITE_URL}/guides/{g["slug"]}/' for g in guides]
     (OUT / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         + "".join(f"  <url><loc>{u}</loc></url>\n" for u in urls)
