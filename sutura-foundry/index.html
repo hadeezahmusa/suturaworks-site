@@ -18,6 +18,7 @@
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-snap-type: y mandatory; }
+html.free { scroll-snap-type: none; }
 body { margin: 0; background: var(--paper); color: var(--navy); font-family: Manrope, "Segoe UI", system-ui, sans-serif; font-size: 17px; line-height: 1.55; overflow-x: hidden; }
 a { color: inherit; }
 h1, h2 { letter-spacing: -0.02em; }
@@ -27,7 +28,8 @@ h1, h2 { letter-spacing: -0.02em; }
   background: rgba(243, 245, 242, .88); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
   transition: background-color .5s ease, color .5s ease, border-color .5s ease; }
 body.s0 .sf-top { background: transparent; border-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
-body.s3 .sf-top { background: transparent; border-color: transparent; color: var(--white); backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.s3 .sf-top { background: var(--deep); border-color: rgba(255, 255, 255, .08); color: var(--white); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html.free body.s0 .sf-top { background: rgba(243, 245, 242, .94); border-color: var(--line); }
 .sf-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; min-height: 44px; }
 .sf-brand svg { width: 30px; height: 30px; flex: none; }
 .sf-brand .ink { fill: var(--navy); transition: fill .5s ease; }
@@ -82,15 +84,18 @@ body.s3 .sf-dots a::after { background: rgba(255, 255, 255, .4); }
 body.s3 .sf-dots a.on::after { background: var(--white); }
 
 /* The stage: the Sutura Foundry seam. Two halves drift apart and are stitched together, section by section. */
-.sf-stage { position: fixed; z-index: 10; pointer-events: none; right: 7vw; top: 50%; transform: translateY(-46%); width: min(40vw, 64vh); aspect-ratio: 1; }
+.sf-stage { position: fixed; z-index: 10; pointer-events: none; right: 7vw; top: 50%; transform: translateY(-46%); width: min(40vw, 64vh); aspect-ratio: 1; transition: opacity .35s ease; }
+/* When a section is taller than the screen and scrolls freely, the artwork steps aside so text never passes under it. */
+html.free .sf-stage { opacity: 0; }
 .sf-stage svg { width: 100%; height: 100%; overflow: visible; }
 .sf-half { transform-box: view-box; transform-origin: 50px 50px; transition: transform 1.2s var(--ease), opacity .8s ease; }
 .sf-half path { fill: var(--navy); transition: fill .8s ease; }
 .sf-float { transform-box: view-box; transform-origin: 50px 50px; }
 .sf-loose { fill: none; stroke: var(--green); stroke-width: 1.4; stroke-linecap: round; stroke-dasharray: 2.5 3.5; opacity: 0; transition: opacity .6s ease; }
-.sf-weave { fill: none; stroke: var(--green); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transition: stroke-dashoffset 1.6s ease .5s, opacity .5s ease; }
-.sf-v { fill: none; stroke-width: 8; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .9s ease; }
-.sf-stitch { fill: none; stroke: var(--green); stroke-width: 7; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .45s ease; }
+/* Undrawn strokes are hidden outright: a round line end on a zero-length dash still shows as a dot. */
+.sf-weave { fill: none; stroke: var(--green); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transition: stroke-dashoffset 1.6s ease .5s, opacity .3s ease; }
+.sf-v { fill: none; stroke-width: 8; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transition: stroke-dashoffset .9s ease, opacity .2s ease; }
+.sf-stitch { fill: none; stroke: var(--green); stroke-width: 7; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transition: stroke-dashoffset .45s ease, opacity .15s ease; }
 
 /* 0. Two halves, apart, with a loose thread drifting between them. */
 body.s0 .sf-ul { transform: translate(-15px, -15px) rotate(-5deg); }
@@ -104,22 +109,30 @@ body.s1 .sf-weave { opacity: 1; stroke-dashoffset: 0; }
 /* 2. The halves open and Viabo is drawn in the space between them. */
 body.s2 .sf-ul { transform: translate(-22px, -22px) scale(.86); opacity: .22; }
 body.s2 .sf-lr { transform: translate(22px, 22px) scale(.86); opacity: .22; }
-body.s2 .sf-v { stroke-dashoffset: 0; transition-delay: .45s; }
+body.s2 .sf-v { stroke-dashoffset: 0; opacity: 1; transition-delay: .45s; }
 body.s2 .sf-v.r { transition-delay: .95s; }
 /* 3. Joined: three stitches, one after another. White on the dark section. */
 body.s3 .sf-half path { fill: var(--white); }
-body.s3 .sf-stitch { stroke-dashoffset: 0; }
+body.s3 .sf-stitch { stroke-dashoffset: 0; opacity: 1; }
 body.s3 .sf-stitch.a { transition-delay: .9s; } body.s3 .sf-stitch.b { transition-delay: 1.2s; } body.s3 .sf-stitch.c { transition-delay: 1.5s; }
 @keyframes sf-flow { to { stroke-dashoffset: -12; } }
 @keyframes sf-bob { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(2.5deg); } }
 
 @media (max-width: 820px) {
-  .sf-stage { left: 50%; right: auto; top: 78px; transform: translateX(-50%); width: min(62vw, 30svh); }
-  .sf-stage svg { transform: scale(.8); }
-  .sf-copy { width: auto; padding: calc(96px + min(62vw, 30svh)) 20px 56px; }
-  #s0 .sf-copy { padding-bottom: 92px; }
-  #s3 .sf-copy { padding-top: calc(96px + min(62vw, 30svh)); }
+  /* The artwork owns a band at the top; each slide's text sits in the space below it. */
+  :root { --art: min(56vw, 26svh); }
+  .sf-stage { left: 50%; right: auto; top: 72px; transform: translateX(-50%); width: var(--art); }
+  .sf-stage svg { transform: scale(.82); }
+  .sf-copy { width: auto; padding: calc(84px + var(--art)) 20px 40px; }
+  #s0 .sf-copy { padding-bottom: 72px; }
+  #s3 .sf-copy { padding-top: calc(84px + var(--art)); }
   .sf-dots, .sf-back { display: none; }
+}
+@media (max-width: 820px) and (max-height: 620px) {
+  :root { --art: min(46vw, 20svh); }
+  .sf-stage { top: 64px; }
+  .sf-copy, #s3 .sf-copy { padding-top: calc(72px + var(--art)); padding-bottom: 28px; }
+  #s3 .sf-foot { padding-top: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 }
 @media (max-width: 560px) {
   body { font-size: 16px; }
@@ -128,7 +141,10 @@ body.s3 .sf-stitch.a { transition-delay: .9s; } body.s3 .sf-stitch.b { transitio
   .sf-cta { padding: 0 12px; font-size: 14px; }
   .sf-copy h1 { font-size: 30px; }
   .sf-big { font-size: 21px; }
-  .sf-actions .sf-btn { flex: 1 1 100%; }
+  .sf-actions .sf-btn { flex: 1 1 0; min-width: 0; min-height: 48px; padding: 0 12px; font-size: 15px; white-space: nowrap; }
+  .sf-sec h2 { font-size: 22px; }
+  .sf-eyebrow { margin-bottom: 10px; }
+  .sf-viabo { margin-bottom: 12px; font-size: 24px; }
   .sf-facts { grid-template-columns: 1fr; gap: 2px; }
   .sf-facts dd { margin-bottom: 10px; }
 }
@@ -208,8 +224,6 @@ body.s3 .sf-stitch.a { transition-delay: .9s; } body.s3 .sf-stitch.b { transitio
       <h2>Sutura Foundry Limited</h2>
       <dl class="sf-facts">
         <dt>Registration</dt><dd>RC 10015989</dd>
-        <dt>Incorporated</dt><dd>17 November 2026, Nigeria</dd>
-        <dt>Registered office</dt><dd>25 Aliyu Turaki Road, off Isa Kaita Road, Malali GRA, Kaduna, Kaduna State</dd>
         <dt>Product</dt><dd><a href="https://viabo.app">Viabo</a></dd>
         <dt>Email</dt><dd>suturafoundry@gmail.com</dd>
       </dl>
@@ -235,6 +249,8 @@ body.s3 .sf-stitch.a { transition-delay: .9s; } body.s3 .sf-stitch.b { transitio
     const mid = innerHeight / 2;
     let best = 0;
     secs.forEach((el, k) => { const r = el.getBoundingClientRect(); if (r.top <= mid && r.bottom > mid) best = k; });
+    // A section taller than the screen scrolls freely so it can be read in full; snapping returns after.
+    document.documentElement.classList.toggle("free", secs[best].offsetHeight > innerHeight + 4);
     show(best);
   };
   addEventListener("scroll", pick, { passive: true });
